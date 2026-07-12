@@ -21,6 +21,7 @@ import {
 	TerminalSquareIcon,
 	Trash2Icon,
 	WifiIcon,
+	ShieldCheckIcon,
 } from "lucide-react"
 import { memo, useMemo, useRef, useState } from "react"
 import { Tooltip, TooltipContent, TooltipTrigger } from "../ui/tooltip"
@@ -38,6 +39,7 @@ import {
 } from "@/lib/utils"
 import { batteryStateTranslations } from "@/lib/i18n"
 import type { SystemRecord } from "@/types"
+import { updateSummary } from "../routes/system/automatic-updates"
 import { SystemDialog } from "../add-system"
 import AlertButton from "../alerts/alert-button"
 import { $router, Link } from "../router"
@@ -325,6 +327,31 @@ export function SystemsTableColumns(viewMode: "table" | "grid"): ColumnDef<Syste
 						<Icon className={cn("size-3.5", iconColor)} />
 						<span className="min-w-10">{pct}%</span>
 					</Link>
+				)
+			},
+		},
+		{
+			accessorFn: ({ info }) => info.upd?.overall_state,
+			id: "updates",
+			name: () => t`Updates`,
+			size: 80,
+			Icon: ShieldCheckIcon,
+			header: sortableHeader,
+			cell(info) {
+				const status = info.row.original.info.upd
+				if (!status || status.overall_state === "unsupported") return <span className="text-muted-foreground">—</span>
+				return (
+					<span
+						className={cn("whitespace-nowrap", {
+							"text-green-600 dark:text-green-400": status.overall_state === "healthy",
+							"text-blue-600 dark:text-blue-400":
+								status.overall_state === "updates_pending" || status.overall_state === "update_in_progress",
+							"text-orange-600 dark:text-orange-400": status.overall_state === "reboot_required",
+							"text-red-600 dark:text-red-400": status.overall_state === "last_run_failed",
+						})}
+					>
+						{updateSummary(status)}
+					</span>
 				)
 			},
 		},

@@ -1,5 +1,5 @@
 import { t } from "@lingui/core/macro"
-import { CpuIcon, HardDriveIcon, MemoryStickIcon, ServerIcon } from "lucide-react"
+import { CpuIcon, HardDriveIcon, MemoryStickIcon, ServerIcon, ShieldAlertIcon, RotateCwIcon } from "lucide-react"
 import type { RecordSubscription } from "pocketbase"
 import { EthernetIcon, GpuIcon } from "@/components/ui/icons"
 import { $alerts } from "@/lib/stores"
@@ -91,6 +91,51 @@ export const alertInfo: Record<string, AlertInfo> = {
 		desc: () => t`Triggers when battery charge drops below a threshold`,
 		start: 20,
 		invert: true,
+	},
+	"Unattended upgrades package missing": {
+		name: () => t`Unattended upgrades package missing`,
+		unit: "",
+		icon: ShieldAlertIcon,
+		desc: () => t`Triggers when unattended-upgrades is not installed`,
+		singleDesc: () => t`Package missing`,
+	},
+	"Automatic updates disabled": {
+		name: () => t`Automatic updates disabled`,
+		unit: "",
+		icon: ShieldAlertIcon,
+		desc: () => t`Triggers when automatic updates are disabled`,
+		singleDesc: () => t`Automatic updates disabled`,
+	},
+	"Automatic update failed": {
+		name: () => t`Automatic update failed`,
+		unit: "",
+		icon: ShieldAlertIcon,
+		desc: () => t`Triggers when the last automatic update failed`,
+		singleDesc: () => t`Last update failed`,
+	},
+	"Security updates pending": {
+		name: () => t`Security updates pending`,
+		unit: " hours",
+		icon: ShieldAlertIcon,
+		desc: () => t`Triggers when security updates remain pending longer than the threshold`,
+		start: 48,
+		max: 336,
+	},
+	"Reboot required": {
+		name: () => t`Reboot required`,
+		unit: " days",
+		icon: RotateCwIcon,
+		desc: () => t`Triggers when a reboot remains required longer than the threshold`,
+		start: 7,
+		max: 90,
+	},
+	"Update information stale": {
+		name: () => t`Update information stale`,
+		unit: " hours",
+		icon: ShieldAlertIcon,
+		desc: () => t`Triggers when update information is older than the threshold`,
+		start: 24,
+		max: 168,
 	},
 } as const
 

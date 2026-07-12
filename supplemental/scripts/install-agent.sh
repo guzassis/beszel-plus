@@ -623,6 +623,16 @@ else
     echo "Adding beszel to disk group"
     usermod -aG disk beszel
   fi
+
+  # Debian/Ubuntu expose APT logs to adm/systemd-journal. Membership is best-effort;
+  # monitoring remains useful (but partial) when either group is unavailable.
+  if grep -Eq '^ID=("?)(debian|ubuntu)\1$' /etc/os-release 2>/dev/null; then
+    for log_group in adm systemd-journal; do
+      if getent group "$log_group" >/dev/null 2>&1; then
+        usermod -aG "$log_group" beszel || echo "Warning: could not add beszel to $log_group"
+      fi
+    done
+  fi
 fi
 
 # Create the directory for the Beszel Agent
@@ -649,12 +659,8 @@ fi
 
 # Determine version to install
 if [ "$VERSION" = "latest" ]; then
-  INSTALL_VERSION=$(curl -s "https://get.beszel.dev/latest-version")
-  if [ -z "$INSTALL_VERSION" ]; then
-    # Fallback to GitHub API
-    API_RELEASE_URL="https://api.github.com/repos/henrygd/beszel/releases/latest"
-    INSTALL_VERSION=$(curl -s "$API_RELEASE_URL" | grep -o '"tag_name": "v[^"]*"' | cut -d'"' -f4 | tr -d 'v')
-  fi
+  API_RELEASE_URL="https://api.github.com/repos/guzassis/beszel-plus/releases/latest"
+  INSTALL_VERSION=$(curl -s "$API_RELEASE_URL" | grep -o '"tag_name": "v[^"]*"' | cut -d'"' -f4 | tr -d 'v')
   if [ -z "$INSTALL_VERSION" ]; then
     echo "Failed to get latest version"
     exit 1
@@ -670,7 +676,7 @@ echo "Downloading beszel-agent v${INSTALL_VERSION}..."
 # Download checksums file
 TEMP_DIR=$(mktemp -d)
 cd "$TEMP_DIR" || exit 1
-CHECKSUM=$(curl -fsSL "$GITHUB_URL/henrygd/beszel/releases/download/v${INSTALL_VERSION}/beszel_${INSTALL_VERSION}_checksums.txt" | grep "$FILE_NAME" | cut -d' ' -f1)
+CHECKSUM=$(curl -fsSL "$GITHUB_URL/guzassis/beszel-plus/releases/download/v${INSTALL_VERSION}/beszel_${INSTALL_VERSION}_checksums.txt" | grep "$FILE_NAME" | cut -d' ' -f1)
 if [ -z "$CHECKSUM" ] || ! echo "$CHECKSUM" | grep -qE "^[a-fA-F0-9]{64}$"; then
   echo "Failed to get checksum or invalid checksum format"
   echo "Try again with --mirror (or --mirror <url>) if GitHub is not reachable."
@@ -678,8 +684,8 @@ if [ -z "$CHECKSUM" ] || ! echo "$CHECKSUM" | grep -qE "^[a-fA-F0-9]{64}$"; then
   exit 1
 fi
 
-if ! curl -fL# --retry 3 --retry-delay 2 --connect-timeout 10 "$GITHUB_URL/henrygd/beszel/releases/download/v${INSTALL_VERSION}/$FILE_NAME" -o "$FILE_NAME"; then
-  echo "Failed to download the agent from $GITHUB_URL/henrygd/beszel/releases/download/v${INSTALL_VERSION}/$FILE_NAME"
+if ! curl -fL# --retry 3 --retry-delay 2 --connect-timeout 10 "$GITHUB_URL/guzassis/beszel-plus/releases/download/v${INSTALL_VERSION}/$FILE_NAME" -o "$FILE_NAME"; then
+  echo "Failed to download the agent from $GITHUB_URL/guzassis/beszel-plus/releases/download/v${INSTALL_VERSION}/$FILE_NAME"
   echo "Try again with --mirror (or --mirror <url>) if GitHub is not reachable."
   rm -rf "$TEMP_DIR"
   exit 1
@@ -987,6 +993,10 @@ Environment="PORT=$PORT"
 Environment="KEY=$KEY"
 Environment="TOKEN=$TOKEN"
 Environment="HUB_URL=$HUB_URL"
+Environment="UPDATE_MONITORING=true"
+Environment="UPDATE_CHECK_INTERVAL=6h"
+Environment="UPDATE_CHECK_TIMEOUT=30s"
+Environment="UPDATE_MAX_PACKAGE_LIST=50"
 # Environment="EXTRA_FILESYSTEMS=sdb"
 ExecStart=$BIN_PATH
 User=beszel
@@ -1013,6 +1023,17 @@ EOF
   else
     echo "Systemd service file already exists. Skipping creation."
   fi
+
+  # Keep monitoring enabled when upgrading an existing installation without
+  # rewriting the user's service file.
+  mkdir -p /etc/systemd/system/beszel-agent.service.d
+  cat >/etc/systemd/system/beszel-agent.service.d/update-monitoring.conf <<EOF
+[Service]
+Environment="UPDATE_MONITORING=true"
+Environment="UPDATE_CHECK_INTERVAL=6h"
+Environment="UPDATE_CHECK_TIMEOUT=30s"
+Environment="UPDATE_MAX_PACKAGE_LIST=50"
+EOF
 
   # Load and start the service
   printf "\nLoading and starting the agent service...\n"
