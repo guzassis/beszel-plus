@@ -1,0 +1,13 @@
+[Unit]
+Description=Beszel maintenance helper socket
+
+[Socket]
+ListenStream=/run/beszel-maintenance.sock
+SocketUser=root
+SocketGroup=beszel
+SocketMode=0660
+Accept=yes
+RemoveOnStop=yes
+
+[Install]
+WantedBy=sockets.target

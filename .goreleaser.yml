@@ -88,7 +88,27 @@ builds:
     goarch:
       - amd64
 
+  - id: beszel-maintenance-helper
+    binary: beszel-maintenance-helper
+    main: internal/cmd/maintenance-helper/main.go
+    env:
+      - CGO_ENABLED=0
+    goos:
+      - linux
+    goarch:
+      - amd64
+      - arm64
+      - arm
+
 archives:
+  - id: beszel-maintenance-helper
+    formats: [tar.gz]
+    ids:
+      - beszel-maintenance-helper
+    name_template: >-
+      {{ .Binary }}_
+      {{- .Os }}_
+      {{- .Arch }}
   - id: beszel-agent
     formats: [tar.gz]
     ids:
