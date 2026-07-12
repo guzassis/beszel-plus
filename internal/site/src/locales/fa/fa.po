@@ -18,6 +18,17 @@ msgstr ""
 "X-Crowdin-File: /main/internal/site/src/locales/en/en.po\n"
 "X-Crowdin-File-ID: 32\n"
 
+#. placeholder {0}: status.cache_age_seconds
+#: src/components/routes/system/automatic-updates.tsx
+msgid "{0, plural, one {# second old} other {# seconds old}}"
+msgstr "{0, plural, one {# second old} other {# seconds old}}"
+
+#. placeholder {0}: operationLabel()
+#. placeholder {1}: states[state]?.() ?? state
+#: src/components/alerts-history-columns.tsx
+msgid "{0} · {1}"
+msgstr "{0} · {1}"
+
 #. placeholder {0}: newVersion.v
 #: src/components/footer-repo-link.tsx
 msgctxt "New version available"
@@ -46,9 +57,18 @@ msgstr "{count, plural, one {{countString} ساعت} other {{countString} ساع
 msgid "{count, plural, one {{countString} minute} few {{countString} minutes} many {{countString} minutes} other {{countString} minutes}}"
 msgstr "{count, plural, one {{countString} دقیقه} few {{countString} دقیقه} many {{countString} دقیقه} other {{countString} دقیقه}}"
 
+#: src/components/routes/system/automatic-updates.tsx
+msgid "{eligible, plural, one {# update} other {# updates}}"
+msgstr "{eligible, plural, one {# update} other {# updates}}"
+
 #: src/components/routes/system/info-bar.tsx
 msgid "{threads, plural, one {# thread} other {# threads}}"
 msgstr "{threads, plural, one {# رشته} other {# رشته}}"
+
+#. placeholder {0}: status.pending_security_updates
+#: src/components/routes/system/automatic-updates.tsx
+msgid "{updates} · {0} security"
+msgstr "{updates} · {0} security"
 
 #: src/lib/utils.ts
 msgid "1 hour"
@@ -101,6 +121,7 @@ msgstr "عملیات"
 #: src/components/routes/settings/alerts-history-data-table.tsx
 #: src/components/routes/settings/heartbeat.tsx
 #: src/components/routes/settings/quiet-hours.tsx
+#: src/components/routes/system/automatic-updates.tsx
 msgid "Active"
 msgstr "فعال"
 
@@ -151,6 +172,10 @@ msgstr "پس از تنظیم متغیرهای محیطی، هاب Beszel خود 
 msgid "Agent"
 msgstr "عامل"
 
+#: src/components/alerts-history-columns.tsx
+msgid "Agent incompatible with maintenance operations"
+msgstr "Agent incompatible with maintenance operations"
+
 #: src/components/command-palette.tsx
 #: src/components/routes/settings/alerts-history-data-table.tsx
 #: src/components/routes/settings/layout.tsx
@@ -170,6 +195,10 @@ msgstr "هشدارها"
 msgid "All Containers"
 msgstr "همه کانتینرها"
 
+#: src/components/routes/system/automatic-updates.tsx
+msgid "All official updates"
+msgstr "All official updates"
+
 #: src/components/alerts/alerts-sheet.tsx
 #: src/components/command-palette.tsx
 #: src/components/routes/home.tsx
@@ -179,6 +208,10 @@ msgstr "همه کانتینرها"
 msgid "All Systems"
 msgstr "همه سیستم‌ها"
 
+#: src/components/alerts-history-columns.tsx
+msgid "Apply update policy"
+msgstr "Apply update policy"
+
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Are you sure you want to delete {name}?"
 msgstr "آیا مطمئن هستید که می‌خواهید {name} را حذف کنید؟"
@@ -187,22 +220,49 @@ msgstr "آیا مطمئن هستید که می‌خواهید {name} را حذف
 msgid "Are you sure?"
 msgstr "آیا مطمئن هستید؟"
 
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Automatic"
+msgstr "Automatic"
+
 #: src/components/copy-to-clipboard.tsx
 msgid "Automatic copy requires a secure context."
 msgstr "کپی خودکار نیاز به یک زمینه امن دارد."
 
+#: src/components/routes/system/automatic-updates.tsx
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Automatic reboot"
+msgstr "Automatic reboot"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Automatic reboot can interrupt running services. It is disabled by default."
+msgstr "Automatic reboot can interrupt running services. It is disabled by default."
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Automatic reboot time"
+msgstr "Automatic reboot time"
+
 #: src/lib/alerts.ts
 msgid "Automatic update failed"
-msgstr ""
+msgstr "Automatic update failed"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Automatic update frequency (days)"
+msgstr "Automatic update frequency (days)"
 
 #: src/components/routes/system/automatic-updates.tsx
 msgid "Automatic updates"
-msgstr ""
+msgstr "Automatic updates"
 
+#: src/components/alerts-history-columns.tsx
+#: src/components/routes/system/automatic-updates.tsx
 #: src/lib/alerts.ts
 #: src/lib/alerts.ts
 msgid "Automatic updates disabled"
-msgstr ""
+msgstr "Automatic updates disabled"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Available updates"
+msgstr "Available updates"
 
 #: src/components/routes/system/chart-card.tsx
 msgid "Average"
@@ -414,10 +474,34 @@ msgstr "برای مشاهده اطلاعات بیشتر روی یک سیستم �
 msgid "Click to copy"
 msgstr "برای کپی کردن کلیک کنید"
 
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Collected"
+msgstr "Collected"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Collection error"
+msgstr "Collection error"
+
 #: src/components/login/forgot-pass-form.tsx
 #: src/components/login/forgot-pass-form.tsx
 msgid "Command line instructions"
 msgstr "دستورالعمل‌های خط فرمان"
+
+#: src/components/alerts-history-columns.tsx
+msgid "Completed"
+msgstr "Completed"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Configuration"
+msgstr "Configuration"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Configure"
+msgstr "Configure"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Configure automatic updates"
+msgstr "Configure automatic updates"
 
 #: src/components/routes/settings/notifications.tsx
 msgid "Configure how you receive alert notifications."
@@ -564,6 +648,10 @@ msgstr "آپلود تجمعی"
 msgid "Current state"
 msgstr "وضعیت فعلی"
 
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Custom repositories"
+msgstr "Custom repositories"
+
 #. Power Cycles
 #: src/components/routes/system/smart-table.tsx
 msgid "Cycles"
@@ -602,9 +690,21 @@ msgstr "توضیحات"
 msgid "Detail"
 msgstr "جزئیات"
 
+#: src/components/alerts-history-columns.tsx
+msgid "Detect repositories"
+msgstr "Detect repositories"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Detected repositories"
+msgstr "Detected repositories"
+
 #: src/components/routes/system/smart-table.tsx
 msgid "Device"
 msgstr "دستگاه"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Disabled"
+msgstr "Disabled"
 
 #. Context: Battery state
 #: src/lib/i18n.ts
@@ -686,6 +786,10 @@ msgstr "ویرایش"
 msgid "Edit {foo}"
 msgstr "ویرایش {foo}"
 
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Eligible updates"
+msgstr "Eligible updates"
+
 #: src/components/login/auth-form.tsx
 #: src/components/login/forgot-pass-form.tsx
 #: src/components/login/otp-forms.tsx
@@ -700,6 +804,10 @@ msgstr "اعلان‌های ایمیلی"
 #: src/lib/i18n.ts
 msgid "Empty"
 msgstr "خالی"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Enabled"
+msgstr "Enabled"
 
 #: src/components/routes/settings/quiet-hours.tsx
 #: src/components/routes/settings/quiet-hours.tsx
@@ -743,6 +851,10 @@ msgstr "گذرا"
 msgid "Error"
 msgstr "خطا"
 
+#: src/components/alerts-history-columns.tsx
+msgid "Event"
+msgstr "Event"
+
 #: src/components/routes/settings/heartbeat.tsx
 msgid "Example:"
 msgstr "مثال:"
@@ -753,6 +865,10 @@ msgstr "مثال:"
 #: src/components/active-alerts.tsx
 msgid "Exceeds {0}{1} in last {2, plural, one {# minute} other {# minutes}}"
 msgstr "در {2, plural, one {# دقیقه} other {# دقیقه}} گذشته از {0}{1} بیشتر است"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Excluded repositories"
+msgstr "Excluded repositories"
 
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Exec main PID"
@@ -786,6 +902,8 @@ msgstr "پیکربندی سیستم‌های فعلی خود را خارج کن�
 msgid "Fahrenheit (°F)"
 msgstr "فارنهایت (°F)"
 
+#: src/components/alerts-history-columns.tsx
+#: src/components/routes/system/automatic-updates.tsx
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Failed"
 msgstr "ناموفق"
@@ -923,6 +1041,10 @@ msgstr "متد HTTP"
 msgid "HTTP method: POST, GET, or HEAD (default: POST)"
 msgstr "متد HTTP: POST، GET، یا HEAD (پیش‌فرض: POST)"
 
+#: src/components/routes/system/automatic-updates.tsx
+msgid "I explicitly confirm the selected third-party repositories"
+msgstr "I explicitly confirm the selected third-party repositories"
+
 #: src/components/routes/system/disk-io-sheet.tsx
 msgctxt "Disk I/O average operation time (iostat await)"
 msgid "I/O Await"
@@ -953,8 +1075,25 @@ msgid "Image"
 msgstr "تصویر"
 
 #: src/components/routes/settings/quiet-hours.tsx
+#: src/components/routes/system/automatic-updates.tsx
 msgid "Inactive"
 msgstr "غیرفعال"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Install required dependencies"
+msgstr "Install required dependencies"
+
+#: src/components/alerts-history-columns.tsx
+msgid "Install update dependencies"
+msgstr "Install update dependencies"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Installed"
+msgstr "Installed"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Installed, not configured"
+msgstr "Installed, not configured"
 
 #: src/components/routes/settings/heartbeat.tsx
 msgid "Interval"
@@ -969,9 +1108,25 @@ msgstr "آدرس ایمیل نامعتبر است."
 msgid "Language"
 msgstr "زبان"
 
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Last check"
+msgstr "Last check"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Last result"
+msgstr "Last result"
+
 #: src/lib/alerts.ts
 msgid "Last update failed"
-msgstr ""
+msgstr "Last update failed"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Last upgrade"
+msgstr "Last upgrade"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Last upgrade failed"
+msgstr "Last upgrade failed"
 
 #: src/components/systems-table/systems-table.tsx
 msgid "Layout"
@@ -1047,14 +1202,38 @@ msgstr "به دنبال جایی برای ایجاد هشدار هستید؟ ر�
 msgid "Main PID"
 msgstr "PID اصلی"
 
+#: src/components/alerts-history-columns.tsx
+msgid "Maintenance event"
+msgstr "Maintenance event"
+
+#: src/components/alerts-history-columns.tsx
+msgid "Maintenance helper incompatible"
+msgstr "Maintenance helper incompatible"
+
+#: src/components/alerts-history-columns.tsx
+msgid "Maintenance operation refused"
+msgstr "Maintenance operation refused"
+
+#: src/components/alerts-history-columns.tsx
+msgid "Maintenance operation timed out"
+msgstr "Maintenance operation timed out"
+
 #: src/components/routes/settings/layout.tsx
 msgid "Manage display and notification preferences."
 msgstr "مدیریت تنظیمات نمایش و اعلان‌ها."
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Manual"
+msgstr "Manual"
 
 #: src/components/add-system.tsx
 #: src/components/routes/settings/tokens-fingerprints.tsx
 msgid "Manual setup instructions"
 msgstr "دستورالعمل‌های راه‌اندازی دستی"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Manual updates"
+msgstr "Manual updates"
 
 #. Chart select field. Please try to keep this short.
 #: src/components/routes/system/chart-card.tsx
@@ -1087,10 +1266,19 @@ msgstr "میزان استفاده از حافظه"
 msgid "Memory usage of docker containers"
 msgstr "میزان استفاده از حافظه کانتینرهای داکر"
 
+#: src/components/routes/system/automatic-updates.tsx
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Missing"
+msgstr "Missing"
+
 #. Device model
 #: src/components/routes/system/smart-table.tsx
 msgid "Model"
 msgstr "مدل"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Monitoring only"
+msgstr "Monitoring only"
 
 #: src/components/add-system.tsx
 #: src/components/alerts-history-columns.tsx
@@ -1121,6 +1309,11 @@ msgstr "ترافیک شبکه رابط‌های عمومی"
 msgid "Network unit"
 msgstr "واحد شبکه"
 
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Never run"
+msgstr "Never run"
+
+#: src/components/routes/system/automatic-updates.tsx
 #: src/components/systemd-table/systemd-table.tsx
 #: src/components/systemd-table/systemd-table.tsx
 #: src/components/systemd-table/systemd-table.tsx
@@ -1150,6 +1343,14 @@ msgstr "هیچ ویژگی S.M.A.R.T برای این دستگاه موجود نی
 msgid "No systems found."
 msgstr "هیچ سیستمی یافت نشد."
 
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Not found"
+msgstr "Not found"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Not installed"
+msgstr "Not installed"
+
 #: src/components/command-palette.tsx
 #: src/components/routes/settings/layout.tsx
 #: src/components/routes/settings/notifications.tsx
@@ -1159,6 +1360,10 @@ msgstr "اعلان‌ها"
 #: src/components/login/auth-form.tsx
 msgid "OAuth 2 / OIDC support"
 msgstr "پشتیبانی از OAuth 2 / OIDC"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Official repository"
+msgstr "Official repository"
 
 #: src/components/routes/settings/config-yaml.tsx
 msgid "On each restart, systems in the database will be updated to match the systems defined in the file."
@@ -1181,6 +1386,29 @@ msgstr "رمز عبور یک‌بار مصرف"
 msgid "Open menu"
 msgstr "باز کردن منو"
 
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Operation completed successfully"
+msgstr "Operation completed successfully"
+
+#: src/components/routes/system/automatic-updates.tsx
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Operation failed"
+msgstr "Operation failed"
+
+#. placeholder {0}: response.progress ?? 0
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Operation in progress: {0}%"
+msgstr "Operation in progress: {0}%"
+
+#: src/components/routes/system/automatic-updates.tsx
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Operation queued"
+msgstr "Operation queued"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Operation result"
+msgstr "Operation result"
+
 #: src/components/login/auth-form.tsx
 msgid "Or continue with"
 msgstr "یا ادامه با"
@@ -1193,9 +1421,13 @@ msgstr "سایر"
 msgid "Overwrite existing alerts"
 msgstr "بازنویسی هشدارهای موجود"
 
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Package list frequency (days)"
+msgstr "Package list frequency (days)"
+
 #: src/lib/alerts.ts
 msgid "Package missing"
-msgstr ""
+msgstr "Package missing"
 
 #: src/components/command-palette.tsx
 #: src/components/command-palette.tsx
@@ -1212,6 +1444,10 @@ msgstr "صفحه {0} از {1}"
 #: src/components/command-palette.tsx
 msgid "Pages / Settings"
 msgstr "صفحات / تنظیمات"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Partial"
+msgstr "Partial"
 
 #: src/components/login/auth-form.tsx
 #: src/components/login/auth-form.tsx
@@ -1327,6 +1563,10 @@ msgstr "میزان دقیق استفاده در زمان ثبت شده"
 msgid "Preferred Language"
 msgstr "زبان ترجیحی"
 
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Privileged helper unavailable. Reinstall or upgrade the Agent with OS update management enabled."
+msgstr "Privileged helper unavailable. Reinstall or upgrade the Agent with OS update management enabled."
+
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Process started"
 msgstr "فرآیند شروع شد"
@@ -1341,6 +1581,10 @@ msgctxt "Disk I/O average queue depth"
 msgid "Queue Depth"
 msgstr "عمق صف"
 
+#: src/components/alerts-history-columns.tsx
+msgid "Queued"
+msgstr "Queued"
+
 #: src/components/routes/settings/quiet-hours.tsx
 msgid "Quiet Hours"
 msgstr "ساعات آرام"
@@ -1353,13 +1597,36 @@ msgstr "ساعات آرام"
 msgid "Read"
 msgstr "خواندن"
 
+#: src/components/alerts-history-columns.tsx
+msgid "Read operation status"
+msgstr "Read operation status"
+
+#: src/components/alerts-history-columns.tsx
+msgid "Read update policy"
+msgstr "Read update policy"
+
+#: src/components/alerts-history-columns.tsx
+#: src/components/routes/system/automatic-updates.tsx
+#: src/components/routes/system/automatic-updates.tsx
 #: src/lib/alerts.ts
 msgid "Reboot required"
-msgstr ""
+msgstr "Reboot required"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Reboot required by"
+msgstr "Reboot required by"
+
+#: src/components/alerts-history-columns.tsx
+msgid "Reboot requirement cleared"
+msgstr "Reboot requirement cleared"
 
 #: src/components/routes/system/charts/network-charts.tsx
 msgid "Received"
 msgstr "دریافت شد"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Recently updated"
+msgstr "Recently updated"
 
 #: src/components/containers-table/containers-table.tsx
 #: src/components/containers-table/containers-table.tsx
@@ -1370,6 +1637,11 @@ msgstr "تازه‌سازی"
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Relationships"
 msgstr "روابط"
+
+#: src/components/routes/system/automatic-updates.tsx
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Remove unused dependencies"
+msgstr "Remove unused dependencies"
 
 #: src/components/login/login.tsx
 msgid "Request a one-time password"
@@ -1418,6 +1690,31 @@ msgstr "چرخش توکن"
 msgid "Rows per page"
 msgstr "ردیف در هر صفحه"
 
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Run dry-run"
+msgstr "Run dry-run"
+
+#: src/components/alerts-history-columns.tsx
+msgid "Run system updates"
+msgstr "Run system updates"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Run system updates now?"
+msgstr "Run system updates now?"
+
+#: src/components/alerts-history-columns.tsx
+msgid "Run update dry-run"
+msgstr "Run update dry-run"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Run updates now"
+msgstr "Run updates now"
+
+#: src/components/alerts-history-columns.tsx
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Running"
+msgstr "Running"
+
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Runtime Metrics"
 msgstr "معیارهای زمان اجرا"
@@ -1437,6 +1734,10 @@ msgstr "ذخیره {foo}"
 #: src/components/routes/settings/notifications.tsx
 msgid "Save address using enter key or comma. Leave blank to disable email notifications."
 msgstr "آدرس را با استفاده از کلید Enter یا کاما ذخیره کنید. برای غیرفعال کردن اعلان‌های ایمیلی، خالی بگذارید."
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Save and apply"
+msgstr "Save and apply"
 
 #: src/components/routes/settings/general.tsx
 #: src/components/routes/settings/notifications.tsx
@@ -1471,9 +1772,18 @@ msgstr "جستجو برای سیستم‌ها یا تنظیمات..."
 msgid "Seconds between pings (default: 60)"
 msgstr "ثانیه بین پینگ‌ها (پیش‌فرض: ۶۰)"
 
+#: src/components/routes/system/automatic-updates.tsx
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Security updates"
+msgstr "Security updates"
+
+#: src/components/alerts-history-columns.tsx
+msgid "Security updates available"
+msgstr "Security updates available"
+
 #: src/lib/alerts.ts
 msgid "Security updates pending"
-msgstr ""
+msgstr "Security updates pending"
 
 #: src/components/alerts/alerts-sheet.tsx
 msgid "See <0>notification settings</0> to configure how you receive alerts."
@@ -1502,6 +1812,10 @@ msgstr "ارسال شد"
 #: src/components/routes/system/smart-table.tsx
 msgid "Serial Number"
 msgstr "شماره سریال"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Service"
+msgstr "Service"
 
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Service Details"
@@ -1546,6 +1860,10 @@ msgstr "تنظیمات SMTP"
 msgid "Sort By"
 msgstr "مرتب‌سازی بر اساس"
 
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Stale data"
+msgstr "Stale data"
+
 #: src/components/routes/settings/quiet-hours.tsx
 #: src/components/routes/settings/quiet-hours.tsx
 msgid "Start Time"
@@ -1559,6 +1877,7 @@ msgid "State"
 msgstr "وضعیت"
 
 #: src/components/containers-table/containers-table-columns.tsx
+#: src/components/routes/system/automatic-updates.tsx
 #: src/components/routes/system/smart-table.tsx
 #: src/components/systemd-table/systemd-table.tsx
 #: src/components/systems-table/systems-table.tsx
@@ -1569,6 +1888,10 @@ msgstr "وضعیت"
 #: src/components/systemd-table/systemd-table-columns.tsx
 msgid "Sub State"
 msgstr "وضعیت فرعی"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Success"
+msgstr "Success"
 
 #: src/components/routes/system/charts/memory-charts.tsx
 msgid "Swap space used by the system"
@@ -1658,6 +1981,10 @@ msgstr "تست ضربان قلب"
 msgid "Test notification sent"
 msgstr "اعلان آزمایشی ارسال شد"
 
+#: src/components/routes/system/automatic-updates.tsx
+msgid "The Agent remains unprivileged. A restricted local helper applies validated APT policies."
+msgstr "The Agent remains unprivileged. A restricted local helper applies validated APT policies."
+
 #: src/components/routes/settings/heartbeat.tsx
 msgid "The overall status is <0>ok</0> when all systems are up, <1>warn</1> when alerts are triggered, and <2>error</2> when any system is down."
 msgstr "وضعیت کلی زمانی <0>ok</0> است که همه سیستم‌ها بالا باشند، <1>warn</1> زمانی که هشدارها فعال شوند، و <2>error</2> زمانی که هر سیستمی پایین باشد."
@@ -1665,6 +1992,10 @@ msgstr "وضعیت کلی زمانی <0>ok</0> است که همه سیستم‌�
 #: src/components/login/forgot-pass-form.tsx
 msgid "Then log into the backend and reset your user account password in the users table."
 msgstr "سپس وارد بخش پشتیبان شوید و رمز عبور حساب کاربری خود را در جدول کاربران بازنشانی کنید."
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Third-party repository"
+msgstr "Third-party repository"
 
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "This action cannot be undone. This will permanently delete all current records for {name} from the database."
@@ -1763,7 +2094,7 @@ msgstr "هنگامی که میانگین بار ۵ دقیقه‌ای از یک �
 
 #: src/lib/alerts.ts
 msgid "Triggers when a reboot remains required longer than the threshold"
-msgstr ""
+msgstr "Triggers when a reboot remains required longer than the threshold"
 
 #: src/lib/alerts.ts
 msgid "Triggers when any sensor exceeds a threshold"
@@ -1771,7 +2102,7 @@ msgstr "هنگامی که هر حسگری از یک آستانه فراتر رو
 
 #: src/lib/alerts.ts
 msgid "Triggers when automatic updates are disabled"
-msgstr ""
+msgstr "Triggers when automatic updates are disabled"
 
 #: src/lib/alerts.ts
 msgid "Triggers when battery charge drops below a threshold"
@@ -1799,7 +2130,7 @@ msgstr "هنگامی که میزان استفاده از حافظه از یک آ
 
 #: src/lib/alerts.ts
 msgid "Triggers when security updates remain pending longer than the threshold"
-msgstr ""
+msgstr "Triggers when security updates remain pending longer than the threshold"
 
 #: src/lib/alerts.ts
 msgid "Triggers when status switches between up and down"
@@ -1807,15 +2138,15 @@ msgstr "هنگامی که وضعیت بین بالا و پایین تغییر م
 
 #: src/lib/alerts.ts
 msgid "Triggers when the last automatic update failed"
-msgstr ""
+msgstr "Triggers when the last automatic update failed"
 
 #: src/lib/alerts.ts
 msgid "Triggers when unattended-upgrades is not installed"
-msgstr ""
+msgstr "Triggers when unattended-upgrades is not installed"
 
 #: src/lib/alerts.ts
 msgid "Triggers when update information is older than the threshold"
-msgstr ""
+msgstr "Triggers when update information is older than the threshold"
 
 #: src/lib/alerts.ts
 msgid "Triggers when usage of any disk exceeds a threshold"
@@ -1827,9 +2158,21 @@ msgstr "هنگامی که استفاده از هر دیسکی از یک آستا
 msgid "Type"
 msgstr "نوع"
 
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Unable to load update policy"
+msgstr "Unable to load update policy"
+
 #: src/lib/alerts.ts
 msgid "Unattended upgrades package missing"
-msgstr ""
+msgstr "Unattended upgrades package missing"
+
+#: src/components/alerts-history-columns.tsx
+msgid "Unauthorized maintenance attempt"
+msgstr "Unauthorized maintenance attempt"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Unavailable"
+msgstr "Unavailable"
 
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Unit file"
@@ -1846,6 +2189,12 @@ msgid "Universal token"
 msgstr "توکن جهانی"
 
 #. Context: Battery state
+#: src/components/routes/system/automatic-updates.tsx
+#: src/components/routes/system/automatic-updates.tsx
+#: src/components/routes/system/automatic-updates.tsx
+#: src/components/routes/system/automatic-updates.tsx
+#: src/components/routes/system/automatic-updates.tsx
+#: src/components/routes/system/automatic-updates.tsx
 #: src/lib/i18n.ts
 msgid "Unknown"
 msgstr "ناشناخته"
@@ -1854,6 +2203,10 @@ msgstr "ناشناخته"
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Unlimited"
 msgstr "نامحدود"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Unsupported"
+msgstr "Unsupported"
 
 #. Context: System is up
 #: src/components/routes/system/info-bar.tsx
@@ -1865,13 +2218,34 @@ msgstr "فعال"
 msgid "Up ({upSystemsLength})"
 msgstr "فعال ({upSystemsLength})"
 
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Up to date"
+msgstr "Up to date"
+
 #: src/components/routes/settings/quiet-hours.tsx
 msgid "Update"
 msgstr "به‌روزرسانی"
 
+#: src/components/routes/system/automatic-updates.tsx
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Update failed"
+msgstr "Update failed"
+
 #: src/lib/alerts.ts
 msgid "Update information stale"
-msgstr ""
+msgstr "Update information stale"
+
+#: src/components/alerts-history-columns.tsx
+msgid "Update monitoring error"
+msgstr "Update monitoring error"
+
+#: src/components/alerts-history-columns.tsx
+msgid "Update package not installed"
+msgstr "Update package not installed"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Update policy"
+msgstr "Update policy"
 
 #: src/components/containers-table/containers-table-columns.tsx
 #: src/components/routes/system/smart-table.tsx
@@ -1886,6 +2260,38 @@ msgstr "هر ۱۰ دقیقه به‌روزرسانی می‌شود."
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Updates"
 msgstr ""
+
+#: src/components/alerts-history-columns.tsx
+msgid "Updates available"
+msgstr "Updates available"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Updates completed successfully"
+msgstr "Updates completed successfully"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Updates pending"
+msgstr "Updates pending"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Updating"
+msgstr "Updating"
+
+#: src/components/alerts-history-columns.tsx
+msgid "Upgrade completed"
+msgstr "Upgrade completed"
+
+#: src/components/alerts-history-columns.tsx
+msgid "Upgrade failed"
+msgstr "Upgrade failed"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Upgrade source"
+msgstr "Upgrade source"
+
+#: src/components/alerts-history-columns.tsx
+msgid "Upgrade started"
+msgstr "Upgrade started"
 
 #: src/components/routes/system/network-sheet.tsx
 msgid "Upload"
@@ -1922,6 +2328,14 @@ msgstr "کاربران"
 msgctxt "Disk I/O utilization"
 msgid "Utilization"
 msgstr "بهره‌وری"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Validate"
+msgstr "Validate"
+
+#: src/components/alerts-history-columns.tsx
+msgid "Validate update policy"
+msgstr "Validate update policy"
 
 #: src/components/alerts-history-columns.tsx
 msgid "Value"
@@ -1999,6 +2413,7 @@ msgstr "پیکربندی YAML"
 msgid "YAML Configuration"
 msgstr "پیکربندی YAML"
 
+#: src/components/routes/system/automatic-updates.tsx
 #: src/components/systemd-table/systemd-table.tsx
 #: src/components/systemd-table/systemd-table.tsx
 #: src/components/systemd-table/systemd-table.tsx

@@ -18,6 +18,17 @@ msgstr ""
 "X-Crowdin-File: /main/internal/site/src/locales/en/en.po\n"
 "X-Crowdin-File-ID: 32\n"
 
+#. placeholder {0}: status.cache_age_seconds
+#: src/components/routes/system/automatic-updates.tsx
+msgid "{0, plural, one {# second old} other {# seconds old}}"
+msgstr "{0, plural, one {# second old} other {# seconds old}}"
+
+#. placeholder {0}: operationLabel()
+#. placeholder {1}: states[state]?.() ?? state
+#: src/components/alerts-history-columns.tsx
+msgid "{0} · {1}"
+msgstr "{0} · {1}"
+
 #. placeholder {0}: newVersion.v
 #: src/components/footer-repo-link.tsx
 msgctxt "New version available"
@@ -46,9 +57,18 @@ msgstr "{count, plural, one {{countString} שעה} two {{countString} שעות} 
 msgid "{count, plural, one {{countString} minute} few {{countString} minutes} many {{countString} minutes} other {{countString} minutes}}"
 msgstr "{count, plural, one {{countString} דקה} two {{countString} דקות} other {{countString} דקות}}"
 
+#: src/components/routes/system/automatic-updates.tsx
+msgid "{eligible, plural, one {# update} other {# updates}}"
+msgstr "{eligible, plural, one {# update} other {# updates}}"
+
 #: src/components/routes/system/info-bar.tsx
 msgid "{threads, plural, one {# thread} other {# threads}}"
 msgstr "{threads, plural, one {# תהליכון} other {# תהליכונים}}"
+
+#. placeholder {0}: status.pending_security_updates
+#: src/components/routes/system/automatic-updates.tsx
+msgid "{updates} · {0} security"
+msgstr "{updates} · {0} security"
 
 #: src/lib/utils.ts
 msgid "1 hour"
@@ -101,6 +121,7 @@ msgstr "פעולות"
 #: src/components/routes/settings/alerts-history-data-table.tsx
 #: src/components/routes/settings/heartbeat.tsx
 #: src/components/routes/settings/quiet-hours.tsx
+#: src/components/routes/system/automatic-updates.tsx
 msgid "Active"
 msgstr "פעיל"
 
@@ -151,6 +172,10 @@ msgstr "לאחר הגדרת משתני הסביבה, הפעל מחדש את ה-B
 msgid "Agent"
 msgstr "סוכן"
 
+#: src/components/alerts-history-columns.tsx
+msgid "Agent incompatible with maintenance operations"
+msgstr "Agent incompatible with maintenance operations"
+
 #: src/components/command-palette.tsx
 #: src/components/routes/settings/alerts-history-data-table.tsx
 #: src/components/routes/settings/layout.tsx
@@ -170,6 +195,10 @@ msgstr "התראות"
 msgid "All Containers"
 msgstr "כל הקונטיינרים"
 
+#: src/components/routes/system/automatic-updates.tsx
+msgid "All official updates"
+msgstr "All official updates"
+
 #: src/components/alerts/alerts-sheet.tsx
 #: src/components/command-palette.tsx
 #: src/components/routes/home.tsx
@@ -179,6 +208,10 @@ msgstr "כל הקונטיינרים"
 msgid "All Systems"
 msgstr "כל המערכות"
 
+#: src/components/alerts-history-columns.tsx
+msgid "Apply update policy"
+msgstr "Apply update policy"
+
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Are you sure you want to delete {name}?"
 msgstr "האם אתה בטוח שברצונך למחוק את {name}?"
@@ -187,22 +220,49 @@ msgstr "האם אתה בטוח שברצונך למחוק את {name}?"
 msgid "Are you sure?"
 msgstr "האם אתה בטוח?"
 
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Automatic"
+msgstr "Automatic"
+
 #: src/components/copy-to-clipboard.tsx
 msgid "Automatic copy requires a secure context."
 msgstr "העתקה אוטומטית דורשת הקשר מאובטח."
 
+#: src/components/routes/system/automatic-updates.tsx
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Automatic reboot"
+msgstr "Automatic reboot"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Automatic reboot can interrupt running services. It is disabled by default."
+msgstr "Automatic reboot can interrupt running services. It is disabled by default."
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Automatic reboot time"
+msgstr "Automatic reboot time"
+
 #: src/lib/alerts.ts
 msgid "Automatic update failed"
-msgstr ""
+msgstr "Automatic update failed"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Automatic update frequency (days)"
+msgstr "Automatic update frequency (days)"
 
 #: src/components/routes/system/automatic-updates.tsx
 msgid "Automatic updates"
-msgstr ""
+msgstr "Automatic updates"
 
+#: src/components/alerts-history-columns.tsx
+#: src/components/routes/system/automatic-updates.tsx
 #: src/lib/alerts.ts
 #: src/lib/alerts.ts
 msgid "Automatic updates disabled"
-msgstr ""
+msgstr "Automatic updates disabled"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Available updates"
+msgstr "Available updates"
 
 #: src/components/routes/system/chart-card.tsx
 msgid "Average"
@@ -414,10 +474,34 @@ msgstr "לחץ על מערכת כדי לצפות במידע נוסף."
 msgid "Click to copy"
 msgstr "לחץ כדי להעתיק"
 
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Collected"
+msgstr "Collected"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Collection error"
+msgstr "Collection error"
+
 #: src/components/login/forgot-pass-form.tsx
 #: src/components/login/forgot-pass-form.tsx
 msgid "Command line instructions"
 msgstr "הוראות שורת פקודה"
+
+#: src/components/alerts-history-columns.tsx
+msgid "Completed"
+msgstr "Completed"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Configuration"
+msgstr "Configuration"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Configure"
+msgstr "Configure"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Configure automatic updates"
+msgstr "Configure automatic updates"
 
 #: src/components/routes/settings/notifications.tsx
 msgid "Configure how you receive alert notifications."
@@ -564,6 +648,10 @@ msgstr "העלאה מצטברת"
 msgid "Current state"
 msgstr "מצב נוכחי"
 
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Custom repositories"
+msgstr "Custom repositories"
+
 #. Power Cycles
 #: src/components/routes/system/smart-table.tsx
 msgid "Cycles"
@@ -602,9 +690,21 @@ msgstr "תיאור"
 msgid "Detail"
 msgstr "פרט"
 
+#: src/components/alerts-history-columns.tsx
+msgid "Detect repositories"
+msgstr "Detect repositories"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Detected repositories"
+msgstr "Detected repositories"
+
 #: src/components/routes/system/smart-table.tsx
 msgid "Device"
 msgstr "התקן"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Disabled"
+msgstr "Disabled"
 
 #. Context: Battery state
 #: src/lib/i18n.ts
@@ -686,6 +786,10 @@ msgstr "ערוך"
 msgid "Edit {foo}"
 msgstr "ערוך {foo}"
 
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Eligible updates"
+msgstr "Eligible updates"
+
 #: src/components/login/auth-form.tsx
 #: src/components/login/forgot-pass-form.tsx
 #: src/components/login/otp-forms.tsx
@@ -700,6 +804,10 @@ msgstr "התראות אימייל"
 #: src/lib/i18n.ts
 msgid "Empty"
 msgstr "ריק"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Enabled"
+msgstr "Enabled"
 
 #: src/components/routes/settings/quiet-hours.tsx
 #: src/components/routes/settings/quiet-hours.tsx
@@ -743,6 +851,10 @@ msgstr "זמני"
 msgid "Error"
 msgstr "שגיאה"
 
+#: src/components/alerts-history-columns.tsx
+msgid "Event"
+msgstr "Event"
+
 #: src/components/routes/settings/heartbeat.tsx
 msgid "Example:"
 msgstr "דוגמה:"
@@ -753,6 +865,10 @@ msgstr "דוגמה:"
 #: src/components/active-alerts.tsx
 msgid "Exceeds {0}{1} in last {2, plural, one {# minute} other {# minutes}}"
 msgstr "עלה על {0}{1} ב{2, plural, one {דקה האחרונה} other {-# הדקות האחרונות}}"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Excluded repositories"
+msgstr "Excluded repositories"
 
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Exec main PID"
@@ -786,6 +902,8 @@ msgstr "ייצא את תצורת המערכות הנוכחית שלך."
 msgid "Fahrenheit (°F)"
 msgstr "פרנהייט (°F)"
 
+#: src/components/alerts-history-columns.tsx
+#: src/components/routes/system/automatic-updates.tsx
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Failed"
 msgstr "נכשל"
@@ -923,6 +1041,10 @@ msgstr "שיטת HTTP"
 msgid "HTTP method: POST, GET, or HEAD (default: POST)"
 msgstr "שיטת HTTP: POST, GET, או HEAD (ברירת מחדל: POST)"
 
+#: src/components/routes/system/automatic-updates.tsx
+msgid "I explicitly confirm the selected third-party repositories"
+msgstr "I explicitly confirm the selected third-party repositories"
+
 #: src/components/routes/system/disk-io-sheet.tsx
 msgctxt "Disk I/O average operation time (iostat await)"
 msgid "I/O Await"
@@ -953,8 +1075,25 @@ msgid "Image"
 msgstr "תמונה"
 
 #: src/components/routes/settings/quiet-hours.tsx
+#: src/components/routes/system/automatic-updates.tsx
 msgid "Inactive"
 msgstr "לא פעיל"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Install required dependencies"
+msgstr "Install required dependencies"
+
+#: src/components/alerts-history-columns.tsx
+msgid "Install update dependencies"
+msgstr "Install update dependencies"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Installed"
+msgstr "Installed"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Installed, not configured"
+msgstr "Installed, not configured"
 
 #: src/components/routes/settings/heartbeat.tsx
 msgid "Interval"
@@ -969,9 +1108,25 @@ msgstr "כתובת אימייל לא תקינה."
 msgid "Language"
 msgstr "שפה"
 
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Last check"
+msgstr "Last check"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Last result"
+msgstr "Last result"
+
 #: src/lib/alerts.ts
 msgid "Last update failed"
-msgstr ""
+msgstr "Last update failed"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Last upgrade"
+msgstr "Last upgrade"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Last upgrade failed"
+msgstr "Last upgrade failed"
 
 #: src/components/systems-table/systems-table.tsx
 msgid "Layout"
@@ -1047,14 +1202,38 @@ msgstr "מחפש איפה ליצור התראות? לחץ על סמלי הפעמ
 msgid "Main PID"
 msgstr "PID ראשי"
 
+#: src/components/alerts-history-columns.tsx
+msgid "Maintenance event"
+msgstr "Maintenance event"
+
+#: src/components/alerts-history-columns.tsx
+msgid "Maintenance helper incompatible"
+msgstr "Maintenance helper incompatible"
+
+#: src/components/alerts-history-columns.tsx
+msgid "Maintenance operation refused"
+msgstr "Maintenance operation refused"
+
+#: src/components/alerts-history-columns.tsx
+msgid "Maintenance operation timed out"
+msgstr "Maintenance operation timed out"
+
 #: src/components/routes/settings/layout.tsx
 msgid "Manage display and notification preferences."
 msgstr "נהל העדפות תצוגה והתראות."
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Manual"
+msgstr "Manual"
 
 #: src/components/add-system.tsx
 #: src/components/routes/settings/tokens-fingerprints.tsx
 msgid "Manual setup instructions"
 msgstr "הוראות התקנה ידניות"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Manual updates"
+msgstr "Manual updates"
 
 #. Chart select field. Please try to keep this short.
 #: src/components/routes/system/chart-card.tsx
@@ -1087,10 +1266,19 @@ msgstr "שימוש בזיכרון"
 msgid "Memory usage of docker containers"
 msgstr "שימוש בזיכרון של קונטיינרים של Docker"
 
+#: src/components/routes/system/automatic-updates.tsx
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Missing"
+msgstr "Missing"
+
 #. Device model
 #: src/components/routes/system/smart-table.tsx
 msgid "Model"
 msgstr "דגם"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Monitoring only"
+msgstr "Monitoring only"
 
 #: src/components/add-system.tsx
 #: src/components/alerts-history-columns.tsx
@@ -1121,6 +1309,11 @@ msgstr "תעבורת רשת של ממשקים ציבוריים"
 msgid "Network unit"
 msgstr "יחידת רשת"
 
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Never run"
+msgstr "Never run"
+
+#: src/components/routes/system/automatic-updates.tsx
 #: src/components/systemd-table/systemd-table.tsx
 #: src/components/systemd-table/systemd-table.tsx
 #: src/components/systemd-table/systemd-table.tsx
@@ -1150,6 +1343,14 @@ msgstr "אין מאפייני S.M.A.R.T. זמינים עבור התקן זה."
 msgid "No systems found."
 msgstr "לא נמצאו מערכות."
 
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Not found"
+msgstr "Not found"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Not installed"
+msgstr "Not installed"
+
 #: src/components/command-palette.tsx
 #: src/components/routes/settings/layout.tsx
 #: src/components/routes/settings/notifications.tsx
@@ -1159,6 +1360,10 @@ msgstr "התראות"
 #: src/components/login/auth-form.tsx
 msgid "OAuth 2 / OIDC support"
 msgstr "תמיכה ב-OAuth 2 / OIDC"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Official repository"
+msgstr "Official repository"
 
 #: src/components/routes/settings/config-yaml.tsx
 msgid "On each restart, systems in the database will be updated to match the systems defined in the file."
@@ -1181,6 +1386,29 @@ msgstr "סיסמה חד-פעמית"
 msgid "Open menu"
 msgstr "פתח תפריט"
 
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Operation completed successfully"
+msgstr "Operation completed successfully"
+
+#: src/components/routes/system/automatic-updates.tsx
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Operation failed"
+msgstr "Operation failed"
+
+#. placeholder {0}: response.progress ?? 0
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Operation in progress: {0}%"
+msgstr "Operation in progress: {0}%"
+
+#: src/components/routes/system/automatic-updates.tsx
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Operation queued"
+msgstr "Operation queued"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Operation result"
+msgstr "Operation result"
+
 #: src/components/login/auth-form.tsx
 msgid "Or continue with"
 msgstr "או המשך עם"
@@ -1193,9 +1421,13 @@ msgstr "אחר"
 msgid "Overwrite existing alerts"
 msgstr "דרוס התראות קיימות"
 
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Package list frequency (days)"
+msgstr "Package list frequency (days)"
+
 #: src/lib/alerts.ts
 msgid "Package missing"
-msgstr ""
+msgstr "Package missing"
 
 #: src/components/command-palette.tsx
 #: src/components/command-palette.tsx
@@ -1212,6 +1444,10 @@ msgstr "עמוד {0} מתוך {1}"
 #: src/components/command-palette.tsx
 msgid "Pages / Settings"
 msgstr "עמודים / הגדרות"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Partial"
+msgstr "Partial"
 
 #: src/components/login/auth-form.tsx
 #: src/components/login/auth-form.tsx
@@ -1327,6 +1563,10 @@ msgstr "ניצול מדויק בזמן הרשום"
 msgid "Preferred Language"
 msgstr "שפה מועדפת"
 
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Privileged helper unavailable. Reinstall or upgrade the Agent with OS update management enabled."
+msgstr "Privileged helper unavailable. Reinstall or upgrade the Agent with OS update management enabled."
+
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Process started"
 msgstr "תהליך התחיל"
@@ -1341,6 +1581,10 @@ msgctxt "Disk I/O average queue depth"
 msgid "Queue Depth"
 msgstr "עומק תור"
 
+#: src/components/alerts-history-columns.tsx
+msgid "Queued"
+msgstr "Queued"
+
 #: src/components/routes/settings/quiet-hours.tsx
 msgid "Quiet Hours"
 msgstr "שעות שקט"
@@ -1353,13 +1597,36 @@ msgstr "שעות שקט"
 msgid "Read"
 msgstr "קריאה"
 
+#: src/components/alerts-history-columns.tsx
+msgid "Read operation status"
+msgstr "Read operation status"
+
+#: src/components/alerts-history-columns.tsx
+msgid "Read update policy"
+msgstr "Read update policy"
+
+#: src/components/alerts-history-columns.tsx
+#: src/components/routes/system/automatic-updates.tsx
+#: src/components/routes/system/automatic-updates.tsx
 #: src/lib/alerts.ts
 msgid "Reboot required"
-msgstr ""
+msgstr "Reboot required"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Reboot required by"
+msgstr "Reboot required by"
+
+#: src/components/alerts-history-columns.tsx
+msgid "Reboot requirement cleared"
+msgstr "Reboot requirement cleared"
 
 #: src/components/routes/system/charts/network-charts.tsx
 msgid "Received"
 msgstr "התקבל"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Recently updated"
+msgstr "Recently updated"
 
 #: src/components/containers-table/containers-table.tsx
 #: src/components/containers-table/containers-table.tsx
@@ -1370,6 +1637,11 @@ msgstr "רענן"
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Relationships"
 msgstr "קשרים"
+
+#: src/components/routes/system/automatic-updates.tsx
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Remove unused dependencies"
+msgstr "Remove unused dependencies"
 
 #: src/components/login/login.tsx
 msgid "Request a one-time password"
@@ -1418,6 +1690,31 @@ msgstr "סובב token"
 msgid "Rows per page"
 msgstr "שורות לעמוד"
 
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Run dry-run"
+msgstr "Run dry-run"
+
+#: src/components/alerts-history-columns.tsx
+msgid "Run system updates"
+msgstr "Run system updates"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Run system updates now?"
+msgstr "Run system updates now?"
+
+#: src/components/alerts-history-columns.tsx
+msgid "Run update dry-run"
+msgstr "Run update dry-run"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Run updates now"
+msgstr "Run updates now"
+
+#: src/components/alerts-history-columns.tsx
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Running"
+msgstr "Running"
+
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Runtime Metrics"
 msgstr "מדדי זמן ריצה"
@@ -1437,6 +1734,10 @@ msgstr "שמור {foo}"
 #: src/components/routes/settings/notifications.tsx
 msgid "Save address using enter key or comma. Leave blank to disable email notifications."
 msgstr "שמור כתובת באמצעות מקש enter או פסיק. השאר ריק כדי להשבית התראות אימייל."
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Save and apply"
+msgstr "Save and apply"
 
 #: src/components/routes/settings/general.tsx
 #: src/components/routes/settings/notifications.tsx
@@ -1471,9 +1772,18 @@ msgstr "חפש מערכות או הגדרות..."
 msgid "Seconds between pings (default: 60)"
 msgstr "שניות בין פינגים (ברירת מחדל: 60)"
 
+#: src/components/routes/system/automatic-updates.tsx
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Security updates"
+msgstr "Security updates"
+
+#: src/components/alerts-history-columns.tsx
+msgid "Security updates available"
+msgstr "Security updates available"
+
 #: src/lib/alerts.ts
 msgid "Security updates pending"
-msgstr ""
+msgstr "Security updates pending"
 
 #: src/components/alerts/alerts-sheet.tsx
 msgid "See <0>notification settings</0> to configure how you receive alerts."
@@ -1502,6 +1812,10 @@ msgstr "נשלח"
 #: src/components/routes/system/smart-table.tsx
 msgid "Serial Number"
 msgstr "מספר סידורי"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Service"
+msgstr "Service"
 
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Service Details"
@@ -1546,6 +1860,10 @@ msgstr "הגדרות SMTP"
 msgid "Sort By"
 msgstr "מיין לפי"
 
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Stale data"
+msgstr "Stale data"
+
 #: src/components/routes/settings/quiet-hours.tsx
 #: src/components/routes/settings/quiet-hours.tsx
 msgid "Start Time"
@@ -1559,6 +1877,7 @@ msgid "State"
 msgstr "מצב"
 
 #: src/components/containers-table/containers-table-columns.tsx
+#: src/components/routes/system/automatic-updates.tsx
 #: src/components/routes/system/smart-table.tsx
 #: src/components/systemd-table/systemd-table.tsx
 #: src/components/systems-table/systems-table.tsx
@@ -1569,6 +1888,10 @@ msgstr "סטטוס"
 #: src/components/systemd-table/systemd-table-columns.tsx
 msgid "Sub State"
 msgstr "מצב משני"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Success"
+msgstr "Success"
 
 #: src/components/routes/system/charts/memory-charts.tsx
 msgid "Swap space used by the system"
@@ -1658,6 +1981,10 @@ msgstr "בדוק פעימת לב"
 msgid "Test notification sent"
 msgstr "התראת בדיקה נשלחה"
 
+#: src/components/routes/system/automatic-updates.tsx
+msgid "The Agent remains unprivileged. A restricted local helper applies validated APT policies."
+msgstr "The Agent remains unprivileged. A restricted local helper applies validated APT policies."
+
 #: src/components/routes/settings/heartbeat.tsx
 msgid "The overall status is <0>ok</0> when all systems are up, <1>warn</1> when alerts are triggered, and <2>error</2> when any system is down."
 msgstr "הסטטוס הכללי הוא <0>ok</0> כשכל המערכות פועלות, <1>warn</1> כשמופעלות התראות, ו-<2>error</2> כשמערכת כלשהי מושבתת."
@@ -1665,6 +1992,10 @@ msgstr "הסטטוס הכללי הוא <0>ok</0> כשכל המערכות פוע�
 #: src/components/login/forgot-pass-form.tsx
 msgid "Then log into the backend and reset your user account password in the users table."
 msgstr "לאחר מכן התחבר ל-backend ואפס את סיסמת חשבון המשתמש שלך בטבלת המשתמשים."
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Third-party repository"
+msgstr "Third-party repository"
 
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "This action cannot be undone. This will permanently delete all current records for {name} from the database."
@@ -1763,7 +2094,7 @@ msgstr "מופעל כאשר ממוצע העומס ל-5 דקות עולה על ס
 
 #: src/lib/alerts.ts
 msgid "Triggers when a reboot remains required longer than the threshold"
-msgstr ""
+msgstr "Triggers when a reboot remains required longer than the threshold"
 
 #: src/lib/alerts.ts
 msgid "Triggers when any sensor exceeds a threshold"
@@ -1771,7 +2102,7 @@ msgstr "מופעל כאשר כל חיישן עולה על סף"
 
 #: src/lib/alerts.ts
 msgid "Triggers when automatic updates are disabled"
-msgstr ""
+msgstr "Triggers when automatic updates are disabled"
 
 #: src/lib/alerts.ts
 msgid "Triggers when battery charge drops below a threshold"
@@ -1799,7 +2130,7 @@ msgstr "מופעל כאשר שימוש בזיכרון עולה על סף"
 
 #: src/lib/alerts.ts
 msgid "Triggers when security updates remain pending longer than the threshold"
-msgstr ""
+msgstr "Triggers when security updates remain pending longer than the threshold"
 
 #: src/lib/alerts.ts
 msgid "Triggers when status switches between up and down"
@@ -1807,15 +2138,15 @@ msgstr "מופעל כאשר הסטטוס מתחלף בין למעלה ולמטה
 
 #: src/lib/alerts.ts
 msgid "Triggers when the last automatic update failed"
-msgstr ""
+msgstr "Triggers when the last automatic update failed"
 
 #: src/lib/alerts.ts
 msgid "Triggers when unattended-upgrades is not installed"
-msgstr ""
+msgstr "Triggers when unattended-upgrades is not installed"
 
 #: src/lib/alerts.ts
 msgid "Triggers when update information is older than the threshold"
-msgstr ""
+msgstr "Triggers when update information is older than the threshold"
 
 #: src/lib/alerts.ts
 msgid "Triggers when usage of any disk exceeds a threshold"
@@ -1827,9 +2158,21 @@ msgstr "מופעל כאשר שימוש בכל דיסק עולה על סף"
 msgid "Type"
 msgstr "סוג"
 
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Unable to load update policy"
+msgstr "Unable to load update policy"
+
 #: src/lib/alerts.ts
 msgid "Unattended upgrades package missing"
-msgstr ""
+msgstr "Unattended upgrades package missing"
+
+#: src/components/alerts-history-columns.tsx
+msgid "Unauthorized maintenance attempt"
+msgstr "Unauthorized maintenance attempt"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Unavailable"
+msgstr "Unavailable"
 
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Unit file"
@@ -1846,6 +2189,12 @@ msgid "Universal token"
 msgstr "token אוניברסלי"
 
 #. Context: Battery state
+#: src/components/routes/system/automatic-updates.tsx
+#: src/components/routes/system/automatic-updates.tsx
+#: src/components/routes/system/automatic-updates.tsx
+#: src/components/routes/system/automatic-updates.tsx
+#: src/components/routes/system/automatic-updates.tsx
+#: src/components/routes/system/automatic-updates.tsx
 #: src/lib/i18n.ts
 msgid "Unknown"
 msgstr "לא ידוע"
@@ -1854,6 +2203,10 @@ msgstr "לא ידוע"
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Unlimited"
 msgstr "ללא הגבלה"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Unsupported"
+msgstr "Unsupported"
 
 #. Context: System is up
 #: src/components/routes/system/info-bar.tsx
@@ -1865,13 +2218,34 @@ msgstr "למעלה"
 msgid "Up ({upSystemsLength})"
 msgstr "למעלה ({upSystemsLength})"
 
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Up to date"
+msgstr "Up to date"
+
 #: src/components/routes/settings/quiet-hours.tsx
 msgid "Update"
 msgstr "עדכן"
 
+#: src/components/routes/system/automatic-updates.tsx
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Update failed"
+msgstr "Update failed"
+
 #: src/lib/alerts.ts
 msgid "Update information stale"
-msgstr ""
+msgstr "Update information stale"
+
+#: src/components/alerts-history-columns.tsx
+msgid "Update monitoring error"
+msgstr "Update monitoring error"
+
+#: src/components/alerts-history-columns.tsx
+msgid "Update package not installed"
+msgstr "Update package not installed"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Update policy"
+msgstr "Update policy"
 
 #: src/components/containers-table/containers-table-columns.tsx
 #: src/components/routes/system/smart-table.tsx
@@ -1886,6 +2260,38 @@ msgstr "מתעדכן כל 10 דקות."
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Updates"
 msgstr ""
+
+#: src/components/alerts-history-columns.tsx
+msgid "Updates available"
+msgstr "Updates available"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Updates completed successfully"
+msgstr "Updates completed successfully"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Updates pending"
+msgstr "Updates pending"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Updating"
+msgstr "Updating"
+
+#: src/components/alerts-history-columns.tsx
+msgid "Upgrade completed"
+msgstr "Upgrade completed"
+
+#: src/components/alerts-history-columns.tsx
+msgid "Upgrade failed"
+msgstr "Upgrade failed"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Upgrade source"
+msgstr "Upgrade source"
+
+#: src/components/alerts-history-columns.tsx
+msgid "Upgrade started"
+msgstr "Upgrade started"
 
 #: src/components/routes/system/network-sheet.tsx
 msgid "Upload"
@@ -1922,6 +2328,14 @@ msgstr "משתמשים"
 msgctxt "Disk I/O utilization"
 msgid "Utilization"
 msgstr "ניצולת"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Validate"
+msgstr "Validate"
+
+#: src/components/alerts-history-columns.tsx
+msgid "Validate update policy"
+msgstr "Validate update policy"
 
 #: src/components/alerts-history-columns.tsx
 msgid "Value"
@@ -1999,6 +2413,7 @@ msgstr "תצורת YAML"
 msgid "YAML Configuration"
 msgstr "תצורת YAML"
 
+#: src/components/routes/system/automatic-updates.tsx
 #: src/components/systemd-table/systemd-table.tsx
 #: src/components/systemd-table/systemd-table.tsx
 #: src/components/systemd-table/systemd-table.tsx
