@@ -2,7 +2,10 @@ package agent
 
 import (
 	"context"
+	"encoding/json"
 	"log/slog"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"sync"
@@ -13,15 +16,17 @@ import (
 )
 
 const (
-	defaultUpdateInterval = 6 * time.Hour
-	defaultUpdateTimeout  = 30 * time.Second
-	defaultUpdateMaxPkgs  = 50
+	defaultUpdateInterval   = 6 * time.Hour
+	defaultUpdateTimeout    = 30 * time.Second
+	defaultUpdateMaxPkgs    = 50
+	defaultUpdateAPTTimeout = 2 * time.Minute
 )
 
 type updateOptions struct {
 	interval    time.Duration
 	timeout     time.Duration
 	maxPackages int
+	aptTimeout  time.Duration
 }
 
 type updateManager struct {
@@ -30,14 +35,16 @@ type updateManager struct {
 	lastAttempt time.Time
 	options     updateOptions
 	systemd     *systemdManager
+	statePath   string
+	persisted   updatePersistentState
 }
 
-func newUpdateManager(systemd *systemdManager) *updateManager {
+func newUpdateManager(systemd *systemdManager, dataDirs ...string) *updateManager {
 	enabled, _ := utils.GetEnv("UPDATE_MONITORING")
 	if !strings.EqualFold(strings.TrimSpace(enabled), "true") {
 		return nil
 	}
-	opts := updateOptions{interval: defaultUpdateInterval, timeout: defaultUpdateTimeout, maxPackages: defaultUpdateMaxPkgs}
+	opts := updateOptions{interval: defaultUpdateInterval, timeout: defaultUpdateTimeout, aptTimeout: defaultUpdateAPTTimeout, maxPackages: defaultUpdateMaxPkgs}
 	if raw, ok := utils.GetEnv("UPDATE_CHECK_INTERVAL"); ok {
 		if parsed, err := time.ParseDuration(raw); err == nil && parsed >= time.Minute {
 			opts.interval = parsed
@@ -59,7 +66,22 @@ func newUpdateManager(systemd *systemdManager) *updateManager {
 			slog.Warn("Invalid UPDATE_MAX_PACKAGE_LIST", "value", raw)
 		}
 	}
+	if raw, ok := utils.GetEnv("UPDATE_APT_TIMEOUT"); ok {
+		if parsed, err := time.ParseDuration(raw); err == nil && parsed >= 10*time.Second && parsed <= time.Hour {
+			opts.aptTimeout = parsed
+		} else {
+			slog.Warn("Invalid UPDATE_APT_TIMEOUT", "value", raw)
+		}
+	}
 	m := &updateManager{options: opts, systemd: systemd}
+	dataDir := ""
+	if len(dataDirs) > 0 {
+		dataDir = dataDirs[0]
+	}
+	if dataDir != "" {
+		m.statePath = filepath.Join(dataDir, "update-monitor-state.json")
+		m.loadState()
+	}
 	go m.run()
 	return m
 }
@@ -74,9 +96,7 @@ func (m *updateManager) run() {
 }
 
 func (m *updateManager) refresh() {
-	ctx, cancel := context.WithTimeout(context.Background(), m.options.timeout)
-	defer cancel()
-	status, err := collectUpdateStatus(ctx, m.options, m.systemd)
+	status, err := collectUpdateStatus(context.Background(), m.options, m.systemd)
 	now := time.Now().UTC()
 	m.mu.Lock()
 	defer m.mu.Unlock()
@@ -86,21 +106,35 @@ func (m *updateManager) refresh() {
 		status.CacheAgeSeconds = 0
 		if status.PendingSecurityUpdates != nil && *status.PendingSecurityUpdates > 0 {
 			status.SecurityUpdatesSince = &now
-			if m.status != nil && m.status.PendingSecurityUpdates != nil && *m.status.PendingSecurityUpdates > 0 && m.status.SecurityUpdatesSince != nil {
+			if m.status != nil && m.status.SecurityUpdatesSince != nil {
 				status.SecurityUpdatesSince = m.status.SecurityUpdatesSince
+			} else if m.persisted.SecurityUpdatesSince != nil {
+				status.SecurityUpdatesSince = m.persisted.SecurityUpdatesSince
 			}
 		}
 		if status.RebootRequired {
 			status.RebootRequiredSince = &now
-			if m.status != nil && m.status.RebootRequired && m.status.RebootRequiredSince != nil {
+			if m.status != nil && m.status.RebootRequiredSince != nil {
 				status.RebootRequiredSince = m.status.RebootRequiredSince
+			} else if m.persisted.RebootRequiredSince != nil {
+				status.RebootRequiredSince = m.persisted.RebootRequiredSince
 			}
 		}
 		if err != nil {
 			status.LastError = sanitizeUpdateText(err.Error(), 512)
 		}
 		status.OverallState = updateentity.DeriveOverallState(status)
+		if status.LastUpgradeAt != nil && m.persisted.LastManualUpgradeAt != nil {
+			delta := status.LastUpgradeAt.Sub(*m.persisted.LastManualUpgradeAt)
+			if delta < 0 {
+				delta = -delta
+			}
+			if delta < 10*time.Minute {
+				status.LastUpgradeSource = "manual"
+			}
+		}
 		m.status = status
+		m.saveState()
 		return
 	}
 	// A failed refresh never discards the last usable snapshot.
@@ -125,8 +159,56 @@ func (m *updateManager) snapshot() *updateentity.Status {
 		if age > 0 {
 			copy.CacheAgeSeconds = uint32(min(age/time.Second, time.Duration(^uint32(0))))
 		}
+		if age > m.options.interval*2 {
+			copy.DataStale = true
+			copy.OverallState = updateentity.OverallMonitoringIncomplete
+		}
 	}
 	return &copy
+}
+
+type updatePersistentState struct {
+	SecurityUpdatesSince *time.Time `json:"security_updates_since,omitempty"`
+	RebootRequiredSince  *time.Time `json:"reboot_required_since,omitempty"`
+	LastManualUpgradeAt  *time.Time `json:"last_manual_upgrade_at,omitempty"`
+}
+
+func (m *updateManager) loadState() {
+	data, err := os.ReadFile(m.statePath)
+	if err != nil {
+		return
+	}
+	var state updatePersistentState
+	if json.Unmarshal(data, &state) == nil {
+		m.persisted = state
+	}
+}
+func (m *updateManager) saveState() {
+	if m.statePath == "" {
+		return
+	}
+	state := m.persisted
+	if m.status != nil {
+		state.SecurityUpdatesSince = m.status.SecurityUpdatesSince
+		state.RebootRequiredSince = m.status.RebootRequiredSince
+	}
+	data, err := json.Marshal(state)
+	if err != nil {
+		return
+	}
+	temp := m.statePath + ".tmp"
+	if os.WriteFile(temp, data, 0o600) == nil {
+		_ = os.Rename(temp, m.statePath)
+		m.persisted = state
+	}
+}
+
+func (m *updateManager) markManualUpgrade(at time.Time) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	at = at.UTC()
+	m.persisted.LastManualUpgradeAt = &at
+	m.saveState()
 }
 
 func sanitizeUpdateText(value string, max int) string {

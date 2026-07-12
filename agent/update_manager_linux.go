@@ -7,10 +7,12 @@ import (
 	"bytes"
 	"context"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
+	"sort"
 	"strconv"
 	"strings"
 	"time"
@@ -41,7 +43,7 @@ func collectLinuxUpdateStatus(ctx context.Context, opts updateOptions, systemd *
 		ServiceState: updateentity.ServiceUnknown, LastResult: updateentity.ResultUnknown,
 	}
 	id, err := readOSRelease("/etc/os-release")
-	if err != nil || (id != "debian" && id != "ubuntu") {
+	if err != nil || (id != "debian" && id != "ubuntu" && id != "raspbian") {
 		s.Supported = false
 		s.OverallState = updateentity.OverallUnsupported
 		return s, nil
@@ -49,19 +51,19 @@ func collectLinuxUpdateStatus(ctx context.Context, opts updateOptions, systemd *
 	s.Supported = true
 	s.DataSources = append(s.DataSources, "os-release")
 
-	collectInstallation(ctx, s, executor)
+	collectInstallation(ctx, s, executor, opts.timeout)
 	if s.InstallationState == updateentity.InstallationNotInstalled {
 		collectReboot(s, opts.maxPackages)
 		s.OverallState = updateentity.DeriveOverallState(s)
 		return s, nil
 	}
-	collectConfiguration(ctx, s, executor)
+	collectConfiguration(ctx, s, executor, opts.timeout)
 	collectSystemd(s, systemd)
-	collectPending(ctx, s, executor)
+	collectPending(ctx, s, executor, opts)
 	collectReboot(s, opts.maxPackages)
 	collectAptHistory(s, opts.maxPackages)
-	if err := ctx.Err(); err != nil {
-		return nil, err
+	if len(s.CollectionErrors) > 0 {
+		s.LastError = s.CollectionErrors[0]
 	}
 	s.OverallState = updateentity.DeriveOverallState(s)
 	return s, nil
@@ -81,8 +83,8 @@ func readOSRelease(path string) (string, error) {
 	return "", errors.New("ID missing in os-release")
 }
 
-func collectInstallation(ctx context.Context, s *updateentity.Status, executor updateCommandExecutor) {
-	output, err := executor.Run(ctx, "dpkg-query", "-W", "-f=${db:Status-Status}", "unattended-upgrades")
+func collectInstallation(ctx context.Context, s *updateentity.Status, executor updateCommandExecutor, timeout time.Duration) {
+	output, err := runUpdateStep(ctx, executor, timeout, "dpkg-query", "-W", "-f=${db:Status-Status}", "unattended-upgrades")
 	if err == nil {
 		s.DataSources = append(s.DataSources, "dpkg-query")
 		if strings.TrimSpace(string(output)) == "installed" {
@@ -98,16 +100,18 @@ func collectInstallation(ctx context.Context, s *updateentity.Status, executor u
 		s.InstallationState = updateentity.InstallationNotInstalled
 		return
 	}
+	s.CollectionErrors = append(s.CollectionErrors, "package detection: "+sanitizeUpdateText(err.Error(), 256))
 	if _, statErr := os.Stat("/usr/bin/unattended-upgrade"); statErr == nil {
 		s.InstallationState = updateentity.InstallationInstalled
 		s.DataSources = append(s.DataSources, "unattended-upgrade-binary-limited")
 	}
 }
 
-func collectConfiguration(ctx context.Context, s *updateentity.Status, executor updateCommandExecutor) {
-	output, err := executor.Run(ctx, "apt-config", "dump")
+func collectConfiguration(ctx context.Context, s *updateentity.Status, executor updateCommandExecutor, timeout time.Duration) {
+	output, err := runUpdateStep(ctx, executor, timeout, "apt-config", "dump")
 	if err != nil {
 		s.ConfigurationState = updateentity.ConfigurationUnknown
+		s.CollectionErrors = append(s.CollectionErrors, "configuration: "+sanitizeUpdateText(err.Error(), 256))
 		return
 	}
 	s.DataSources = append(s.DataSources, "apt-config")
@@ -205,6 +209,7 @@ func collectSystemd(s *updateentity.Status, manager *systemdManager) {
 	}
 	if ts := systemdTimestamp(props["ExecMainExitTimestamp"]); ts != nil {
 		s.LastUpgradeAt = ts
+		s.LastUpgradeSource = "automatic"
 	}
 }
 
@@ -270,26 +275,115 @@ func systemdTimestamp(value any) *time.Time {
 	return &t
 }
 
-func collectPending(ctx context.Context, s *updateentity.Status, executor updateCommandExecutor) {
+func collectPending(ctx context.Context, s *updateentity.Status, executor updateCommandExecutor, opts updateOptions) {
 	if _, err := os.Stat("/usr/lib/update-notifier/apt-check"); err == nil {
-		output, runErr := executor.Run(ctx, "/usr/lib/update-notifier/apt-check")
+		output, runErr := runUpdateStep(ctx, executor, opts.timeout, "/usr/lib/update-notifier/apt-check")
 		// apt-check may use a non-zero status to signal available updates; parse valid output first.
 		if total, security, ok := parseAptCheck(output); ok {
-			s.PendingUpdates, s.PendingSecurityUpdates = &total, &security
+			s.PendingUpdatesTotal, s.PendingSecurityUpdates = &total, &security
 			s.DataSources = append(s.DataSources, "apt-check")
+			collectEligible(ctx, s, executor, opts)
 			return
 		} else if runErr == nil {
+			collectEligible(ctx, s, executor, opts)
 			return
 		}
 	}
-	output, err := executor.Run(ctx, "apt-get", "-s", "-o", "Debug::NoLocking=true", "upgrade")
+	output, err := runUpdateStep(ctx, executor, opts.aptTimeout, "apt-get", "-s", "-o", "Debug::NoLocking=true", "upgrade")
 	if err != nil {
+		s.CollectionErrors = append(s.CollectionErrors, "apt simulation: "+sanitizeUpdateText(err.Error(), 256))
 		return
 	}
 	if count, ok := parseAptSimulation(output); ok {
-		s.PendingUpdates = &count
+		s.PendingUpdatesTotal = &count
 		s.DataSources = append(s.DataSources, "apt-get-simulation")
 	}
+	collectEligible(ctx, s, executor, opts)
+}
+
+func collectEligible(ctx context.Context, s *updateentity.Status, executor updateCommandExecutor, opts updateOptions) {
+	output, err := runUpdateStep(ctx, executor, opts.aptTimeout, "unattended-upgrade", "--dry-run", "--debug")
+	if err != nil {
+		s.CollectionErrors = append(s.CollectionErrors, "eligibility dry-run: "+sanitizeUpdateText(err.Error(), 256))
+		return
+	}
+	if count, ok := parseEligibleUpdates(output); ok {
+		s.PendingUpdatesEligible, s.PendingUpdates = &count, &count
+		if s.PendingUpdatesTotal != nil && *s.PendingUpdatesTotal >= count {
+			excluded := *s.PendingUpdatesTotal - count
+			s.PendingUpdatesExcluded = &excluded
+		}
+		s.DataSources = append(s.DataSources, "unattended-upgrade-dry-run")
+		if s.PendingUpdatesExcluded != nil && *s.PendingUpdatesExcluded > 0 {
+			s.ExcludedRepositories = parseExcludedRepositories(output)
+		}
+	}
+}
+
+func parseExcludedRepositories(output []byte) []string {
+	seen := map[string]struct{}{}
+	for line := range strings.Lines(string(output)) {
+		remaining := line
+		for {
+			_, after, ok := strings.Cut(remaining, "origin:'")
+			if !ok {
+				break
+			}
+			origin, rest, ok := strings.Cut(after, "'")
+			if !ok {
+				break
+			}
+			remaining = rest
+			origin = sanitizeUpdateText(origin, 80)
+			switch strings.ToLower(origin) {
+			case "", "debian", "ubuntu", "canonical", "raspbian", "raspberry pi foundation":
+				continue
+			}
+			seen[origin] = struct{}{}
+		}
+	}
+	result := make([]string, 0, len(seen))
+	for origin := range seen {
+		result = append(result, origin)
+	}
+	sort.Strings(result)
+	return result
+}
+
+func parseEligibleUpdates(output []byte) (uint16, bool) {
+	for line := range strings.Lines(string(output)) {
+		trimmed := strings.TrimSpace(line)
+		for _, prefix := range []string{"Packages that will be upgraded:", "pkgs that look like they should be upgraded:"} {
+			if value, ok := strings.CutPrefix(trimmed, prefix); ok {
+				value = strings.Trim(value, " []'")
+				if value == "" {
+					return 0, true
+				}
+				parts := strings.FieldsFunc(value, func(r rune) bool { return r == ',' || r == ' ' || r == '\'' || r == '"' })
+				seen := map[string]struct{}{}
+				for _, part := range parts {
+					part = strings.TrimSpace(part)
+					if part != "" {
+						seen[part] = struct{}{}
+					}
+				}
+				if len(seen) <= 65535 {
+					return uint16(len(seen)), true
+				}
+			}
+		}
+	}
+	return 0, false
+}
+
+func runUpdateStep(parent context.Context, executor updateCommandExecutor, timeout time.Duration, name string, args ...string) ([]byte, error) {
+	ctx, cancel := context.WithTimeout(parent, timeout)
+	defer cancel()
+	output, err := executor.Run(ctx, name, args...)
+	if ctx.Err() != nil {
+		return output, fmt.Errorf("%s timed out: %w", name, ctx.Err())
+	}
+	return output, err
 }
 
 func parseAptCheck(output []byte) (uint16, uint16, bool) {
@@ -339,10 +433,11 @@ func collectAptHistory(s *updateentity.Status, maxPackages int) {
 		if err != nil {
 			continue
 		}
-		when, packages := parseLatestAptHistory(data, maxPackages)
+		when, packages, source := parseLatestAptHistory(data, maxPackages)
 		if when != nil {
-			if s.LastUpgradeAt == nil {
+			if s.LastUpgradeAt == nil || when.After(*s.LastUpgradeAt) {
 				s.LastUpgradeAt = when
+				s.LastUpgradeSource = source
 			}
 			s.RecentlyUpdatedPackages = packages
 			s.DataSources = append(s.DataSources, "apt-history")
@@ -374,11 +469,12 @@ func tailFile(path string, limit int64) ([]byte, error) {
 	return data, err
 }
 
-func parseLatestAptHistory(data []byte, maxPackages int) (*time.Time, []string) {
+func parseLatestAptHistory(data []byte, maxPackages int) (*time.Time, []string, string) {
 	blocks := strings.Split(string(data), "\n\n")
 	for i := len(blocks) - 1; i >= 0; i-- {
 		var when *time.Time
 		var packages []string
+		source := "manual"
 		for line := range strings.Lines(blocks[i]) {
 			line = strings.TrimSpace(line)
 			if value, ok := strings.CutPrefix(line, "Start-Date:"); ok {
@@ -400,12 +496,15 @@ func parseLatestAptHistory(data []byte, maxPackages int) (*time.Time, []string) 
 					}
 				}
 			}
+			if value, ok := strings.CutPrefix(line, "Commandline:"); ok && strings.Contains(value, "unattended-upgrade") {
+				source = "automatic"
+			}
 		}
 		if when != nil && len(packages) > 0 {
-			return when, readPackageLines([]byte(strings.Join(packages, "\n")), maxPackages)
+			return when, readPackageLines([]byte(strings.Join(packages, "\n")), maxPackages), source
 		}
 	}
-	return nil, nil
+	return nil, nil, ""
 }
 
 func appendUnique(values []string, value string) []string {

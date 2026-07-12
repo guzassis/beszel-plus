@@ -281,12 +281,14 @@ func (sm *systemdManager) getServiceDetails(serviceName string) (systemd.Service
 // getUpdateUnitDetails exposes read-only unit state to the update collector while
 // keeping systemd access on the agent's existing D-Bus implementation.
 func (sm *systemdManager) getUpdateUnitDetails(unitName string) (systemd.ServiceDetails, error) {
-	conn, err := dbus.NewSystemConnectionContext(context.Background())
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	conn, err := dbus.NewSystemConnectionContext(ctx)
 	if err != nil {
 		return nil, err
 	}
 	defer conn.Close()
-	props, err := conn.GetUnitPropertiesContext(context.Background(), unitName)
+	props, err := conn.GetUnitPropertiesContext(ctx, unitName)
 	if err != nil {
 		return nil, err
 	}
@@ -303,7 +305,7 @@ func (sm *systemdManager) getUpdateUnitDetails(unitName string) (systemd.Service
 		if name == "UnitFileState" {
 			typeName = "Unit"
 		}
-		if variant, propErr := conn.GetUnitTypePropertyContext(context.Background(), unitName, typeName, name); propErr == nil {
+		if variant, propErr := conn.GetUnitTypePropertyContext(ctx, unitName, typeName, name); propErr == nil {
 			details[name] = variant.Value.Value()
 		}
 	}

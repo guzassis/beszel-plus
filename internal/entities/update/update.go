@@ -3,6 +3,8 @@ package update
 
 import "time"
 
+import maintenanceentity "github.com/henrygd/beszel/internal/entities/maintenance"
+
 type InstallationState string
 type ConfigurationState string
 type TimerState string
@@ -63,28 +65,36 @@ type UnitStatus struct {
 
 // Status is a current snapshot. It is intentionally not part of minute-series data.
 type Status struct {
-	Supported               bool               `json:"supported" cbor:"0,keyasint"`
-	PackageManager          string             `json:"package_manager,omitempty" cbor:"1,keyasint,omitempty"`
-	InstallationState       InstallationState  `json:"installation_state" cbor:"2,keyasint"`
-	ConfigurationState      ConfigurationState `json:"configuration_state" cbor:"3,keyasint"`
-	TimerState              TimerState         `json:"timer_state" cbor:"4,keyasint"`
-	ServiceState            ServiceState       `json:"service_state" cbor:"5,keyasint"`
-	LastResult              LastResult         `json:"last_result" cbor:"6,keyasint"`
-	OverallState            OverallState       `json:"overall_state" cbor:"7,keyasint"`
-	PendingUpdates          *uint16            `json:"pending_updates,omitempty" cbor:"8,keyasint,omitempty"`
-	PendingSecurityUpdates  *uint16            `json:"pending_security_updates,omitempty" cbor:"9,keyasint,omitempty"`
-	LastCheckAt             *time.Time         `json:"last_check_at,omitempty" cbor:"10,keyasint,omitempty"`
-	LastUpgradeAt           *time.Time         `json:"last_upgrade_at,omitempty" cbor:"11,keyasint,omitempty"`
-	LastError               string             `json:"last_error,omitempty" cbor:"12,keyasint,omitempty"`
-	RecentlyUpdatedPackages []string           `json:"recently_updated_packages,omitempty" cbor:"13,keyasint,omitempty"`
-	RebootRequired          bool               `json:"reboot_required" cbor:"14,keyasint"`
-	RebootRequiredBy        []string           `json:"reboot_required_by,omitempty" cbor:"15,keyasint,omitempty"`
-	CollectedAt             time.Time          `json:"collected_at" cbor:"16,keyasint"`
-	CacheAgeSeconds         uint32             `json:"cache_age_seconds" cbor:"17,keyasint"`
-	DataSources             []string           `json:"data_sources,omitempty" cbor:"18,keyasint,omitempty"`
-	Timers                  []UnitStatus       `json:"timers,omitempty" cbor:"19,keyasint,omitempty"`
-	SecurityUpdatesSince    *time.Time         `json:"security_updates_since,omitempty" cbor:"20,keyasint,omitempty"`
-	RebootRequiredSince     *time.Time         `json:"reboot_required_since,omitempty" cbor:"21,keyasint,omitempty"`
+	Supported               bool                            `json:"supported" cbor:"0,keyasint"`
+	PackageManager          string                          `json:"package_manager,omitempty" cbor:"1,keyasint,omitempty"`
+	InstallationState       InstallationState               `json:"installation_state" cbor:"2,keyasint"`
+	ConfigurationState      ConfigurationState              `json:"configuration_state" cbor:"3,keyasint"`
+	TimerState              TimerState                      `json:"timer_state" cbor:"4,keyasint"`
+	ServiceState            ServiceState                    `json:"service_state" cbor:"5,keyasint"`
+	LastResult              LastResult                      `json:"last_result" cbor:"6,keyasint"`
+	OverallState            OverallState                    `json:"overall_state" cbor:"7,keyasint"`
+	PendingUpdates          *uint16                         `json:"pending_updates,omitempty" cbor:"8,keyasint,omitempty"`
+	PendingSecurityUpdates  *uint16                         `json:"pending_security_updates,omitempty" cbor:"9,keyasint,omitempty"`
+	LastCheckAt             *time.Time                      `json:"last_check_at,omitempty" cbor:"10,keyasint,omitempty"`
+	LastUpgradeAt           *time.Time                      `json:"last_upgrade_at,omitempty" cbor:"11,keyasint,omitempty"`
+	LastError               string                          `json:"last_error,omitempty" cbor:"12,keyasint,omitempty"`
+	RecentlyUpdatedPackages []string                        `json:"recently_updated_packages,omitempty" cbor:"13,keyasint,omitempty"`
+	RebootRequired          bool                            `json:"reboot_required" cbor:"14,keyasint"`
+	RebootRequiredBy        []string                        `json:"reboot_required_by,omitempty" cbor:"15,keyasint,omitempty"`
+	CollectedAt             time.Time                       `json:"collected_at" cbor:"16,keyasint"`
+	CacheAgeSeconds         uint32                          `json:"cache_age_seconds" cbor:"17,keyasint"`
+	DataSources             []string                        `json:"data_sources,omitempty" cbor:"18,keyasint,omitempty"`
+	Timers                  []UnitStatus                    `json:"timers,omitempty" cbor:"19,keyasint,omitempty"`
+	SecurityUpdatesSince    *time.Time                      `json:"security_updates_since,omitempty" cbor:"20,keyasint,omitempty"`
+	RebootRequiredSince     *time.Time                      `json:"reboot_required_since,omitempty" cbor:"21,keyasint,omitempty"`
+	PendingUpdatesTotal     *uint16                         `json:"pending_updates_total,omitempty" cbor:"22,keyasint,omitempty"`
+	PendingUpdatesEligible  *uint16                         `json:"pending_updates_eligible,omitempty" cbor:"23,keyasint,omitempty"`
+	PendingUpdatesExcluded  *uint16                         `json:"pending_updates_excluded,omitempty" cbor:"24,keyasint,omitempty"`
+	ExcludedRepositories    []string                        `json:"excluded_repositories,omitempty" cbor:"25,keyasint,omitempty"`
+	DataStale               bool                            `json:"data_stale,omitempty" cbor:"26,keyasint,omitempty"`
+	CollectionErrors        []string                        `json:"collection_errors,omitempty" cbor:"27,keyasint,omitempty"`
+	Capabilities            *maintenanceentity.Capabilities `json:"capabilities,omitempty" cbor:"28,keyasint,omitempty"`
+	LastUpgradeSource       string                          `json:"last_upgrade_source,omitempty" cbor:"29,keyasint,omitempty"`
 }
 
 // DeriveOverallState is the single precedence definition used by agent and hub.
@@ -112,8 +122,14 @@ func DeriveOverallState(s *Status) OverallState {
 	if s.RebootRequired {
 		return OverallRebootRequired
 	}
-	if s.PendingUpdates != nil && *s.PendingUpdates > 0 {
+	if s.PendingUpdatesEligible != nil && *s.PendingUpdatesEligible > 0 {
 		return OverallUpdatesPending
+	}
+	if s.PendingUpdatesEligible == nil && s.PendingUpdates != nil && *s.PendingUpdates > 0 {
+		return OverallUpdatesPending
+	}
+	if s.DataStale {
+		return OverallMonitoringIncomplete
 	}
 	if s.InstallationState == InstallationUnknown || s.ConfigurationState == ConfigurationUnknown || s.TimerState == TimerUnknown || s.ServiceState == ServiceUnknown || s.LastResult == ResultUnknown {
 		return OverallMonitoringIncomplete

@@ -20,6 +20,12 @@ func TestDeriveOverallStatePrecedence(t *testing.T) {
 		{"running before reboot", func(s *Status) { s.LastResult = ResultRunning; s.RebootRequired = true }, OverallUpdateInProgress},
 		{"reboot", func(s *Status) { s.RebootRequired = true }, OverallRebootRequired},
 		{"pending", func(s *Status) { s.PendingUpdates = u16(5) }, OverallUpdatesPending},
+		{"manual only stays healthy", func(s *Status) {
+			s.PendingUpdatesTotal = u16(5)
+			s.PendingUpdatesEligible = u16(0)
+			s.PendingUpdatesExcluded = u16(5)
+		}, OverallHealthy},
+		{"stale", func(s *Status) { s.DataStale = true }, OverallMonitoringIncomplete},
 		{"incomplete", func(s *Status) { s.ServiceState = ServiceUnknown }, OverallMonitoringIncomplete},
 		{"healthy", func(*Status) {}, OverallHealthy},
 	}
