@@ -49,6 +49,7 @@ type Agent struct {
 	smartManager              *SmartManager                                         // Manages SMART data
 	systemdManager            *systemdManager                                       // Manages systemd services
 	updateManager             *updateManager                                        // Cached automatic update status (opt-in)
+	maintenanceManager        *maintenanceManager                                   // Typed IPC bridge to privileged helper
 }
 
 // NewAgent creates a new agent with the given data directory for persisting data.
@@ -132,7 +133,8 @@ func NewAgent(dataDir ...string) (agent *Agent, err error) {
 	if err != nil {
 		slog.Debug("Systemd", "err", err)
 	}
-	agent.updateManager = newUpdateManager(agent.systemdManager)
+	agent.updateManager = newUpdateManager(agent.systemdManager, agent.dataDir)
+	agent.maintenanceManager = newMaintenanceManager(agent)
 
 	agent.smartManager, err = NewSmartManager()
 	if err != nil {
@@ -170,6 +172,9 @@ func (a *Agent) gatherStats(options common.DataRequestOptions) *system.CombinedD
 	}
 	if a.updateManager != nil {
 		data.Updates = a.updateManager.snapshot()
+		if a.maintenanceManager != nil && data.Updates != nil {
+			data.Updates.Capabilities = a.maintenanceManager.capabilities()
+		}
 	}
 
 	// slog.Info("System data", "data", data, "cacheTimeMs", cacheTimeMs)

@@ -16,3 +16,8 @@ var MinVersionCbor = semver.MustParse("0.12.0")
 
 // MinVersionAgentResponse is the minimum supported version for AgentResponse compatibility.
 var MinVersionAgentResponse = semver.MustParse("0.13.0")
+
+// MinVersionMaintenance is the oldest Agent protocol version that may advertise
+// typed operating-system maintenance capabilities. Capability negotiation is
+// still required because upstream Agents can share this base version.
+var MinVersionMaintenance = semver.MustParse("0.18.7")

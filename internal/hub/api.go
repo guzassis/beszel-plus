@@ -127,6 +127,8 @@ func (h *Hub) registerApiRoutes(se *core.ServeEvent) error {
 	apiAuth.POST("/smart/refresh", h.refreshSmartData).BindFunc(excludeReadOnlyRole)
 	// get systemd service details
 	apiAuth.GET("/systemd/info", h.getSystemdInfo)
+	// privileged OS maintenance uses the existing authenticated Hub-Agent transport.
+	apiAuth.POST("/maintenance", h.handleMaintenance)
 	// /containers routes
 	if enabled, _ := utils.GetEnv("CONTAINER_DETAILS"); enabled != "false" {
 		// get container logs

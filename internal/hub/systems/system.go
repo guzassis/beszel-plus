@@ -18,6 +18,7 @@ import (
 	"github.com/henrygd/beszel/internal/hub/ws"
 
 	"github.com/henrygd/beszel/internal/entities/container"
+	maintenanceentity "github.com/henrygd/beszel/internal/entities/maintenance"
 	"github.com/henrygd/beszel/internal/entities/smart"
 	"github.com/henrygd/beszel/internal/entities/system"
 	"github.com/henrygd/beszel/internal/entities/systemd"
@@ -59,6 +60,10 @@ func (sm *SystemManager) NewSystem(systemId string) *System {
 	}
 	system.ctx, system.cancel = system.getContext()
 	return system
+}
+
+func (sys *System) SupportsMaintenanceProtocol() bool {
+	return sys.agentVersion.GTE(beszel.MinVersionMaintenance)
 }
 
 // StartUpdater starts the system updater.
@@ -467,6 +472,11 @@ func (sys *System) HasUser(app core.App, user *core.Record) bool {
 // It takes the original error that caused the system to go down and returns any error
 // encountered during the process of updating the system status.
 func (sys *System) setDown(originalError error) error {
+	// Shutdown cancels system updaters before PocketBase closes its database,
+	// but an in-flight request can finish between those two steps.
+	if sys.ctx == nil || sys.ctx.Err() != nil || sys.manager == nil || sys.manager.hub == nil || sys.manager.hub.ConcurrentDB() == nil {
+		return nil
+	}
 	if sys.Status == down || sys.Status == paused {
 		return nil
 	}
@@ -618,6 +628,13 @@ func (sys *System) FetchSystemdInfoFromAgent(serviceName string) (systemd.Servic
 	var result systemd.ServiceDetails
 	err := sys.request(ctx, common.GetSystemdInfo, common.SystemdInfoRequest{ServiceName: serviceName}, &result)
 	return result, err
+}
+
+// RequestMaintenance sends a typed maintenance operation over the existing transport.
+func (sys *System) RequestMaintenance(ctx context.Context, req maintenanceentity.Request) (maintenanceentity.Response, error) {
+	var response maintenanceentity.Response
+	err := sys.request(ctx, common.MaintenanceRequest, req, &response)
+	return response, err
 }
 
 // FetchSmartDataFromAgent fetches SMART data from the agent

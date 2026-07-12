@@ -22,6 +22,8 @@ const (
 	GetSmartData
 	// Request detailed systemd service info from agent
 	GetSystemdInfo
+	// Perform a typed operating-system maintenance request.
+	MaintenanceRequest
 	// Add new actions here...
 )
 

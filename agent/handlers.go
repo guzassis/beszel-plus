@@ -7,6 +7,7 @@ import (
 
 	"github.com/fxamacker/cbor/v2"
 	"github.com/henrygd/beszel/internal/common"
+	maintenanceentity "github.com/henrygd/beszel/internal/entities/maintenance"
 	"github.com/henrygd/beszel/internal/entities/smart"
 
 	"log/slog"
@@ -51,8 +52,24 @@ func NewHandlerRegistry() *HandlerRegistry {
 	registry.Register(common.GetContainerInfo, &GetContainerInfoHandler{})
 	registry.Register(common.GetSmartData, &GetSmartDataHandler{})
 	registry.Register(common.GetSystemdInfo, &GetSystemdInfoHandler{})
+	registry.Register(common.MaintenanceRequest, &MaintenanceRequestHandler{})
 
 	return registry
+}
+
+// MaintenanceRequestHandler validates and forwards enumerated operations to the local helper.
+type MaintenanceRequestHandler struct{}
+
+func (h *MaintenanceRequestHandler) Handle(hctx *HandlerContext) error {
+	if hctx.Agent.maintenanceManager == nil {
+		return errors.ErrUnsupported
+	}
+	var req maintenanceentity.Request
+	if err := cbor.Unmarshal(hctx.Request.Data, &req); err != nil {
+		return errors.New("invalid maintenance payload")
+	}
+	response := hctx.Agent.maintenanceManager.handle(req)
+	return hctx.SendResponse(response, hctx.RequestID)
 }
 
 // Register registers a handler for a specific action type

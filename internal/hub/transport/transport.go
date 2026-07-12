@@ -107,6 +107,8 @@ func unmarshalLegacyResponse(resp common.AgentResponse, action common.WebSocketA
 		}
 		*d = resp.ServiceInfo
 		return nil
+	case common.MaintenanceRequest:
+		return errors.New("maintenance response requires generic agent payload")
 	}
 	return fmt.Errorf("unsupported action: %d", action)
 }
