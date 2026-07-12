@@ -1,6 +1,6 @@
 module github.com/henrygd/beszel
 
-go 1.26.3
+go 1.26.5
 
 require (
 	github.com/blang/semver v3.5.1+incompatible
@@ -56,11 +56,11 @@ require (
 	github.com/tklauser/numcpus v0.11.0 // indirect
 	github.com/x448/float16 v0.8.4 // indirect
 	github.com/yusufpapurcu/wmi v1.2.4 // indirect
-	golang.org/x/image v0.41.0 // indirect
+	golang.org/x/image v0.43.0 // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
-	golang.org/x/sync v0.20.0 // indirect
+	golang.org/x/sync v0.21.0 // indirect
 	golang.org/x/term v0.43.0 // indirect
-	golang.org/x/text v0.37.0 // indirect
+	golang.org/x/text v0.38.0 // indirect
 	modernc.org/libc v1.70.0 // indirect
 	modernc.org/mathutil v1.7.1 // indirect
 	modernc.org/memory v1.11.0 // indirect
