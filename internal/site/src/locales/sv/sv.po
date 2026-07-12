@@ -191,6 +191,19 @@ msgstr "Är du säker?"
 msgid "Automatic copy requires a secure context."
 msgstr "Automatisk kopiering kräver en säker kontext."
 
+#: src/lib/alerts.ts
+msgid "Automatic update failed"
+msgstr ""
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Automatic updates"
+msgstr ""
+
+#: src/lib/alerts.ts
+#: src/lib/alerts.ts
+msgid "Automatic updates disabled"
+msgstr ""
+
 #: src/components/routes/system/chart-card.tsx
 msgid "Average"
 msgstr "Genomsnitt"
@@ -717,7 +730,6 @@ msgstr "Ange ditt engångslösenord."
 msgid "Ephemeral"
 msgstr "Flyktig"
 
-#: src/components/login/auth-form.tsx
 #: src/components/routes/settings/alerts-history-data-table.tsx
 #: src/components/routes/settings/config-yaml.tsx
 #: src/components/routes/settings/heartbeat.tsx
@@ -957,6 +969,10 @@ msgstr "Ogiltig e-postadress."
 msgid "Language"
 msgstr "Språk"
 
+#: src/lib/alerts.ts
+msgid "Last update failed"
+msgstr ""
+
 #: src/components/systems-table/systems-table.tsx
 msgid "Layout"
 msgstr ""
@@ -1177,6 +1193,10 @@ msgstr "Annat"
 msgid "Overwrite existing alerts"
 msgstr "Skriv över befintliga larm"
 
+#: src/lib/alerts.ts
+msgid "Package missing"
+msgstr ""
+
 #: src/components/command-palette.tsx
 #: src/components/command-palette.tsx
 #: src/components/command-palette.tsx
@@ -1333,6 +1353,10 @@ msgstr "Tysta timmar"
 msgid "Read"
 msgstr "Läs"
 
+#: src/lib/alerts.ts
+msgid "Reboot required"
+msgstr ""
+
 #: src/components/routes/system/charts/network-charts.tsx
 msgid "Received"
 msgstr "Mottaget"
@@ -1447,6 +1471,10 @@ msgstr "Sök efter system eller inställningar..."
 msgid "Seconds between pings (default: 60)"
 msgstr "Sekunder mellan pingar (standard: 60)"
 
+#: src/lib/alerts.ts
+msgid "Security updates pending"
+msgstr ""
+
 #: src/components/alerts/alerts-sheet.tsx
 msgid "See <0>notification settings</0> to configure how you receive alerts."
 msgstr "Se <0>aviseringsinställningar</0> för att konfigurera hur du tar emot larm."
@@ -1549,6 +1577,11 @@ msgstr "Swap-utrymme som används av systemet"
 #: src/components/routes/system/charts/memory-charts.tsx
 msgid "Swap Usage"
 msgstr "Swap-användning"
+
+#: src/components/mode-toggle.tsx
+#: src/components/mode-toggle.tsx
+msgid "Switch theme"
+msgstr ""
 
 #: src/components/add-system.tsx
 #: src/components/alerts-history-columns.tsx
@@ -1659,8 +1692,8 @@ msgstr "Till e-postadress(er)"
 
 #: src/components/mode-toggle.tsx
 #: src/components/mode-toggle.tsx
-msgid "Toggle theme"
-msgstr "Växla tema"
+#~ msgid "Toggle theme"
+#~ msgstr "Växla tema"
 
 #: src/components/add-system.tsx
 #: src/components/routes/settings/tokens-fingerprints.tsx
@@ -1725,8 +1758,20 @@ msgid "Triggers when 5 minute load average exceeds a threshold"
 msgstr "Utlöses när 5-minuters genomsnittlig belastning överskrider ett tröskelvärde"
 
 #: src/lib/alerts.ts
+#~ msgid "Triggers when a reboot is required"
+#~ msgstr ""
+
+#: src/lib/alerts.ts
+msgid "Triggers when a reboot remains required longer than the threshold"
+msgstr ""
+
+#: src/lib/alerts.ts
 msgid "Triggers when any sensor exceeds a threshold"
 msgstr "Utlöses när någon sensor överskrider ett tröskelvärde"
+
+#: src/lib/alerts.ts
+msgid "Triggers when automatic updates are disabled"
+msgstr ""
 
 #: src/lib/alerts.ts
 msgid "Triggers when battery charge drops below a threshold"
@@ -1749,8 +1794,28 @@ msgid "Triggers when memory usage exceeds a threshold"
 msgstr "Utlöses när minnesanvändningen överskrider ett tröskelvärde"
 
 #: src/lib/alerts.ts
+#~ msgid "Triggers when security updates are pending"
+#~ msgstr ""
+
+#: src/lib/alerts.ts
+msgid "Triggers when security updates remain pending longer than the threshold"
+msgstr ""
+
+#: src/lib/alerts.ts
 msgid "Triggers when status switches between up and down"
 msgstr "Utlöses när status växlar mellan upp och ner"
+
+#: src/lib/alerts.ts
+msgid "Triggers when the last automatic update failed"
+msgstr ""
+
+#: src/lib/alerts.ts
+msgid "Triggers when unattended-upgrades is not installed"
+msgstr ""
+
+#: src/lib/alerts.ts
+msgid "Triggers when update information is older than the threshold"
+msgstr ""
 
 #: src/lib/alerts.ts
 msgid "Triggers when usage of any disk exceeds a threshold"
@@ -1761,6 +1826,10 @@ msgstr "Utlöses när användningen av någon disk överskrider ett tröskelvär
 #: src/components/routes/system/smart-table.tsx
 msgid "Type"
 msgstr "Typ"
+
+#: src/lib/alerts.ts
+msgid "Unattended upgrades package missing"
+msgstr ""
 
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Unit file"
@@ -1800,6 +1869,10 @@ msgstr "Upp ({upSystemsLength})"
 msgid "Update"
 msgstr "Uppdatera"
 
+#: src/lib/alerts.ts
+msgid "Update information stale"
+msgstr ""
+
 #: src/components/containers-table/containers-table-columns.tsx
 #: src/components/routes/system/smart-table.tsx
 #: src/components/systemd-table/systemd-table-columns.tsx
@@ -1809,6 +1882,10 @@ msgstr "Uppdaterad"
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Updated every 10 minutes."
 msgstr "Uppdateras var 10:e minut."
+
+#: src/components/systems-table/systems-table-columns.tsx
+msgid "Updates"
+msgstr ""
 
 #: src/components/routes/system/network-sheet.tsx
 msgid "Upload"

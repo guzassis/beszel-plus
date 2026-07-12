@@ -78,6 +78,53 @@ export interface SystemInfo {
 	efs?: Record<string, number>
 	/** services [totalServices, numFailedServices] */
 	sv?: [number, number]
+	/** current unattended-upgrades monitoring snapshot */
+	upd?: UpdateStatus
+}
+
+export type UpdateOverallState =
+	| "unsupported"
+	| "not_installed"
+	| "installed_not_configured"
+	| "configured_disabled"
+	| "monitoring_incomplete"
+	| "healthy"
+	| "updates_pending"
+	| "reboot_required"
+	| "last_run_failed"
+	| "update_in_progress"
+	| "unknown"
+
+export interface UpdateUnitStatus {
+	name: string
+	state: "unknown" | "not_found" | "disabled" | "inactive" | "active" | "failed"
+	next?: string
+	last?: string
+}
+
+export interface UpdateStatus {
+	supported: boolean
+	package_manager?: string
+	installation_state: "unknown" | "not_installed" | "installed"
+	configuration_state: "unknown" | "missing" | "partial" | "disabled" | "enabled"
+	timer_state: "unknown" | "not_found" | "disabled" | "inactive" | "active" | "failed"
+	service_state: "unknown" | "not_found" | "inactive" | "running" | "success" | "failed"
+	last_result: "unknown" | "never_run" | "running" | "success" | "failed"
+	overall_state: UpdateOverallState
+	pending_updates?: number
+	pending_security_updates?: number
+	last_check_at?: string
+	last_upgrade_at?: string
+	last_error?: string
+	recently_updated_packages?: string[]
+	reboot_required: boolean
+	reboot_required_by?: string[]
+	collected_at: string
+	cache_age_seconds: number
+	data_sources?: string[]
+	timers?: UpdateUnitStatus[]
+	security_updates_since?: string
+	reboot_required_since?: string
 }
 
 export interface SystemStats {

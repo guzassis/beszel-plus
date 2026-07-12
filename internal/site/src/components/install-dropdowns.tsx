@@ -12,7 +12,8 @@ import { DropdownMenuContent, DropdownMenuItem } from "./ui/dropdown-menu"
  * @returns The URL for the script.
  */
 const getScriptUrl = (path: string = "") => {
-	return `https://get.beszel.dev${path}`
+	const file = path === "/brew" ? "install-agent-brew.sh" : path === "/windows" ? "install-agent.ps1" : "install-agent.sh"
+	return `https://raw.githubusercontent.com/guzassis/beszel-plus/main/supplemental/scripts/${file}`
 	// no beta for now
 	// const url = new URL("https://get.beszel.dev")
 	// url.pathname = path
@@ -60,7 +61,7 @@ export function copyLinuxCommand(port = "45876", publicKey: string, token: strin
 
 export function copyWindowsCommand(port = "45876", publicKey: string, token: string) {
 	copyToClipboard(
-		`& iwr -useb ${getScriptUrl()} -OutFile "$env:TEMP\\install-agent.ps1"; & Powershell -ExecutionPolicy Bypass -File "$env:TEMP\\install-agent.ps1" -Key "${publicKey}" -Port ${port} -Token "${token}" -Url "${getHubURL()}"`
+		`& iwr -useb ${getScriptUrl("/windows")} -OutFile "$env:TEMP\\install-agent.ps1"; & Powershell -ExecutionPolicy Bypass -File "$env:TEMP\\install-agent.ps1" -Key "${publicKey}" -Port ${port} -Token "${token}" -Url "${getHubURL()}"`
 	)
 }
 
