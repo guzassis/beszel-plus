@@ -7,6 +7,53 @@ import { alertInfo } from "@/lib/alerts"
 import { cn, formatDuration, formatShortDate, toFixedFloat } from "@/lib/utils"
 import type { AlertsHistoryRecord } from "@/types"
 
+function maintenanceEventLabel(name: string) {
+	if (!name.startsWith("maintenance:")) return undefined
+	const value = name.slice("maintenance:".length)
+	const direct: Record<string, () => string> = {
+		package_not_installed: () => t`Update package not installed`,
+		automatic_updates_disabled: () => t`Automatic updates disabled`,
+		updates_available: () => t`Updates available`,
+		security_updates_available: () => t`Security updates available`,
+		upgrade_started: () => t`Upgrade started`,
+		upgrade_succeeded: () => t`Upgrade completed`,
+		upgrade_failed: () => t`Upgrade failed`,
+		reboot_required: () => t`Reboot required`,
+		reboot_cleared: () => t`Reboot requirement cleared`,
+		monitoring_error: () => t`Update monitoring error`,
+		operation_refused: () => t`Maintenance operation refused`,
+		unauthorized_attempt: () => t`Unauthorized maintenance attempt`,
+		helper_incompatible: () => t`Maintenance helper incompatible`,
+		agent_incompatible: () => t`Agent incompatible with maintenance operations`,
+		operation_timeout: () => t`Maintenance operation timed out`,
+	}
+	if (direct[value]) return direct[value]()
+	const operations: Record<string, () => string> = {
+		"apply-update-policy": () => t`Apply update policy`,
+		"validate-update-policy": () => t`Validate update policy`,
+		"install-update-dependencies": () => t`Install update dependencies`,
+		"run-update-dry-run": () => t`Run update dry-run`,
+		"run-unattended-upgrades": () => t`Run system updates`,
+		"get-update-policy": () => t`Read update policy`,
+		"detect-repositories": () => t`Detect repositories`,
+		"get-operation-status": () => t`Read operation status`,
+	}
+	const states: Record<string, () => string> = {
+		queued: () => t`Queued`,
+		running: () => t`Running`,
+		completed: () => t`Completed`,
+		failed: () => t`Failed`,
+	}
+	for (const [operation, operationLabel] of Object.entries(operations)) {
+		const prefix = `operation_${operation}_`
+		if (value.startsWith(prefix)) {
+			const state = value.slice(prefix.length)
+			return t`${operationLabel()} · ${states[state]?.() ?? state}`
+		}
+	}
+	return t`Maintenance event`
+}
+
 export const alertsHistoryColumns: ColumnDef<AlertsHistoryRecord>[] = [
 	{
 		accessorKey: "system",
@@ -30,7 +77,7 @@ export const alertsHistoryColumns: ColumnDef<AlertsHistoryRecord>[] = [
 		accessorFn: (record) => {
 			const name = record.name
 			const info = alertInfo[name]
-			return info?.name().replace("cpu", "CPU") || name
+			return maintenanceEventLabel(name) || info?.name().replace("cpu", "CPU") || name
 		},
 		header: ({ column }) => (
 			<Button variant="ghost" onClick={() => column.toggleSorting(column.getIsSorted() === "asc")}>
@@ -83,6 +130,12 @@ export const alertsHistoryColumns: ColumnDef<AlertsHistoryRecord>[] = [
 			</Button>
 		),
 		cell: ({ row }) => {
+			if (row.original.name.startsWith("maintenance:"))
+				return (
+					<Badge variant="outline">
+						<Trans>Event</Trans>
+					</Badge>
+				)
 			const resolved = row.original.resolved
 			return (
 				<Badge

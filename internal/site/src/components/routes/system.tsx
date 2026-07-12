@@ -278,7 +278,7 @@ export default memo(function SystemDetail({ id }: { id: string }) {
 				setDisplayMode={setDisplayMode}
 				details={details}
 			/>
-			<AutomaticUpdates status={system.info.upd} />
+			<AutomaticUpdates status={system.info.upd} systemId={system.id} />
 
 			{displayMode === "tabs" ? tabbedLayout() : defaultLayout()}
 		</div>

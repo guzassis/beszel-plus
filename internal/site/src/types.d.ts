@@ -125,6 +125,67 @@ export interface UpdateStatus {
 	timers?: UpdateUnitStatus[]
 	security_updates_since?: string
 	reboot_required_since?: string
+	pending_updates_total?: number
+	pending_updates_eligible?: number
+	pending_updates_excluded?: number
+	excluded_repositories?: string[]
+	data_stale?: boolean
+	collection_errors?: string[]
+	capabilities?: MaintenanceCapabilities
+	last_upgrade_source?: "automatic" | "manual"
+}
+
+export interface MaintenanceCapabilities {
+	update_monitoring: boolean
+	update_management: boolean
+	privileged_helper: boolean
+	policy_read: boolean
+	policy_write: boolean
+	dry_run: boolean
+	run_upgrade: boolean
+	automatic_reboot: boolean
+	supported_platform?: string
+}
+
+export type UpdatePolicyMode = "monitor_only" | "security" | "official_all" | "custom"
+export interface UpdatePolicy {
+	enabled: boolean
+	mode: UpdatePolicyMode
+	update_package_lists_days: number
+	unattended_upgrade_days: number
+	automatic_reboot: boolean
+	automatic_reboot_time: string
+	remove_unused_dependencies: boolean
+	allowed_repositories?: string[]
+	confirm_third_party?: boolean
+}
+export interface UpdateRepository {
+	id: string
+	origin: string
+	label: string
+	codename: string
+	archive: string
+	components?: string[]
+	site?: string
+	architectures?: string[]
+	trusted: boolean
+	official: boolean
+}
+export interface MaintenanceResponse {
+	version: number
+	request_id: string
+	operation: string
+	status: "queued" | "running" | "completed" | "failed"
+	progress?: number
+	message?: string
+	result?: {
+		capabilities?: MaintenanceCapabilities
+		policy?: UpdatePolicy
+		repositories?: UpdateRepository[]
+		output?: string
+		changed?: boolean
+	}
+	error?: string
 }
 
 export interface SystemStats {
