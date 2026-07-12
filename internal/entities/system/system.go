@@ -8,6 +8,7 @@ import (
 
 	"github.com/henrygd/beszel/internal/entities/container"
 	"github.com/henrygd/beszel/internal/entities/systemd"
+	updateentity "github.com/henrygd/beszel/internal/entities/update"
 )
 
 type Stats struct {
@@ -149,12 +150,13 @@ type Info struct {
 	// LoadAvg5       float64 `json:"l5,omitempty" cbor:"16,keyasint,omitempty"`  // deprecated - use `la` array instead
 	// LoadAvg15      float64 `json:"l15,omitempty" cbor:"17,keyasint,omitempty"` // deprecated - use `la` array instead
 
-	BandwidthBytes uint64             `json:"bb" cbor:"18,keyasint"`
-	LoadAvg        [3]float64         `json:"la,omitempty" cbor:"19,keyasint"`
-	ConnectionType ConnectionType     `json:"ct,omitempty" cbor:"20,keyasint,omitempty,omitzero"`
-	ExtraFsPct     map[string]float64 `json:"efs,omitempty" cbor:"21,keyasint,omitempty"`
-	Services       []uint16           `json:"sv,omitempty" cbor:"22,keyasint,omitempty"` // [totalServices, numFailedServices]
-	Battery        [2]uint8           `json:"bat,omitzero" cbor:"23,keyasint,omitzero"`  // [percent, charge state]
+	BandwidthBytes uint64               `json:"bb" cbor:"18,keyasint"`
+	LoadAvg        [3]float64           `json:"la,omitempty" cbor:"19,keyasint"`
+	ConnectionType ConnectionType       `json:"ct,omitempty" cbor:"20,keyasint,omitempty,omitzero"`
+	ExtraFsPct     map[string]float64   `json:"efs,omitempty" cbor:"21,keyasint,omitempty"`
+	Services       []uint16             `json:"sv,omitempty" cbor:"22,keyasint,omitempty"`  // [totalServices, numFailedServices]
+	Battery        [2]uint8             `json:"bat,omitzero" cbor:"23,keyasint,omitzero"`   // [percent, charge state]
+	Updates        *updateentity.Status `json:"upd,omitempty" cbor:"24,keyasint,omitempty"` // current update snapshot (not time-series)
 }
 
 // Data that does not change during process lifetime and is not needed in All Systems table
@@ -174,9 +176,10 @@ type Details struct {
 
 // Final data structure to return to the hub
 type CombinedData struct {
-	Stats           Stats              `json:"stats" cbor:"0,keyasint"`
-	Info            Info               `json:"info" cbor:"1,keyasint"`
-	Containers      []*container.Stats `json:"container" cbor:"2,keyasint"`
-	SystemdServices []*systemd.Service `json:"systemd,omitempty" cbor:"3,keyasint,omitempty"`
-	Details         *Details           `cbor:"4,keyasint,omitempty"`
+	Stats           Stats                `json:"stats" cbor:"0,keyasint"`
+	Info            Info                 `json:"info" cbor:"1,keyasint"`
+	Containers      []*container.Stats   `json:"container" cbor:"2,keyasint"`
+	SystemdServices []*systemd.Service   `json:"systemd,omitempty" cbor:"3,keyasint,omitempty"`
+	Details         *Details             `cbor:"4,keyasint,omitempty"`
+	Updates         *updateentity.Status `json:"updates,omitempty" cbor:"5,keyasint,omitempty"`
 }

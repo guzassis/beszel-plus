@@ -48,6 +48,7 @@ type Agent struct {
 	keys                      []gossh.PublicKey                                     // SSH public keys
 	smartManager              *SmartManager                                         // Manages SMART data
 	systemdManager            *systemdManager                                       // Manages systemd services
+	updateManager             *updateManager                                        // Cached automatic update status (opt-in)
 }
 
 // NewAgent creates a new agent with the given data directory for persisting data.
@@ -131,6 +132,7 @@ func NewAgent(dataDir ...string) (agent *Agent, err error) {
 	if err != nil {
 		slog.Debug("Systemd", "err", err)
 	}
+	agent.updateManager = newUpdateManager(agent.systemdManager)
 
 	agent.smartManager, err = NewSmartManager()
 	if err != nil {
@@ -165,6 +167,9 @@ func (a *Agent) gatherStats(options common.DataRequestOptions) *system.CombinedD
 	*data = system.CombinedData{
 		Stats: a.getSystemStats(cacheTimeMs),
 		Info:  a.systemInfo,
+	}
+	if a.updateManager != nil {
+		data.Updates = a.updateManager.snapshot()
 	}
 
 	// slog.Info("System data", "data", data, "cacheTimeMs", cacheTimeMs)

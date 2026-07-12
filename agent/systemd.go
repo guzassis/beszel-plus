@@ -278,6 +278,38 @@ func (sm *systemdManager) getServiceDetails(serviceName string) (systemd.Service
 	return details, nil
 }
 
+// getUpdateUnitDetails exposes read-only unit state to the update collector while
+// keeping systemd access on the agent's existing D-Bus implementation.
+func (sm *systemdManager) getUpdateUnitDetails(unitName string) (systemd.ServiceDetails, error) {
+	conn, err := dbus.NewSystemConnectionContext(context.Background())
+	if err != nil {
+		return nil, err
+	}
+	defer conn.Close()
+	props, err := conn.GetUnitPropertiesContext(context.Background(), unitName)
+	if err != nil {
+		return nil, err
+	}
+	details := systemd.ServiceDetails{}
+	maps.Copy(details, props)
+	unitType := "Service"
+	propertyNames := []string{"Result", "ExecMainStatus", "ExecMainStartTimestamp", "ExecMainExitTimestamp"}
+	if strings.HasSuffix(unitName, ".timer") {
+		unitType = "Timer"
+		propertyNames = []string{"LastTriggerUSec", "NextElapseUSecRealtime"}
+	}
+	for _, name := range append([]string{"UnitFileState"}, propertyNames...) {
+		typeName := unitType
+		if name == "UnitFileState" {
+			typeName = "Unit"
+		}
+		if variant, propErr := conn.GetUnitTypePropertyContext(context.Background(), unitName, typeName, name); propErr == nil {
+			details[name] = variant.Value.Value()
+		}
+	}
+	return details, nil
+}
+
 // unescapeServiceName unescapes systemd service names that contain C-style escape sequences like \x2d
 func unescapeServiceName(name string) string {
 	if !strings.Contains(name, "\\x") {
