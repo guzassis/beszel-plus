@@ -12,7 +12,8 @@ import { DropdownMenuContent, DropdownMenuItem } from "./ui/dropdown-menu"
  * @returns The URL for the script.
  */
 const getScriptUrl = (path: string = "") => {
-	const file = path === "/brew" ? "install-agent-brew.sh" : path === "/windows" ? "install-agent.ps1" : "install-agent.sh"
+	const file =
+		path === "/brew" ? "install-agent-brew.sh" : path === "/windows" ? "install-agent.ps1" : "install-agent.sh"
 	return `https://raw.githubusercontent.com/guzassis/beszel-plus/main/supplemental/scripts/${file}`
 	// no beta for now
 	// const url = new URL("https://get.beszel.dev")
@@ -52,6 +53,9 @@ export function copyLinuxCommand(port = "45876", publicKey: string, token: strin
 	let cmd = `curl -sL ${getScriptUrl(
 		brew ? "/brew" : ""
 	)} -o /tmp/install-agent.sh && chmod +x /tmp/install-agent.sh && /tmp/install-agent.sh -p ${port} -k "${publicKey}" -t "${token}" -url "${getHubURL()}"`
+	if (!brew) {
+		cmd += " --os-update-management=true --os-update-policy=security"
+	}
 	// brew script does not support --china-mirrors
 	if (!brew && (i18n.locale + navigator.language).includes("zh-CN")) {
 		cmd += ` --china-mirrors`

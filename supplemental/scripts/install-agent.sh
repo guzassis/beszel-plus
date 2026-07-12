@@ -239,6 +239,8 @@ KEY=""
 TOKEN=""
 HUB_URL=""
 AUTO_UPDATE_FLAG="" # empty string means prompt, "true" means auto-enable, "false" means skip
+OS_UPDATE_MANAGEMENT_FLAG="false"
+OS_UPDATE_POLICY="security"
 VERSION="latest"
 
 # Check for help flag
@@ -253,7 +255,10 @@ case "$1" in
   printf "  -url                  : Hub URL (optional for backwards compatibility)\n"
   printf "  -v, --version         : Version to install (default: latest)\n"
   printf "  -u                    : Uninstall Beszel Agent\n"
-  printf "  --auto-update [VALUE] : Control automatic daily updates\n"
+	printf "  --agent-auto-update=true|false : Control automatic updates of the Agent binary\n"
+	printf "  --auto-update [VALUE] : Deprecated alias for --agent-auto-update\n"
+	printf "  --os-update-management=true|false : Install OS update management components\n"
+	printf "  --os-update-policy=monitor|security|official-all : Initial policy for new installations\n"
   printf "                          VALUE can be true (enable) or false (disable). If not specified, will prompt.\n"
   printf "  --mirror [URL]        : Use GitHub proxy to resolve network timeout issues in mainland China\n"
   printf "                          URL: optional custom proxy URL (default: https://gh.beszel.dev)\n"
@@ -337,7 +342,20 @@ while [ $# -gt 0 ]; do
       GITHUB_URL="$GITHUB_PROXY_URL"
     fi
     ;;
+	--agent-auto-update*)
+		if echo "$1" | grep -q "="; then AUTO_UPDATE_VALUE=$(echo "$1" | cut -d'=' -f2); else AUTO_UPDATE_VALUE="$2"; shift; fi
+		if [ "$AUTO_UPDATE_VALUE" = "true" ] || [ "$AUTO_UPDATE_VALUE" = "false" ]; then AUTO_UPDATE_FLAG="$AUTO_UPDATE_VALUE"; else echo "Invalid --agent-auto-update value" >&2; exit 1; fi
+		;;
+	--os-update-management*)
+		if echo "$1" | grep -q "="; then OS_UPDATE_VALUE=$(echo "$1" | cut -d'=' -f2); else OS_UPDATE_VALUE="$2"; shift; fi
+		if [ "$OS_UPDATE_VALUE" = "true" ] || [ "$OS_UPDATE_VALUE" = "false" ]; then OS_UPDATE_MANAGEMENT_FLAG="$OS_UPDATE_VALUE"; else echo "Invalid --os-update-management value" >&2; exit 1; fi
+		;;
+	--os-update-policy*)
+		if echo "$1" | grep -q "="; then OS_UPDATE_POLICY=$(echo "$1" | cut -d'=' -f2); else OS_UPDATE_POLICY="$2"; shift; fi
+		case "$OS_UPDATE_POLICY" in monitor|security|official-all) ;; *) echo "Invalid --os-update-policy value" >&2; exit 1 ;; esac
+		;;
   --auto-update*)
+		echo "Warning: --auto-update is deprecated; use --agent-auto-update." >&2
     # Check if there's a value after the = sign
     if echo "$1" | grep -q "="; then
       # Extract the value after =
@@ -376,6 +394,10 @@ else
   BIN_DIR="/opt/beszel-agent"
   BIN_PATH="/opt/beszel-agent/beszel-agent"
 fi
+MAINTENANCE_HELPER_PATH="/usr/local/libexec/beszel/maintenance-helper"
+
+EXISTING_INSTALLATION=false
+if [ -f "$BIN_PATH" ]; then EXISTING_INSTALLATION=true; fi
 
 # Stop existing service if it exists (for upgrades)
 if [ "$UNINSTALL" != true ] && [ -f "$BIN_PATH" ]; then
@@ -456,6 +478,7 @@ if [ "$UNINSTALL" = true ]; then
     echo "Stopping and disabling the agent service..."
     systemctl stop beszel-agent.service
     systemctl disable beszel-agent.service >/dev/null 2>&1
+		systemctl disable --now beszel-maintenance.socket 2>/dev/null || true
 
     echo "Removing the systemd service file..."
     rm /etc/systemd/system/beszel-agent.service
@@ -466,6 +489,11 @@ if [ "$UNINSTALL" = true ]; then
     systemctl disable beszel-agent-update.timer >/dev/null 2>&1
     rm -f /etc/systemd/system/beszel-agent-update.service
     rm -f /etc/systemd/system/beszel-agent-update.timer
+		rm -f /etc/systemd/system/beszel-maintenance.socket
+		rm -f /etc/systemd/system/beszel-maintenance-helper@.service
+		rm -f /usr/local/libexec/beszel/maintenance-helper
+		rmdir /usr/local/libexec/beszel 2>/dev/null || true
+		rm -rf /var/lib/beszel-maintenance
 
     systemctl daemon-reload
   fi
@@ -724,6 +752,28 @@ fi
 mv beszel-agent "$BIN_PATH"
 chown beszel:beszel "$BIN_PATH"
 chmod 755 "$BIN_PATH"
+
+# Install the privileged one-shot helper only on supported Linux systems when requested.
+OS_UPDATE_SUPPORTED=false
+if [ "$OS" = "linux" ] && grep -Eq '^ID=("?)(debian|ubuntu|raspbian)\1$' /etc/os-release 2>/dev/null; then OS_UPDATE_SUPPORTED=true; fi
+if [ "$OS_UPDATE_MANAGEMENT_FLAG" = "true" ] && [ "$OS_UPDATE_SUPPORTED" = "true" ]; then
+  if ! dpkg-query -W -f='${db:Status-Status}' unattended-upgrades 2>/dev/null | grep -qx installed; then
+    echo "Installing unattended-upgrades dependency..."
+    if ! apt-get update || ! DEBIAN_FRONTEND=noninteractive apt-get install -y unattended-upgrades; then echo "Failed to install unattended-upgrades" >&2; exit 1; fi
+  fi
+  HELPER_FILE_NAME="beszel-maintenance-helper_${OS}_${ARCH}.tar.gz"
+  HELPER_CHECKSUM=$(curl -fsSL "$GITHUB_URL/guzassis/beszel-plus/releases/download/v${INSTALL_VERSION}/beszel_${INSTALL_VERSION}_checksums.txt" | grep "$HELPER_FILE_NAME" | cut -d' ' -f1)
+  if [ -z "$HELPER_CHECKSUM" ] || ! echo "$HELPER_CHECKSUM" | grep -qE '^[a-fA-F0-9]{64}$'; then echo "Invalid maintenance helper checksum" >&2; exit 1; fi
+  curl -fL# --retry 3 --retry-delay 2 --connect-timeout 10 "$GITHUB_URL/guzassis/beszel-plus/releases/download/v${INSTALL_VERSION}/$HELPER_FILE_NAME" -o "$HELPER_FILE_NAME"
+  if [ "$($CHECK_CMD "$HELPER_FILE_NAME" | cut -d' ' -f1)" != "$HELPER_CHECKSUM" ]; then echo "Maintenance helper checksum verification failed" >&2; exit 1; fi
+  tar -xzf "$HELPER_FILE_NAME" beszel-maintenance-helper
+  mkdir -p "$(dirname "$MAINTENANCE_HELPER_PATH")"
+  chown root:root "$(dirname "$MAINTENANCE_HELPER_PATH")"
+  chmod 0755 "$(dirname "$MAINTENANCE_HELPER_PATH")"
+  mv beszel-maintenance-helper "$MAINTENANCE_HELPER_PATH"
+  chown root:root "$MAINTENANCE_HELPER_PATH"
+  chmod 0755 "$MAINTENANCE_HELPER_PATH"
+fi
 
 # Set SELinux context if needed
 set_selinux_context
@@ -997,6 +1047,8 @@ Environment="UPDATE_MONITORING=true"
 Environment="UPDATE_CHECK_INTERVAL=6h"
 Environment="UPDATE_CHECK_TIMEOUT=30s"
 Environment="UPDATE_MAX_PACKAGE_LIST=50"
+Environment="UPDATE_APT_TIMEOUT=2m"
+Environment="OS_UPDATE_MANAGEMENT=$OS_UPDATE_MANAGEMENT_FLAG"
 # Environment="EXTRA_FILESYSTEMS=sdb"
 ExecStart=$BIN_PATH
 User=beszel
@@ -1033,13 +1085,60 @@ Environment="UPDATE_MONITORING=true"
 Environment="UPDATE_CHECK_INTERVAL=6h"
 Environment="UPDATE_CHECK_TIMEOUT=30s"
 Environment="UPDATE_MAX_PACKAGE_LIST=50"
+Environment="UPDATE_APT_TIMEOUT=2m"
+Environment="OS_UPDATE_MANAGEMENT=$OS_UPDATE_MANAGEMENT_FLAG"
 EOF
+
+  if [ "$OS_UPDATE_MANAGEMENT_FLAG" = "true" ] && [ "$OS_UPDATE_SUPPORTED" = "true" ]; then
+    cat >/etc/systemd/system/beszel-maintenance.socket <<EOF
+[Unit]
+Description=Beszel maintenance helper socket
+[Socket]
+ListenStream=/run/beszel-maintenance.sock
+SocketUser=root
+SocketGroup=beszel
+SocketMode=0660
+Accept=yes
+RemoveOnStop=yes
+[Install]
+WantedBy=sockets.target
+EOF
+    cat >/etc/systemd/system/beszel-maintenance-helper@.service <<EOF
+[Unit]
+Description=Beszel privileged maintenance helper
+[Service]
+Type=oneshot
+TimeoutStartSec=3h
+ExecStart=$MAINTENANCE_HELPER_PATH
+StandardInput=socket
+StandardOutput=socket
+StandardError=journal
+User=root
+Group=root
+UMask=0077
+NoNewPrivileges=yes
+PrivateTmp=yes
+ProtectHome=yes
+ProtectKernelTunables=yes
+ProtectKernelModules=yes
+ProtectControlGroups=yes
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictNamespaces=yes
+LockPersonality=yes
+MemoryDenyWriteExecute=yes
+EOF
+  fi
 
   # Load and start the service
   printf "\nLoading and starting the agent service...\n"
   systemctl daemon-reload
+	if [ "$OS_UPDATE_MANAGEMENT_FLAG" = "true" ] && [ "$OS_UPDATE_SUPPORTED" = "true" ]; then systemctl enable --now beszel-maintenance.socket apt-daily.timer apt-daily-upgrade.timer; fi
   systemctl enable beszel-agent.service >/dev/null 2>&1
   systemctl restart beszel-agent.service
+	if [ "$EXISTING_INSTALLATION" = "false" ] && [ "$OS_UPDATE_MANAGEMENT_FLAG" = "true" ] && [ "$OS_UPDATE_SUPPORTED" = "true" ]; then
+		case "$OS_UPDATE_POLICY" in monitor) POLICY_MODE="monitor_only" ;; official-all) POLICY_MODE="official_all" ;; *) POLICY_MODE="security" ;; esac
+		printf '{"version":1,"request_id":"installer-initial","operation":"apply-update-policy","idempotency_key":"installer-initial-policy","policy":{"enabled":true,"mode":"%s","update_package_lists_days":1,"unattended_upgrade_days":1,"automatic_reboot":false,"automatic_reboot_time":"04:00","remove_unused_dependencies":false}}\n' "$POLICY_MODE" | "$MAINTENANCE_HELPER_PATH" >/dev/null || echo "Warning: initial OS update policy validation failed; monitoring remains enabled."
+	fi
 
 
 
