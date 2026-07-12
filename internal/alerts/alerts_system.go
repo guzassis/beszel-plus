@@ -28,6 +28,13 @@ func (am *AlertManager) HandleSystemAlerts(systemRecord *core.Record, data *syst
 		var val float64
 		unit := "%"
 
+		if triggered, known, maintenanceVal, maintenanceUnit := evaluateUpdateAlert(name, alertData.Value, data, now); known {
+			if triggered != alertData.Triggered {
+				go am.sendSystemAlert(SystemAlertData{systemRecord: systemRecord, alertData: alertData, name: name, unit: maintenanceUnit, val: maintenanceVal, threshold: alertData.Value, triggered: triggered, min: 1, descriptor: name})
+			}
+			continue
+		}
+
 		switch name {
 		case "CPU":
 			val = data.Info.Cpu
@@ -297,6 +304,62 @@ func (am *AlertManager) HandleSystemAlerts(systemRecord *core.Record, data *syst
 	return nil
 }
 
+func evaluateUpdateAlert(name string, threshold float64, data *system.CombinedData, now time.Time) (bool, bool, float64, string) {
+	status := data.Updates
+	if status == nil || !status.Supported {
+		return false, false, 0, ""
+	}
+	switch name {
+	case "Unattended upgrades package missing":
+		if status.InstallationState == "unknown" {
+			return false, false, 0, ""
+		}
+		return status.InstallationState == "not_installed", true, 1, ""
+	case "Automatic updates disabled":
+		if status.ConfigurationState == "unknown" || status.TimerState == "unknown" {
+			return false, false, 0, ""
+		}
+		return status.ConfigurationState == "disabled" || status.TimerState == "disabled", true, 1, ""
+	case "Automatic update failed":
+		if status.LastResult == "unknown" {
+			return false, false, 0, ""
+		}
+		return status.LastResult == "failed", true, 1, ""
+	case "Security updates pending":
+		if status.PendingSecurityUpdates == nil {
+			return false, false, 0, ""
+		}
+		if *status.PendingSecurityUpdates == 0 {
+			return false, true, 0, " hours"
+		}
+		if status.SecurityUpdatesSince == nil {
+			return false, false, 0, ""
+		}
+		hours := max(now.Sub(*status.SecurityUpdatesSince).Hours(), 0)
+		return hours > threshold, true, hours, " hours"
+	case "Reboot required":
+		if !status.RebootRequired {
+			return false, true, 0, " days"
+		}
+		if status.RebootRequiredSince == nil {
+			return false, false, 0, ""
+		}
+		days := max(now.Sub(*status.RebootRequiredSince).Hours()/24, 0)
+		return days > threshold, true, days, " days"
+	case "Update information stale":
+		if status.CollectedAt.IsZero() {
+			return false, false, 0, ""
+		}
+		hours := now.Sub(status.CollectedAt).Hours()
+		if hours < 0 {
+			hours = 0
+		}
+		return hours > threshold, true, hours, " hours"
+	default:
+		return false, false, 0, ""
+	}
+}
+
 func (am *AlertManager) sendSystemAlert(alert SystemAlertData) {
 	// log.Printf("Sending alert %s: val %f | count %d | threshold %f\n", alert.name, alert.val, alert.count, alert.threshold)
 	systemName := alert.systemRecord.GetString("name")
@@ -339,6 +402,15 @@ func (am *AlertManager) sendSystemAlert(alert SystemAlertData) {
 		alert.descriptor = alert.name
 	}
 	body := fmt.Sprintf("%s averaged %.2f%s for the previous %v %s.", alert.descriptor, alert.val, alert.unit, alert.min, minutesLabel)
+	if strings.Contains(alert.name, "update") || strings.Contains(alert.name, "Reboot") || strings.Contains(alert.name, "Unattended") {
+		if alert.triggered {
+			subject = fmt.Sprintf("%s: %s", systemName, alert.name)
+			body = alert.name + "."
+		} else {
+			subject = fmt.Sprintf("%s: %s resolved", systemName, alert.name)
+			body = alert.name + " is no longer active."
+		}
+	}
 
 	if err := am.setAlertTriggered(alert.alertData, alert.triggered); err != nil {
 		// app.Logger().Error("failed to save alert record", "err", err)

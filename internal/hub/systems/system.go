@@ -21,6 +21,7 @@ import (
 	"github.com/henrygd/beszel/internal/entities/smart"
 	"github.com/henrygd/beszel/internal/entities/system"
 	"github.com/henrygd/beszel/internal/entities/systemd"
+	updateentity "github.com/henrygd/beszel/internal/entities/update"
 
 	"github.com/henrygd/beszel"
 
@@ -190,6 +191,8 @@ func (sys *System) createRecords(data *system.CombinedData) (*core.Record, error
 		return nil, err
 	}
 	hub := sys.manager.hub
+	var previousInfo system.Info
+	_ = systemRecord.UnmarshalJSONField("info", &previousInfo)
 	err = hub.RunInTransaction(func(txApp core.App) error {
 		// add system_stats record
 		systemStatsCollection, err := txApp.FindCachedCollectionByNameOrId("system_stats")
@@ -239,6 +242,11 @@ func (sys *System) createRecords(data *system.CombinedData) (*core.Record, error
 		}
 
 		// update system record (do this last because it triggers alerts and we need above records to be inserted first)
+		// Keep the maintenance snapshot in systems.info, separate from metric series.
+		data.Info.Updates = data.Updates
+		if err := createUpdateEvents(txApp, systemRecord, previousInfo.Updates, data.Updates); err != nil {
+			return err
+		}
 		systemRecord.Set("status", up)
 		systemRecord.Set("info", data.Info)
 		if err := txApp.SaveNoValidate(systemRecord); err != nil {
@@ -248,6 +256,87 @@ func (sys *System) createRecords(data *system.CombinedData) (*core.Record, error
 	})
 
 	return systemRecord, err
+}
+
+func createUpdateEvents(app core.App, systemRecord *core.Record, previous, current *updateentity.Status) error {
+	if current == nil {
+		return nil
+	}
+	types := make([]string, 0, 4)
+	if previous == nil {
+		previous = &updateentity.Status{}
+	}
+	if previous.InstallationState != current.InstallationState && current.InstallationState == updateentity.InstallationNotInstalled {
+		types = append(types, "package_not_installed")
+	}
+	if previous.ConfigurationState != current.ConfigurationState && current.ConfigurationState == updateentity.ConfigurationDisabled {
+		types = append(types, "automatic_updates_disabled")
+	}
+	if previous.LastResult != current.LastResult {
+		switch current.LastResult {
+		case updateentity.ResultRunning:
+			types = append(types, "upgrade_started")
+		case updateentity.ResultSuccess:
+			types = append(types, "upgrade_succeeded")
+		case updateentity.ResultFailed:
+			types = append(types, "upgrade_failed")
+		}
+	}
+	prevPending, currentPending := uint16(0), uint16(0)
+	if previous.PendingUpdates != nil {
+		prevPending = *previous.PendingUpdates
+	}
+	if current.PendingUpdates != nil {
+		currentPending = *current.PendingUpdates
+	}
+	if prevPending == 0 && currentPending > 0 {
+		types = append(types, "updates_available")
+	}
+	prevSecurity, currentSecurity := uint16(0), uint16(0)
+	if previous.PendingSecurityUpdates != nil {
+		prevSecurity = *previous.PendingSecurityUpdates
+	}
+	if current.PendingSecurityUpdates != nil {
+		currentSecurity = *current.PendingSecurityUpdates
+	}
+	if prevSecurity == 0 && currentSecurity > 0 {
+		types = append(types, "security_updates_available")
+	}
+	if previous.RebootRequired != current.RebootRequired {
+		if current.RebootRequired {
+			types = append(types, "reboot_required")
+		} else {
+			types = append(types, "reboot_cleared")
+		}
+	}
+	if previous.LastError == "" && current.LastError != "" {
+		types = append(types, "monitoring_error")
+	}
+	if len(types) == 0 {
+		return nil
+	}
+	collection, err := app.FindCachedCollectionByNameOrId("alerts_history")
+	if err != nil {
+		return err
+	}
+	for _, userID := range systemRecord.GetStringSlice("users") {
+		for _, eventType := range types {
+			record := core.NewRecord(collection)
+			record.Set("user", userID)
+			record.Set("system", systemRecord.Id)
+			record.Set("name", "maintenance:"+eventType)
+			if eventType == "updates_available" {
+				record.Set("value", currentPending)
+			}
+			if eventType == "security_updates_available" {
+				record.Set("value", currentSecurity)
+			}
+			if err := app.SaveNoValidate(record); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func createSystemDetailsRecord(app core.App, data *system.Details, systemId string) error {
