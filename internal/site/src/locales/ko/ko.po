@@ -212,6 +212,18 @@ msgstr "모든 시스템"
 msgid "Apply update policy"
 msgstr "Apply update policy"
 
+#: src/components/routes/system/automatic-updates.tsx
+msgid "APT dry-run failed after the configuration was validated."
+msgstr ""
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "APT is currently busy. This operation will be retried automatically."
+msgstr ""
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "APT rejected the generated configuration."
+msgstr ""
+
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Are you sure you want to delete {name}?"
 msgstr "{name}을(를) 삭제하시겠습니까?"
@@ -1210,6 +1222,10 @@ msgstr "Maintenance event"
 msgid "Maintenance helper incompatible"
 msgstr "Maintenance helper incompatible"
 
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Maintenance helper version is incompatible with this Agent. Re-run the Agent installer."
+msgstr ""
+
 #: src/components/alerts-history-columns.tsx
 msgid "Maintenance operation refused"
 msgstr "Maintenance operation refused"
@@ -1989,6 +2005,10 @@ msgstr "The Agent remains unprivileged. A restricted local helper applies valida
 msgid "The overall status is <0>ok</0> when all systems are up, <1>warn</1> when alerts are triggered, and <2>error</2> when any system is down."
 msgstr "모든 시스템이 정상이면 <0>ok</0>, 알림이 트리거되면 <1>경고</1>, 시스템이 다운되면 <2>오류</2> 상태가 됩니다."
 
+#: src/components/routes/system/automatic-updates.tsx
+msgid "The update policy was restored because APT timers could not be updated."
+msgstr ""
+
 #: src/components/login/forgot-pass-form.tsx
 msgid "Then log into the backend and reset your user account password in the users table."
 msgstr "그런 다음 백엔드에 로그인하여 사용자 테이블에서 사용자 계정 비밀번호를 재설정하세요."
@@ -2226,7 +2246,6 @@ msgstr "Up to date"
 msgid "Update"
 msgstr "업데이트"
 
-#: src/components/routes/system/automatic-updates.tsx
 #: src/components/routes/system/automatic-updates.tsx
 msgid "Update failed"
 msgstr "Update failed"

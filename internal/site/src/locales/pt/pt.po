@@ -212,6 +212,18 @@ msgstr "Todos os Sistemas"
 msgid "Apply update policy"
 msgstr "Aplicar política de atualizações"
 
+#: src/components/routes/system/automatic-updates.tsx
+msgid "APT dry-run failed after the configuration was validated."
+msgstr ""
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "APT is currently busy. This operation will be retried automatically."
+msgstr ""
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "APT rejected the generated configuration."
+msgstr ""
+
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Are you sure you want to delete {name}?"
 msgstr "Tem certeza de que deseja excluir {name}?"
@@ -1210,6 +1222,10 @@ msgstr "Evento de manutenção"
 msgid "Maintenance helper incompatible"
 msgstr "Helper de manutenção incompatível"
 
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Maintenance helper version is incompatible with this Agent. Re-run the Agent installer."
+msgstr ""
+
 #: src/components/alerts-history-columns.tsx
 msgid "Maintenance operation refused"
 msgstr "Operação de manutenção recusada"
@@ -1989,6 +2005,10 @@ msgstr "O Agent continua sem privilégios. Um helper local restrito aplica polí
 msgid "The overall status is <0>ok</0> when all systems are up, <1>warn</1> when alerts are triggered, and <2>error</2> when any system is down."
 msgstr "O estado geral é <0>ok</0> quando todos os sistemas estão ativos, <1>aviso</1> quando os alertas são acionados e <2>erro</2> quando qualquer sistema está inativo."
 
+#: src/components/routes/system/automatic-updates.tsx
+msgid "The update policy was restored because APT timers could not be updated."
+msgstr ""
+
 #: src/components/login/forgot-pass-form.tsx
 msgid "Then log into the backend and reset your user account password in the users table."
 msgstr "Em seguida, faça login no backend e redefina a senha da sua conta de usuário na tabela de usuários."
@@ -2226,7 +2246,6 @@ msgstr "Atualizado"
 msgid "Update"
 msgstr "Atualizar"
 
-#: src/components/routes/system/automatic-updates.tsx
 #: src/components/routes/system/automatic-updates.tsx
 msgid "Update failed"
 msgstr "A atualização falhou"

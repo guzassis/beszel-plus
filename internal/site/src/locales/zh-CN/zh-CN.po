@@ -212,6 +212,18 @@ msgstr "所有客户端"
 msgid "Apply update policy"
 msgstr "Apply update policy"
 
+#: src/components/routes/system/automatic-updates.tsx
+msgid "APT dry-run failed after the configuration was validated."
+msgstr ""
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "APT is currently busy. This operation will be retried automatically."
+msgstr ""
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "APT rejected the generated configuration."
+msgstr ""
+
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Are you sure you want to delete {name}?"
 msgstr "您确定要删除 {name} 吗？"
@@ -1210,6 +1222,10 @@ msgstr "Maintenance event"
 msgid "Maintenance helper incompatible"
 msgstr "Maintenance helper incompatible"
 
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Maintenance helper version is incompatible with this Agent. Re-run the Agent installer."
+msgstr ""
+
 #: src/components/alerts-history-columns.tsx
 msgid "Maintenance operation refused"
 msgstr "Maintenance operation refused"
@@ -1989,6 +2005,10 @@ msgstr "The Agent remains unprivileged. A restricted local helper applies valida
 msgid "The overall status is <0>ok</0> when all systems are up, <1>warn</1> when alerts are triggered, and <2>error</2> when any system is down."
 msgstr "当所有系统都正常运行时，整体状态为 <0>ok</0>；当触发警报时为 <1>警告</1>；当任何系统故障时为 <2>错误</2>。"
 
+#: src/components/routes/system/automatic-updates.tsx
+msgid "The update policy was restored because APT timers could not be updated."
+msgstr ""
+
 #: src/components/login/forgot-pass-form.tsx
 msgid "Then log into the backend and reset your user account password in the users table."
 msgstr "然后登录到后台并在用户表中重置您的用户账户密码。"
@@ -2226,7 +2246,6 @@ msgstr "Up to date"
 msgid "Update"
 msgstr "更新"
 
-#: src/components/routes/system/automatic-updates.tsx
 #: src/components/routes/system/automatic-updates.tsx
 msgid "Update failed"
 msgstr "Update failed"
