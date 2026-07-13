@@ -134,6 +134,23 @@ function maintenance(systemId: string, operation: string, policy?: UpdatePolicy)
 	})
 }
 
+function maintenanceError(response: MaintenanceResponse) {
+	switch (response.error_code) {
+		case "apt_lock_busy":
+			return t`APT is currently busy. This operation will be retried automatically.`
+		case "helper_incompatible":
+			return t`Maintenance helper version is incompatible with this Agent. Re-run the Agent installer.`
+		case "apt_config_invalid":
+			return t`APT rejected the generated configuration.`
+		case "apt_dry_run_failed":
+			return t`APT dry-run failed after the configuration was validated.`
+		case "timer_update_failed":
+			return t`The update policy was restored because APT timers could not be updated.`
+		default:
+			return response.error || t`Operation failed`
+	}
+}
+
 function PolicyDialog({
 	systemId,
 	status,
@@ -181,7 +198,7 @@ function PolicyDialog({
 				await new Promise((resolve) => setTimeout(resolve, 2000))
 				response = await maintenance(systemId, "get-operation-status")
 			}
-			setMessage(response.status === "completed" ? t`Operation completed successfully` : t`Operation failed`)
+			setMessage(response.status === "completed" ? t`Operation completed successfully` : maintenanceError(response))
 			setOutput(response.result?.output ?? "")
 		} catch {
 			setMessage(t`Operation failed`)
@@ -380,7 +397,7 @@ export default function AutomaticUpdates({ status, systemId }: { status?: Update
 				await new Promise((resolve) => setTimeout(resolve, 2000))
 				response = await maintenance(systemId, "get-operation-status")
 			}
-			setMessage(response.status === "completed" ? t`Updates completed successfully` : t`Update failed`)
+			setMessage(response.status === "completed" ? t`Updates completed successfully` : maintenanceError(response))
 		} catch {
 			setMessage(t`Update failed`)
 		} finally {

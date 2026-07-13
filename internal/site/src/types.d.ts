@@ -145,6 +145,11 @@ export interface MaintenanceCapabilities {
 	run_upgrade: boolean
 	automatic_reboot: boolean
 	supported_platform?: string
+	helper_version?: string
+	protocol_version?: number
+	min_agent_version?: string
+	max_protocol_version?: number
+	build_commit?: string
 }
 
 export type UpdatePolicyMode = "monitor_only" | "security" | "official_all" | "custom"
@@ -186,6 +191,10 @@ export interface MaintenanceResponse {
 		changed?: boolean
 	}
 	error?: string
+	error_code?: string
+	stage?: string
+	retryable?: boolean
+	rollback?: { attempted: boolean; succeeded: boolean }
 }
 
 export interface SystemStats {
