@@ -1,5 +1,3 @@
-//go:build testing
-
 // Package tests provides helpers for testing the application.
 package tests
 
@@ -118,7 +116,7 @@ func ClearCollection(t testing.TB, app core.App, collectionName string) error {
 }
 
 func (h *TestHub) Cleanup() {
-	h.GetAlertManager().Stop()
+	h.AlertManager.Stop()
 	h.GetSystemManager().RemoveAllSystems()
 	h.TestApp.Cleanup()
 }
