@@ -20,6 +20,14 @@ func TestInstallerContainsSafeMaintenanceUpgradeFlow(t *testing.T) {
 			t.Fatalf("installer missing %q", required)
 		}
 	}
+	for _, required := range []string{"10-beszel-connection.conf", "maintenance-smoke", "HELPER_BACKUP_PATH", "Maintenance helper protocol compatibility verified", `"retryable":true`} {
+		if !strings.Contains(script, required) {
+			t.Fatalf("installer missing upgrade safeguard %q", required)
+		}
+	}
+	if strings.Contains(script, "Preserving existing maintenance helper") {
+		t.Fatal("installer still preserves a helper from an older release")
+	}
 	for _, forbidden := range []string{"systemctl reboot", "shutdown -r", "reboot now"} {
 		if strings.Contains(script, forbidden) {
 			t.Fatalf("installer contains reboot command %q", forbidden)

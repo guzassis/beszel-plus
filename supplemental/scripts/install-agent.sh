@@ -185,7 +185,7 @@ EOF
 
 # Detect system architecture
 detect_architecture() {
-  local arch=$(uname -m)
+  arch=$(uname -m)
 
   if [ "$arch" = "mips" ]; then
     detect_mips_endianness
@@ -209,8 +209,7 @@ detect_architecture() {
 
 # Detect MIPS endianness using ELF header
 detect_mips_endianness() {
-  local bins="/bin/sh /bin/ls /usr/bin/env"
-  local bin_to_check endian
+  bins="/bin/sh /bin/ls /usr/bin/env"
   
   for bin_to_check in $bins; do
     if [ -f "$bin_to_check" ]; then
@@ -242,6 +241,7 @@ AUTO_UPDATE_FLAG="" # empty string means prompt, "true" means auto-enable, "fals
 OS_UPDATE_MANAGEMENT_FLAG="false"
 OS_UPDATE_POLICY="security"
 VERSION="latest"
+WEBSOCKET_AUTH_WARNING=false
 
 # Check for help flag
 case "$1" in
@@ -250,7 +250,7 @@ case "$1" in
   printf "Usage: ./install-agent.sh [options]\n\n"
   printf "Options: \n"
   printf "  -k                    : SSH key (required, or interactive if not provided)\n"
-  printf "  -p                    : Port (default: $PORT)\n"
+  printf "  -p                    : Port (default: %s)\n" "$PORT"
   printf "  -t                    : Token (optional for backwards compatibility)\n"
   printf "  -url                  : Hub URL (optional for backwards compatibility)\n"
   printf "  -v, --version         : Version to install (default: latest)\n"
@@ -278,6 +278,11 @@ build_sudo_args() {
     shift
   done
   echo "$QUOTED_ARGS"
+}
+
+systemd_escape_environment() {
+  # systemd double-quoted Environment= values require backslash and quote escaping.
+  printf '%s' "$1" | sed 's/\\/\\\\/g; s/"/\\"/g'
 }
 
 # Check if running as root and re-execute with sudo if needed
@@ -567,7 +572,7 @@ if [ -z "$KEY" ]; then
     echo "Upgrading existing installation. Using existing service configuration."
   else
     printf "Enter your SSH key: "
-    read KEY
+    read -r KEY
   fi
 fi
 
@@ -769,20 +774,40 @@ if [ "$OS_UPDATE_MANAGEMENT_FLAG" = "true" ] && [ "$OS_UPDATE_SUPPORTED" = "true
     echo "Installing unattended-upgrades dependency..."
     if ! apt-get update || ! DEBIAN_FRONTEND=noninteractive apt-get install -y unattended-upgrades; then echo "Failed to install unattended-upgrades" >&2; exit 1; fi
   fi
-  if [ -x "$MAINTENANCE_HELPER_PATH" ]; then
-    echo "Preserving existing maintenance helper at $MAINTENANCE_HELPER_PATH"
-  else
-    HELPER_FILE_NAME="beszel-maintenance-helper_${OS}_${ARCH}.tar.gz"
-    HELPER_CHECKSUM=$(curl -fsSL "$GITHUB_URL/guzassis/beszel-plus/releases/download/v${INSTALL_VERSION}/beszel_${INSTALL_VERSION}_checksums.txt" | grep "$HELPER_FILE_NAME" | cut -d' ' -f1)
-    if [ -z "$HELPER_CHECKSUM" ] || ! echo "$HELPER_CHECKSUM" | grep -qE '^[a-fA-F0-9]{64}$'; then echo "Invalid maintenance helper checksum" >&2; exit 1; fi
-    curl -fL# --retry 3 --retry-delay 2 --connect-timeout 10 "$GITHUB_URL/guzassis/beszel-plus/releases/download/v${INSTALL_VERSION}/$HELPER_FILE_NAME" -o "$HELPER_FILE_NAME"
-    if [ "$($CHECK_CMD "$HELPER_FILE_NAME" | cut -d' ' -f1)" != "$HELPER_CHECKSUM" ]; then echo "Maintenance helper checksum verification failed" >&2; exit 1; fi
-    tar -xzf "$HELPER_FILE_NAME" beszel-maintenance-helper
-    mkdir -p "$(dirname "$MAINTENANCE_HELPER_PATH")"
-    chown root:root "$(dirname "$MAINTENANCE_HELPER_PATH")"
-    chmod 0755 "$(dirname "$MAINTENANCE_HELPER_PATH")"
-    mv beszel-maintenance-helper "$MAINTENANCE_HELPER_PATH"
+  HELPER_FILE_NAME="beszel-maintenance-helper_${OS}_${ARCH}.tar.gz"
+  HELPER_CHECKSUM=$(curl -fsSL "$GITHUB_URL/guzassis/beszel-plus/releases/download/v${INSTALL_VERSION}/beszel_${INSTALL_VERSION}_checksums.txt" | grep " $HELPER_FILE_NAME$" | cut -d' ' -f1)
+  if [ -z "$HELPER_CHECKSUM" ] || ! echo "$HELPER_CHECKSUM" | grep -qE '^[a-fA-F0-9]{64}$'; then echo "Invalid maintenance helper checksum" >&2; exit 1; fi
+  curl -fL# --retry 3 --retry-delay 2 --connect-timeout 10 "$GITHUB_URL/guzassis/beszel-plus/releases/download/v${INSTALL_VERSION}/$HELPER_FILE_NAME" -o "$HELPER_FILE_NAME"
+  if [ "$($CHECK_CMD "$HELPER_FILE_NAME" | cut -d' ' -f1)" != "$HELPER_CHECKSUM" ]; then echo "Maintenance helper checksum verification failed" >&2; exit 1; fi
+  if ! tar -xzf "$HELPER_FILE_NAME" beszel-maintenance-helper; then echo "Failed to extract maintenance helper" >&2; exit 1; fi
+  chmod 0755 beszel-maintenance-helper
+  HELPER_VERSION_OUTPUT=$(./beszel-maintenance-helper --version 2>&1) || { echo "New maintenance helper version check failed" >&2; exit 1; }
+  if ! printf '%s\n' "$HELPER_VERSION_OUTPUT" | grep -qx "beszel-maintenance-helper v${INSTALL_VERSION}" || ! printf '%s\n' "$HELPER_VERSION_OUTPUT" | grep -qx 'protocol 1'; then
+    echo "Maintenance helper version or protocol does not match Agent v${INSTALL_VERSION}." >&2
+    exit 1
   fi
+  OLD_HELPER_VERSION="legacy"
+  if [ -x "$MAINTENANCE_HELPER_PATH" ]; then
+    OLD_HELPER_VERSION=$("$MAINTENANCE_HELPER_PATH" --version 2>/dev/null | sed -n 's/^beszel-maintenance-helper v//p' | head -n 1)
+    [ -n "$OLD_HELPER_VERSION" ] || OLD_HELPER_VERSION="legacy"
+    echo "Upgrading maintenance helper from ${OLD_HELPER_VERSION} to v${INSTALL_VERSION}..."
+  fi
+  mkdir -p "$(dirname "$MAINTENANCE_HELPER_PATH")"
+  chown root:root "$(dirname "$MAINTENANCE_HELPER_PATH")"
+  chmod 0755 "$(dirname "$MAINTENANCE_HELPER_PATH")"
+  HELPER_NEW_PATH="${MAINTENANCE_HELPER_PATH}.new.$$"
+  HELPER_BACKUP_PATH="${MAINTENANCE_HELPER_PATH}.backup.$$"
+  cp beszel-maintenance-helper "$HELPER_NEW_PATH"
+  chown root:root "$HELPER_NEW_PATH"
+  chmod 0755 "$HELPER_NEW_PATH"
+  if [ -e "$MAINTENANCE_HELPER_PATH" ]; then cp -p "$MAINTENANCE_HELPER_PATH" "$HELPER_BACKUP_PATH"; fi
+  if ! mv -f "$HELPER_NEW_PATH" "$MAINTENANCE_HELPER_PATH" || ! "$MAINTENANCE_HELPER_PATH" --version >/dev/null 2>&1; then
+    echo "New maintenance helper smoke test failed; restoring previous helper." >&2
+    if [ -e "$HELPER_BACKUP_PATH" ]; then mv -f "$HELPER_BACKUP_PATH" "$MAINTENANCE_HELPER_PATH"; fi
+    exit 1
+  fi
+  rm -f "$HELPER_BACKUP_PATH"
+  echo "Maintenance helper protocol compatibility verified."
   chown root:root "$MAINTENANCE_HELPER_PATH"
   chmod 0755 "$MAINTENANCE_HELPER_PATH"
 fi
@@ -800,7 +825,7 @@ fi
 
 # Check for NVIDIA GPUs and grant device permissions for systemd service
 detect_nvidia_devices() {
-  local devices=""
+  devices=""
   for i in /dev/nvidia*; do
     if [ -e "$i" ]; then
       devices="${devices}DeviceAllow=$i rw\n"
@@ -867,7 +892,7 @@ EOF
     AUTO_UPDATE="n"
   else
     printf "\nEnable automatic daily updates for beszel-agent? (y/n): "
-    read AUTO_UPDATE
+    read -r AUTO_UPDATE
   fi
   case "$AUTO_UPDATE" in
   [Yy]*)
@@ -939,7 +964,7 @@ EOF
     sleep 1 # give time for the service to start
   else
     printf "\nEnable automatic daily updates for beszel-agent? (y/n): "
-    read AUTO_UPDATE
+    read -r AUTO_UPDATE
   fi
   case "$AUTO_UPDATE" in
   [Yy]*)
@@ -1013,7 +1038,7 @@ EOF
     AUTO_UPDATE="n"
   else
     printf "\nEnable automatic daily updates for beszel-agent? (y/n): "
-    read AUTO_UPDATE
+    read -r AUTO_UPDATE
   fi
   case "$AUTO_UPDATE" in
   [Yy]*)
@@ -1091,6 +1116,21 @@ EOF
   # Keep monitoring enabled when upgrading an existing installation without
   # rewriting the user's service file.
   mkdir -p /etc/systemd/system/beszel-agent.service.d
+  if [ -n "$TOKEN" ] || [ -n "$HUB_URL" ]; then
+    if printf '%s%s' "$TOKEN" "$HUB_URL" | grep -q '[[:cntrl:]]'; then
+      echo "Error: TOKEN and HUB_URL cannot contain control characters." >&2
+      exit 1
+    fi
+    TOKEN_SYSTEMD=$(systemd_escape_environment "$TOKEN")
+    HUB_URL_SYSTEMD=$(systemd_escape_environment "$HUB_URL")
+    cat >/etc/systemd/system/beszel-agent.service.d/10-beszel-connection.conf <<EOF
+[Service]
+Environment="TOKEN=$TOKEN_SYSTEMD"
+Environment="HUB_URL=$HUB_URL_SYSTEMD"
+EOF
+    chmod 0600 /etc/systemd/system/beszel-agent.service.d/10-beszel-connection.conf
+    echo "Updated Agent connection settings from this install command."
+  fi
   cat >/etc/systemd/system/beszel-agent.service.d/update-monitoring.conf <<EOF
 [Service]
 Environment="UPDATE_MONITORING=true"
@@ -1163,6 +1203,17 @@ EOF
       systemctl status beszel-maintenance.socket --no-pager 2>/dev/null || true
       exit 1
     fi
+    systemctl reset-failed 'beszel-maintenance@*.service' 2>/dev/null || true
+    if ! "$BIN_PATH" maintenance-smoke; then
+      echo "Error: Maintenance IPC smoke test failed." >&2
+      systemctl status 'beszel-maintenance@*.service' --no-pager 2>/dev/null || true
+      exit 1
+    fi
+    if systemctl --failed --no-legend 2>/dev/null | grep -q 'beszel-maintenance@'; then
+      echo "Error: Maintenance helper unit failed during smoke test." >&2
+      exit 1
+    fi
+    echo "Maintenance IPC smoke test passed."
     if ! systemctl enable --now apt-daily.timer apt-daily-upgrade.timer; then
       echo "Error: Failed to enable APT update timers." >&2
       exit 1
@@ -1178,8 +1229,18 @@ EOF
       exit 1
     fi
     if ! printf '%s' "$POLICY_RESPONSE" | grep -q '"status":"completed"'; then
-      echo "Error: Maintenance helper rejected the initial OS update policy." >&2
-      exit 1
+      if printf '%s' "$POLICY_RESPONSE" | grep -q '"retryable":true'; then
+        POLICY_ERROR_CODE=$(printf '%s' "$POLICY_RESPONSE" | sed -n 's/.*"error_code":"\([^"]*\)".*/\1/p')
+        POLICY_STAGE=$(printf '%s' "$POLICY_RESPONSE" | sed -n 's/.*"stage":"\([^"]*\)".*/\1/p')
+        echo "Initial OS update policy could not be applied yet."
+        echo "Stage: ${POLICY_STAGE:-unknown}"
+        echo "Reason: ${POLICY_ERROR_CODE:-temporary maintenance condition}"
+        echo "Retryable: yes"
+        echo "The Agent and helper were installed successfully. The policy will be retried by the Agent."
+      else
+        echo "Error: Initial OS update policy failed: $POLICY_RESPONSE" >&2
+        exit 1
+      fi
     fi
   fi
 
@@ -1194,7 +1255,7 @@ EOF
     sleep 1 # give time for the service to start
   else
     printf "\nEnable automatic daily updates for beszel-agent? (y/n): "
-    read AUTO_UPDATE
+    read -r AUTO_UPDATE
   fi
   case "$AUTO_UPDATE" in
   [Yy]*)
@@ -1235,9 +1296,22 @@ EOF
   # Wait for the service to start or fail
   if [ "$(systemctl is-active beszel-agent.service)" != "active" ]; then
     echo "Error: The Beszel Agent service is not running."
-    echo "$(systemctl status beszel-agent.service)"
+    systemctl status beszel-agent.service
     exit 1
+  fi
+  if [ -n "$TOKEN" ] && [ -n "$HUB_URL" ]; then
+    sleep 2
+    if journalctl -u beszel-agent.service --since '1 minute ago' --no-pager 2>/dev/null | grep -qE 'unexpected status code: 401|status code.? 401'; then
+      WEBSOCKET_AUTH_WARNING=true
+      echo "Warning: Hub WebSocket authentication returned 401. Verify that TOKEN belongs to this Agent and HUB_URL points to the correct Hub." >&2
+      echo "The Agent remains running and SSH fallback may still be available." >&2
+    else
+      echo "No WebSocket authentication rejection was detected after restart."
+    fi
   fi
 fi
 
-printf "\n\033[32mBeszel Agent has been installed successfully! It is now running on $PORT.\033[0m\n"
+printf "\n\033[32mBeszel Agent has been installed successfully! It is now running on %s.\033[0m\n" "$PORT"
+if [ "$WEBSOCKET_AUTH_WARNING" = "true" ]; then
+  printf "\033[33mInstallation completed with a WebSocket authentication warning (401); review TOKEN and HUB_URL.\033[0m\n"
+fi

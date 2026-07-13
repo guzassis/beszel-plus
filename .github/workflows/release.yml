@@ -53,3 +53,25 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.TOKEN || secrets.GITHUB_TOKEN }}
           WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
           IS_FORK: ${{ github.repository_owner != 'henrygd' }}
+
+      - name: Verify paired Agent and maintenance helper assets
+        env:
+          GH_TOKEN: ${{ secrets.TOKEN || secrets.GITHUB_TOKEN }}
+        run: |
+          set -eu
+          assets=$(gh api "repos/${GITHUB_REPOSITORY}/releases/tags/${GITHUB_REF_NAME}" --jq '.assets[].name')
+          checksum="beszel_${GITHUB_REF_NAME#v}_checksums.txt"
+          printf '%s\n' "$assets" | grep -qx "$checksum"
+          printf '%s\n' "$assets" | while IFS= read -r asset; do
+            case "$asset" in
+              beszel-agent_linux_*_glibc.tar.gz) continue ;;
+              beszel-agent_linux_*.tar.gz)
+                suffix=${asset#beszel-agent_}
+                helper="beszel-maintenance-helper_${suffix}"
+                printf '%s\n' "$assets" | grep -qx "$helper" || {
+                  echo "Missing paired helper asset: $helper" >&2
+                  exit 1
+                }
+                ;;
+            esac
+          done

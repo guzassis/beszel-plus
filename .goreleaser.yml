@@ -93,12 +93,20 @@ builds:
     main: internal/cmd/maintenance-helper/main.go
     env:
       - CGO_ENABLED=0
+    ldflags:
+      - -s -w -X github.com/henrygd/beszel/internal/maintenance.BuildCommit={{.Commit}}
     goos:
       - linux
     goarch:
       - amd64
       - arm64
       - arm
+      - riscv64
+      - mipsle
+      - mips
+      - ppc64le
+    gomips:
+      - softfloat
 
 archives:
   - id: beszel-maintenance-helper
@@ -213,35 +221,6 @@ scoops:
 #     tags: foss cross-platform admin monitoring
 #     require_license_acceptance: false
 #     release_notes: 'https://github.com/henrygd/beszel/releases/tag/v{{ .Version }}'
-
-brews:
-  - ids: [beszel-agent]
-    name: beszel-agent
-    repository:
-      owner: henrygd
-      name: homebrew-beszel
-    homepage: "https://beszel.dev"
-    description: "Agent for Beszel, a lightweight server monitoring platform."
-    license: MIT
-    skip_upload: '{{ if eq (tolower .Env.IS_FORK) "true" }}true{{ else }}auto{{ end }}'
-    extra_install: |
-      (bin/"beszel-agent-launcher").write <<~EOS
-        #!/bin/bash
-        set -a
-        if [ -f "$HOME/.config/beszel/beszel-agent.env" ]; then
-          source "$HOME/.config/beszel/beszel-agent.env"
-        fi
-        set +a
-        exec #{bin}/beszel-agent "$@"
-      EOS
-      (bin/"beszel-agent-launcher").chmod 0755
-    service: |
-      run ["#{bin}/beszel-agent-launcher"]
-      log_path "#{Dir.home}/.cache/beszel/beszel-agent.log"
-      error_log_path "#{Dir.home}/.cache/beszel/beszel-agent.log"
-      keep_alive true
-      restart_delay 5
-      process_type :background
 
 winget:
   - ids: [beszel-agent]
