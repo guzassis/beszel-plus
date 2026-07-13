@@ -63,8 +63,18 @@ func TestApplyPolicyWritesOnlyManagedFilesAndBackup(t *testing.T) {
 	if response.Status != entity.StateCompleted {
 		t.Fatalf("response: %#v", response)
 	}
-	if data, _ := os.ReadFile(autoPath + ".beszel-backup"); !bytes.Equal(data, existing) {
+	backups, err := filepath.Glob(filepath.Join(h.stateDir(), "backups", "20auto-upgrades.*.bak"))
+	if err != nil || len(backups) != 1 {
+		t.Fatalf("backup files = %v, %v", backups, err)
+	}
+	if data, _ := os.ReadFile(backups[0]); !bytes.Equal(data, existing) {
 		t.Fatalf("backup = %q", data)
+	}
+	if _, err := os.Stat(autoPath + ".beszel-backup"); !os.IsNotExist(err) {
+		t.Fatal("legacy backup was left inside apt.conf.d")
+	}
+	if info, err := os.Stat(filepath.Dir(backups[0])); err != nil || info.Mode().Perm() != 0o700 {
+		t.Fatalf("backup directory permissions = %v, %v", info, err)
 	}
 	if _, err := os.Stat(h.path("/etc/apt/apt.conf.d/52beszel-plus-unattended-upgrades")); err != nil {
 		t.Fatal(err)
@@ -74,6 +84,69 @@ func TestApplyPolicyWritesOnlyManagedFilesAndBackup(t *testing.T) {
 	}
 	if _, err := os.Stat(h.path("/etc/apt/apt.conf.d/50unattended-upgrades")); !os.IsNotExist(err) {
 		t.Fatal("helper touched vendor configuration")
+	}
+}
+
+func TestUnattendedDryRunRetriesTransientAPTLock(t *testing.T) {
+	attempts := 0
+	h := testHelper(t)
+	h.APTLockTimeout = time.Second
+	h.APTRetryBase = time.Millisecond
+	h.Runner = helperRunnerFunc(func(_ context.Context, name string, _ ...string) ([]byte, error) {
+		if name != "unattended-upgrade" {
+			return nil, errors.New("inactive")
+		}
+		attempts++
+		if attempts == 1 {
+			return []byte("Lock file is already taken, exiting"), errors.New("exit 1")
+		}
+		return []byte("dry-run complete"), nil
+	})
+	output, err := h.unattendedDryRun(context.Background())
+	if err != nil || attempts != 2 || !bytes.Contains(output, []byte("complete")) {
+		t.Fatalf("output=%q attempts=%d err=%v", output, attempts, err)
+	}
+}
+
+func TestUnattendedDryRunReturnsTypedBusyErrorAtTimeout(t *testing.T) {
+	h := testHelper(t)
+	h.APTLockTimeout = time.Millisecond
+	h.APTRetryBase = 2 * time.Millisecond
+	h.Runner = helperRunnerFunc(func(_ context.Context, name string, _ ...string) ([]byte, error) {
+		if name != "unattended-upgrade" {
+			return nil, errors.New("inactive")
+		}
+		return []byte("Could not get lock /var/lib/dpkg/lock-frontend"), errors.New("exit 100")
+	})
+	_, err := h.unattendedDryRun(context.Background())
+	var typed *operationError
+	if !errors.As(err, &typed) || typed.code != "apt_lock_busy" || !typed.retryable || typed.stage != "unattended_upgrade_dry_run" {
+		t.Fatalf("unexpected error: %#v", err)
+	}
+}
+
+func TestMigratesOnlyKnownLegacyAPTBackups(t *testing.T) {
+	h := testHelper(t)
+	known := h.path("/etc/apt/apt.conf.d/20auto-upgrades.beszel-backup")
+	unknown := h.path("/etc/apt/apt.conf.d/vendor.beszel-backup")
+	if err := os.WriteFile(known, []byte("known"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(unknown, []byte("unknown"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := h.migrateLegacyBackups(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(known); !os.IsNotExist(err) {
+		t.Fatal("known legacy backup was not moved")
+	}
+	if _, err := os.Stat(unknown); err != nil {
+		t.Fatal("unrelated backup was modified")
+	}
+	moved, _ := filepath.Glob(filepath.Join(h.stateDir(), "backups", "20auto-upgrades.legacy.*.bak"))
+	if len(moved) != 1 {
+		t.Fatalf("migrated backups: %v", moved)
 	}
 }
 

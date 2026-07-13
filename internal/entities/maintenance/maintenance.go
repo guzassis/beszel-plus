@@ -39,15 +39,20 @@ const (
 var safeRepositoryValue = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._+:/-]{0,127}$`)
 
 type Capabilities struct {
-	UpdateMonitoring  bool   `json:"update_monitoring" cbor:"0,keyasint"`
-	UpdateManagement  bool   `json:"update_management" cbor:"1,keyasint"`
-	PrivilegedHelper  bool   `json:"privileged_helper" cbor:"2,keyasint"`
-	PolicyRead        bool   `json:"policy_read" cbor:"3,keyasint"`
-	PolicyWrite       bool   `json:"policy_write" cbor:"4,keyasint"`
-	DryRun            bool   `json:"dry_run" cbor:"5,keyasint"`
-	RunUpgrade        bool   `json:"run_upgrade" cbor:"6,keyasint"`
-	AutomaticReboot   bool   `json:"automatic_reboot" cbor:"7,keyasint"`
-	SupportedPlatform string `json:"supported_platform,omitempty" cbor:"8,keyasint,omitempty"`
+	UpdateMonitoring   bool   `json:"update_monitoring" cbor:"0,keyasint"`
+	UpdateManagement   bool   `json:"update_management" cbor:"1,keyasint"`
+	PrivilegedHelper   bool   `json:"privileged_helper" cbor:"2,keyasint"`
+	PolicyRead         bool   `json:"policy_read" cbor:"3,keyasint"`
+	PolicyWrite        bool   `json:"policy_write" cbor:"4,keyasint"`
+	DryRun             bool   `json:"dry_run" cbor:"5,keyasint"`
+	RunUpgrade         bool   `json:"run_upgrade" cbor:"6,keyasint"`
+	AutomaticReboot    bool   `json:"automatic_reboot" cbor:"7,keyasint"`
+	SupportedPlatform  string `json:"supported_platform,omitempty" cbor:"8,keyasint,omitempty"`
+	HelperVersion      string `json:"helper_version,omitempty" cbor:"9,keyasint,omitempty"`
+	ProtocolVersion    uint8  `json:"protocol_version,omitempty" cbor:"10,keyasint,omitempty"`
+	MinAgentVersion    string `json:"min_agent_version,omitempty" cbor:"11,keyasint,omitempty"`
+	MaxProtocolVersion uint8  `json:"max_protocol_version,omitempty" cbor:"12,keyasint,omitempty"`
+	BuildCommit        string `json:"build_commit,omitempty" cbor:"13,keyasint,omitempty"`
 }
 
 type Policy struct {
@@ -107,6 +112,15 @@ type Response struct {
 	IdempotencyKey string         `json:"idempotency_key,omitempty" cbor:"8,keyasint,omitempty"`
 	StartedAt      *time.Time     `json:"started_at,omitempty" cbor:"9,keyasint,omitempty"`
 	FinishedAt     *time.Time     `json:"finished_at,omitempty" cbor:"10,keyasint,omitempty"`
+	ErrorCode      string         `json:"error_code,omitempty" cbor:"11,keyasint,omitempty"`
+	Stage          string         `json:"stage,omitempty" cbor:"12,keyasint,omitempty"`
+	Retryable      bool           `json:"retryable,omitempty" cbor:"13,keyasint,omitempty"`
+	Rollback       *Rollback      `json:"rollback,omitempty" cbor:"14,keyasint,omitempty"`
+}
+
+type Rollback struct {
+	Attempted bool `json:"attempted" cbor:"0,keyasint"`
+	Succeeded bool `json:"succeeded" cbor:"1,keyasint"`
 }
 
 func IsOperationAllowed(op Operation) bool {

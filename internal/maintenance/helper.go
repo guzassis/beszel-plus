@@ -44,10 +44,12 @@ type Helper struct {
 	Runner            Runner
 	Now               func() time.Time
 	RunSystemCommands bool
+	APTLockTimeout    time.Duration
+	APTRetryBase      time.Duration
 }
 
 func NewHelper() *Helper {
-	return &Helper{Root: "/", Runner: ExecRunner{}, Now: func() time.Time { return time.Now().UTC() }, RunSystemCommands: true}
+	return &Helper{Root: "/", Runner: ExecRunner{}, Now: func() time.Time { return time.Now().UTC() }, RunSystemCommands: true, APTLockTimeout: 7 * time.Minute, APTRetryBase: 5 * time.Second}
 }
 
 func (h *Helper) path(value string) string {
@@ -88,12 +90,35 @@ func failed(req entity.Request, message string) entity.Response {
 	return entity.Response{Version: entity.ProtocolVersion, RequestID: req.RequestID, Operation: req.Operation, Status: entity.StateFailed, Error: sanitize(message, 1024), IdempotencyKey: req.IdempotencyKey, FinishedAt: &now}
 }
 
+type operationError struct {
+	code, stage, message string
+	retryable            bool
+	rollback             *entity.Rollback
+}
+
+func (e *operationError) Error() string { return e.message }
+
+func failureFor(req entity.Request, err error) entity.Response {
+	response := failed(req, err.Error())
+	var typed *operationError
+	if errors.As(err, &typed) {
+		response.ErrorCode = typed.code
+		response.Stage = typed.stage
+		response.Retryable = typed.retryable
+		response.Rollback = typed.rollback
+	}
+	return response
+}
+
 func (h *Helper) Execute(ctx context.Context, req entity.Request) entity.Response {
 	if err := entity.ValidateRequest(req); err != nil {
 		slog.Warn("maintenance operation refused", "operation", req.Operation, "request_id", req.RequestID)
 		return failed(req, err.Error())
 	}
 	slog.Info("maintenance operation requested", "operation", req.Operation, "request_id", req.RequestID)
+	if err := h.migrateLegacyBackups(); err != nil {
+		return failureFor(req, &operationError{code: "filesystem_write_failed", stage: "legacy_backup_migration", message: err.Error()})
+	}
 	if cached, ok := h.cachedResponse(req.IdempotencyKey); ok {
 		if cached.Operation != req.Operation {
 			return failed(req, "idempotency key reused for another operation")
@@ -123,14 +148,18 @@ func (h *Helper) Execute(ctx context.Context, req entity.Request) entity.Respons
 	result, changed, runErr := h.run(ctx, req)
 	var response entity.Response
 	if runErr != nil {
-		response = failed(req, runErr.Error())
+		response = failureFor(req, runErr)
 		response.StartedAt = &start
+		if req.Operation == entity.ApplyUpdatePolicy && response.Retryable {
+			response.Result = &entity.Result{Policy: req.Policy}
+		}
 	} else {
 		response = h.complete(req, result, changed)
 		response.StartedAt = &start
 	}
 	_ = h.saveStatus(response)
-	slog.Info("maintenance operation finished", "operation", req.Operation, "request_id", req.RequestID, "status", response.Status)
+	duration := h.Now().Sub(start)
+	slog.Info("maintenance operation finished", "operation", req.Operation, "request_id", req.RequestID, "status", response.Status, "error_code", response.ErrorCode, "stage", response.Stage, "retryable", response.Retryable, "rollback_attempted", response.Rollback != nil && response.Rollback.Attempted, "rollback_succeeded", response.Rollback != nil && response.Rollback.Succeeded, "duration", duration, "helper_version", HelperVersion(), "protocol_version", entity.ProtocolVersion)
 	return response
 }
 
@@ -152,9 +181,12 @@ func (h *Helper) run(ctx context.Context, req entity.Request) (*entity.Result, b
 	case entity.InstallUpdateDependencies:
 		return h.installDependencies(ctx)
 	case entity.RunUpdateDryRun:
-		out, err := h.command(ctx, 30*time.Minute, "unattended-upgrade", "--dry-run", "--debug")
+		out, err := h.unattendedDryRun(ctx)
 		return &entity.Result{Output: sanitize(string(out), maxCommandOutputBytes)}, false, err
 	case entity.RunUnattendedUpgrades:
+		if err := h.waitForAPT(ctx); err != nil {
+			return nil, false, err
+		}
 		out, err := h.command(ctx, 2*time.Hour, "unattended-upgrade", "--verbose")
 		return &entity.Result{Output: sanitize(string(out), maxCommandOutputBytes)}, false, err
 	}
@@ -164,7 +196,7 @@ func (h *Helper) run(ctx context.Context, req entity.Request) (*entity.Result, b
 func (h *Helper) capabilities() *entity.Capabilities {
 	platform := platformID(h.path("/etc/os-release"))
 	supported := platform == "debian" || platform == "ubuntu" || platform == "raspbian"
-	return &entity.Capabilities{UpdateMonitoring: true, UpdateManagement: supported, PrivilegedHelper: true, PolicyRead: supported, PolicyWrite: supported, DryRun: supported, RunUpgrade: supported, AutomaticReboot: supported, SupportedPlatform: platform}
+	return &entity.Capabilities{UpdateMonitoring: true, UpdateManagement: supported, PrivilegedHelper: true, PolicyRead: supported, PolicyWrite: supported, DryRun: supported, RunUpgrade: supported, AutomaticReboot: supported, SupportedPlatform: platform, HelperVersion: HelperVersion(), ProtocolVersion: entity.ProtocolVersion, MinAgentVersion: MinAgentVersion, MaxProtocolVersion: entity.ProtocolVersion, BuildCommit: BuildCommit}
 }
 
 func platformID(path string) string {
@@ -239,28 +271,38 @@ func (h *Helper) applyPolicy(ctx context.Context, req entity.Request) (*entity.R
 		aptDailyEnabled = h.unitEnabled(ctx, "apt-daily.timer")
 		aptUpgradeEnabled = h.unitEnabled(ctx, "apt-daily-upgrade.timer")
 	}
-	rollback := func() {
+	rollback := func() bool {
 		slog.Warn("maintenance policy rollback", "operation", req.Operation, "request_id", req.RequestID)
 		rollbackCtx := context.WithoutCancel(ctx)
+		succeeded := true
 		for i, path := range paths {
 			if existed[i] {
-				_ = atomicWrite(path, backups[i], 0o644)
+				if atomicWrite(path, backups[i], 0o644) != nil {
+					succeeded = false
+				}
 			} else {
-				_ = os.Remove(path)
+				if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
+					succeeded = false
+				}
 			}
 		}
 		if policyExisted {
-			_ = atomicWrite(policyPath, policyBackup, 0o600)
+			if atomicWrite(policyPath, policyBackup, 0o600) != nil {
+				succeeded = false
+			}
 		} else {
-			_ = os.Remove(policyPath)
+			if err := os.Remove(policyPath); err != nil && !os.IsNotExist(err) {
+				succeeded = false
+			}
 		}
 		if runSystemCommands {
 			h.restoreUnit(rollbackCtx, "apt-daily.timer", aptDailyEnabled)
 			h.restoreUnit(rollbackCtx, "apt-daily-upgrade.timer", aptUpgradeEnabled)
 		}
+		return succeeded
 	}
 	for i, path := range paths {
-		if err := backupFile(path); err != nil {
+		if err := h.backupFile(path); err != nil {
 			rollback()
 			return nil, false, err
 		}
@@ -271,12 +313,17 @@ func (h *Helper) applyPolicy(ctx context.Context, req entity.Request) (*entity.R
 	}
 	if runSystemCommands {
 		if _, err := h.command(ctx, time.Minute, "apt-config", "dump"); err != nil {
-			rollback()
-			return nil, false, fmt.Errorf("apt-config validation failed: %w", err)
+			rollbackSucceeded := rollback()
+			return nil, false, &operationError{code: "apt_config_invalid", stage: "apt_config_validation", message: fmt.Sprintf("apt-config validation failed: %v", err), rollback: &entity.Rollback{Attempted: true, Succeeded: rollbackSucceeded}}
 		}
-		if _, err := h.command(ctx, 30*time.Minute, "unattended-upgrade", "--dry-run", "--debug"); err != nil {
-			rollback()
-			return nil, false, fmt.Errorf("unattended-upgrade validation failed: %w", err)
+		if _, err := h.unattendedDryRun(ctx); err != nil {
+			rollbackSucceeded := rollback()
+			var typed *operationError
+			if errors.As(err, &typed) {
+				typed.rollback = &entity.Rollback{Attempted: true, Succeeded: rollbackSucceeded}
+				return nil, false, typed
+			}
+			return nil, false, &operationError{code: "apt_dry_run_failed", stage: "unattended_upgrade_dry_run", message: fmt.Sprintf("unattended-upgrade dry-run failed: %v", err), rollback: &entity.Rollback{Attempted: true, Succeeded: rollbackSucceeded}}
 		}
 		if policy.Enabled && policy.Mode != entity.ModeMonitorOnly {
 			_, err = h.command(ctx, time.Minute, "systemctl", "enable", "--now", "apt-daily.timer", "apt-daily-upgrade.timer")
@@ -284,8 +331,8 @@ func (h *Helper) applyPolicy(ctx context.Context, req entity.Request) (*entity.R
 			_, err = h.command(ctx, time.Minute, "systemctl", "disable", "--now", "apt-daily-upgrade.timer")
 		}
 		if err != nil {
-			rollback()
-			return nil, false, fmt.Errorf("timer update failed: %w", err)
+			rollbackSucceeded := rollback()
+			return nil, false, &operationError{code: "timer_update_failed", stage: "timer_update", message: fmt.Sprintf("timer update failed: %v", err), rollback: &entity.Rollback{Attempted: true, Succeeded: rollbackSucceeded}}
 		}
 	}
 	if err := h.writePolicy(policy); err != nil {
@@ -328,6 +375,9 @@ func (h *Helper) installDependencies(ctx context.Context) (*entity.Result, bool,
 	if h.Root != "" && h.Root != "/" {
 		return nil, false, errors.New("dependency installation unavailable in test root")
 	}
+	if err := h.waitForAPT(ctx); err != nil {
+		return nil, false, err
+	}
 	if _, err := h.command(ctx, 20*time.Minute, "apt-get", "update"); err != nil {
 		return nil, false, fmt.Errorf("apt metadata refresh failed: %w", err)
 	}
@@ -352,6 +402,113 @@ func (h *Helper) command(ctx context.Context, timeout time.Duration, name string
 		return output, fmt.Errorf("%s failed: %s", name, sanitize(string(output), 1024))
 	}
 	return output, nil
+}
+
+func (h *Helper) unattendedDryRun(ctx context.Context) ([]byte, error) {
+	timeout := h.APTLockTimeout
+	if timeout <= 0 {
+		timeout = 7 * time.Minute
+	}
+	base := h.APTRetryBase
+	if base <= 0 {
+		base = 5 * time.Second
+	}
+	deadline := time.Now().Add(timeout)
+	for attempt := 0; ; attempt++ {
+		if err := h.waitForAPTUntil(ctx, deadline, base); err != nil {
+			return nil, err
+		}
+		stepCtx, cancel := context.WithTimeout(ctx, 30*time.Minute)
+		output, err := h.Runner.Run(stepCtx, "unattended-upgrade", "--dry-run", "--debug")
+		cancel()
+		if err == nil {
+			return output, nil
+		}
+		if !aptLockBusy(output) {
+			return output, fmt.Errorf("unattended-upgrade failed: %s", sanitize(string(output), 1024))
+		}
+		wait := base * time.Duration(attempt+1)
+		if wait > time.Minute {
+			wait = time.Minute
+		}
+		if !time.Now().Add(wait).Before(deadline) {
+			return output, &operationError{code: "apt_lock_busy", stage: "unattended_upgrade_dry_run", retryable: true, message: "APT is currently in use; lock remained busy until timeout"}
+		}
+		slog.Info("waiting for APT lock", "stage", "unattended_upgrade_dry_run", "retry_in", wait, "attempt", attempt+1)
+		timer := time.NewTimer(wait)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return output, ctx.Err()
+		case <-timer.C:
+		}
+	}
+}
+
+func (h *Helper) waitForAPT(ctx context.Context) error {
+	timeout := h.APTLockTimeout
+	if timeout <= 0 {
+		timeout = 7 * time.Minute
+	}
+	base := h.APTRetryBase
+	if base <= 0 {
+		base = 5 * time.Second
+	}
+	return h.waitForAPTUntil(ctx, time.Now().Add(timeout), base)
+}
+
+func (h *Helper) waitForAPTUntil(ctx context.Context, deadline time.Time, base time.Duration) error {
+	for attempt := 0; ; attempt++ {
+		reason := h.aptActivity(ctx)
+		if reason == "" {
+			return nil
+		}
+		wait := base * time.Duration(attempt+1)
+		if wait > time.Minute {
+			wait = time.Minute
+		}
+		if !time.Now().Add(wait).Before(deadline) {
+			return &operationError{code: "apt_lock_busy", stage: "apt_lock_wait", retryable: true, message: "APT is currently in use by " + reason}
+		}
+		slog.Info("waiting for APT lock", "holder", reason, "retry_in", wait, "attempt", attempt+1)
+		timer := time.NewTimer(wait)
+		select {
+		case <-ctx.Done():
+			timer.Stop()
+			return ctx.Err()
+		case <-timer.C:
+		}
+	}
+}
+
+func (h *Helper) aptActivity(ctx context.Context) string {
+	for _, unit := range []string{"apt-daily.service", "apt-daily-upgrade.service"} {
+		stepCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		output, err := h.Runner.Run(stepCtx, "systemctl", "is-active", unit)
+		cancel()
+		if err == nil && strings.TrimSpace(string(output)) == "active" {
+			return unit
+		}
+	}
+	for _, process := range []string{"apt", "apt-get", "dpkg", "unattended-upgrade"} {
+		stepCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
+		output, err := h.Runner.Run(stepCtx, "pgrep", "-x", process)
+		cancel()
+		if err == nil && strings.TrimSpace(string(output)) != "" {
+			return process
+		}
+	}
+	return ""
+}
+
+func aptLockBusy(output []byte) bool {
+	value := strings.ToLower(string(output))
+	for _, marker := range []string{"lock file is already taken", "could not get lock", "unable to acquire", "is another process using it"} {
+		if strings.Contains(value, marker) {
+			return true
+		}
+	}
+	return false
 }
 
 func renderAutoConfig(policy entity.Policy) []byte {
@@ -604,7 +761,7 @@ func atomicWrite(path string, data []byte, mode os.FileMode) error {
 	}
 	return err
 }
-func backupFile(path string) error {
+func (h *Helper) backupFile(path string) error {
 	data, err := os.ReadFile(path)
 	if os.IsNotExist(err) {
 		return nil
@@ -612,7 +769,60 @@ func backupFile(path string) error {
 	if err != nil {
 		return err
 	}
-	return atomicWrite(path+".beszel-backup", data, 0o600)
+	dir := filepath.Join(h.stateDir(), "backups")
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return err
+	}
+	if err := os.Chmod(dir, 0o700); err != nil {
+		return err
+	}
+	name := filepath.Base(path) + "." + h.Now().UTC().Format("20060102T150405Z") + ".bak"
+	if err := atomicWrite(filepath.Join(dir, name), data, 0o600); err != nil {
+		return err
+	}
+	return retainBackups(dir, filepath.Base(path)+".*.bak", 5)
+}
+
+func (h *Helper) migrateLegacyBackups() error {
+	dir := filepath.Join(h.stateDir(), "backups")
+	for _, source := range []string{h.path("/etc/apt/apt.conf.d/20auto-upgrades.beszel-backup"), h.path("/etc/apt/apt.conf.d/52beszel-plus-unattended-upgrades.beszel-backup")} {
+		data, err := os.ReadFile(source)
+		if os.IsNotExist(err) {
+			continue
+		}
+		if err != nil {
+			return err
+		}
+		if err := os.MkdirAll(dir, 0o700); err != nil {
+			return err
+		}
+		if err := os.Chmod(dir, 0o700); err != nil {
+			return err
+		}
+		name := filepath.Base(strings.TrimSuffix(source, ".beszel-backup")) + ".legacy." + h.Now().UTC().Format("20060102T150405Z") + ".bak"
+		if err := atomicWrite(filepath.Join(dir, name), data, 0o600); err != nil {
+			return err
+		}
+		if err := os.Remove(source); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
+func retainBackups(dir, pattern string, keep int) error {
+	files, err := filepath.Glob(filepath.Join(dir, pattern))
+	if err != nil {
+		return err
+	}
+	sort.Strings(files)
+	for len(files) > keep {
+		if err := os.Remove(files[0]); err != nil {
+			return err
+		}
+		files = files[1:]
+	}
+	return nil
 }
 func readLimited(path string, limit int64) ([]byte, error) {
 	file, err := os.Open(filepath.Clean(path))

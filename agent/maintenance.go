@@ -10,11 +10,28 @@ import (
 	"sync"
 	"time"
 
+	"github.com/henrygd/beszel"
 	"github.com/henrygd/beszel/agent/utils"
 	entity "github.com/henrygd/beszel/internal/entities/maintenance"
 )
 
 const maintenanceSocket = "/run/beszel-maintenance.sock"
+
+// SmokeMaintenance performs a complete single-request Unix socket exchange.
+func SmokeMaintenance(ctx context.Context, socket string) error {
+	if socket == "" {
+		socket = maintenanceSocket
+	}
+	manager := &maintenanceManager{socket: socket}
+	response, err := manager.call(ctx, entity.Request{Version: entity.ProtocolVersion, RequestID: "installer-smoke", Operation: entity.GetCapabilities})
+	if err != nil {
+		return err
+	}
+	if response.Status != entity.StateCompleted || response.Result == nil || !helperCompatible(response.Result.Capabilities) {
+		return errors.New("Maintenance helper version is incompatible with this Agent.")
+	}
+	return nil
+}
 
 type maintenanceManager struct {
 	mu      sync.Mutex
@@ -47,6 +64,9 @@ func (m *maintenanceManager) runCapabilityRefresh() {
 func (m *maintenanceManager) capabilities() *entity.Capabilities {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if m.caps == nil {
+		return &entity.Capabilities{}
+	}
 	copy := *m.caps
 	return &copy
 }
@@ -70,9 +90,28 @@ func (m *maintenanceManager) refreshCapabilities() {
 		return
 	}
 	response.Result.Capabilities.UpdateMonitoring = base.UpdateMonitoring
+	if !helperCompatible(response.Result.Capabilities) {
+		response.Result.Capabilities.UpdateManagement = false
+		response.Result.Capabilities.PolicyWrite = false
+		response.Result.Capabilities.RunUpgrade = false
+	}
 	m.mu.Lock()
 	m.caps = response.Result.Capabilities
 	m.mu.Unlock()
+	go m.retryPersistedPolicy()
+}
+
+func (m *maintenanceManager) retryPersistedPolicy() {
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+	req := entity.Request{Version: entity.ProtocolVersion, RequestID: "pending-policy-status", Operation: entity.GetOperationStatus}
+	response, err := m.call(ctx, req)
+	if err != nil || response.Status != entity.StateFailed || !response.Retryable || response.Result == nil || response.Result.Policy == nil {
+		return
+	}
+	now := time.Now().UTC().Format("20060102T150405.000000000")
+	retry := entity.Request{Version: entity.ProtocolVersion, RequestID: "policy-retry-" + now, Operation: entity.ApplyUpdatePolicy, IdempotencyKey: "policy-retry-" + now, Policy: response.Result.Policy}
+	m.handle(retry)
 }
 
 func (m *maintenanceManager) handle(req entity.Request) entity.Response {
@@ -88,6 +127,12 @@ func (m *maintenanceManager) handle(req entity.Request) entity.Response {
 			}
 		}
 		return maintenanceFailure(req, "update management disabled")
+	}
+	if maintenanceWriteOperation(req.Operation) && !helperCompatible(m.capabilities()) {
+		response := maintenanceFailure(req, "Maintenance helper version is incompatible with this Agent.")
+		response.ErrorCode = "helper_incompatible"
+		response.Stage = "capability_negotiation"
+		return response
 	}
 	m.mu.Lock()
 	if req.IdempotencyKey != "" {
@@ -160,6 +205,15 @@ func (m *maintenanceManager) run(req entity.Request) {
 		go m.agent.updateManager.refresh()
 	}
 	go m.refreshCapabilities()
+	if req.Operation == entity.ApplyUpdatePolicy && response.Status == entity.StateFailed && response.Retryable {
+		time.AfterFunc(time.Minute, func() {
+			retry := req
+			suffix := time.Now().UTC().Format("20060102T150405.000000000")
+			retry.RequestID = "policy-retry-" + suffix
+			retry.IdempotencyKey = retry.RequestID
+			m.handle(retry)
+		})
+	}
 }
 
 func (m *maintenanceManager) call(ctx context.Context, req entity.Request) (entity.Response, error) {
@@ -175,6 +229,15 @@ func (m *maintenanceManager) call(ctx context.Context, req entity.Request) (enti
 	if err := json.NewEncoder(conn).Encode(req); err != nil {
 		return entity.Response{}, err
 	}
+	unixConn, ok := conn.(*net.UnixConn)
+	if !ok {
+		return entity.Response{}, errors.New("maintenance socket is not a Unix stream")
+	}
+	// The helper reads exactly one request through EOF. Half-close only the
+	// writing side so its complete response remains readable.
+	if err := unixConn.CloseWrite(); err != nil {
+		return entity.Response{}, err
+	}
 	var response entity.Response
 	decoder := json.NewDecoder(bufio.NewReaderSize(conn, 64*1024))
 	decoder.DisallowUnknownFields()
@@ -185,6 +248,19 @@ func (m *maintenanceManager) call(ctx context.Context, req entity.Request) (enti
 		return entity.Response{}, errors.New("helper response request ID mismatch")
 	}
 	return response, nil
+}
+
+func helperCompatible(caps *entity.Capabilities) bool {
+	return caps != nil && caps.HelperVersion == beszel.PlusVersion && caps.ProtocolVersion == entity.ProtocolVersion && caps.MaxProtocolVersion >= entity.ProtocolVersion
+}
+
+func maintenanceWriteOperation(operation entity.Operation) bool {
+	switch operation {
+	case entity.ApplyUpdatePolicy, entity.InstallUpdateDependencies, entity.RunUnattendedUpgrades:
+		return true
+	default:
+		return false
+	}
 }
 
 func maintenanceFailure(req entity.Request, message string) entity.Response {

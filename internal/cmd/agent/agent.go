@@ -1,15 +1,18 @@
 package main
 
 import (
+	"context"
 	"fmt"
 	"log"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/henrygd/beszel"
 	"github.com/henrygd/beszel/agent"
 	"github.com/henrygd/beszel/agent/health"
 	"github.com/henrygd/beszel/agent/utils"
+	maintenanceentity "github.com/henrygd/beszel/internal/entities/maintenance"
 	"github.com/spf13/pflag"
 	"golang.org/x/crypto/ssh"
 )
@@ -41,6 +44,14 @@ func (opts *cmdOptions) parse() bool {
 		return true
 	case "fingerprint":
 		handleFingerprint()
+		return true
+	case "maintenance-smoke":
+		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+		defer cancel()
+		if err := agent.SmokeMaintenance(ctx, ""); err != nil {
+			log.Fatal(err)
+		}
+		fmt.Println("maintenance IPC smoke test passed")
 		return true
 	}
 
@@ -89,7 +100,7 @@ func (opts *cmdOptions) parse() bool {
 	// Must run after pflag.Parse()
 	switch {
 	case *version:
-		fmt.Println(beszel.AppName+"-agent", beszel.Version)
+		fmt.Printf("%s-agent %s\nBeszel Plus v%s\nmaintenance protocol %d\n", beszel.AppName, beszel.Version, beszel.PlusVersion, maintenanceentity.ProtocolVersion)
 		return true
 	case *help || subcommand == "help":
 		pflag.Usage()
