@@ -36,7 +36,8 @@ Set `OS_UPDATE_MANAGEMENT=false` and restart the Agent to hide and reject manage
 ```bash
 systemctl disable --now beszel-maintenance.socket
 rm /etc/systemd/system/beszel-maintenance.socket
-rm /etc/systemd/system/beszel-maintenance-helper@.service
+rm /etc/systemd/system/beszel-maintenance@.service
+rm /etc/systemd/system/beszel-maintenance-helper@.service # legacy <= v0.0.3
 rm /usr/local/libexec/beszel/maintenance-helper
 systemctl daemon-reload
 ```
@@ -81,7 +82,7 @@ Long operations return `queued` immediately. The UI polls persisted `running`, `
 Audit history includes dependency installation, policy validation/application, dry-runs, upgrades, refusals, timeouts, incompatibility, and reboot transitions. View helper logs with:
 
 ```bash
-journalctl -u 'beszel-maintenance-helper@*'
+journalctl -u 'beszel-maintenance@*'
 ```
 
 If controls are absent, verify that the user is an administrator with access to the system, `OS_UPDATE_MANAGEMENT=true`, the Agent is current, the socket is active, and `/run/beszel-maintenance.sock` is `root:beszel` mode `0660`.

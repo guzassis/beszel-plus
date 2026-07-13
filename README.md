@@ -25,6 +25,7 @@ The fork preserves compatibility with the original project while adding operatio
 - **OS update monitoring**: Reports `unattended-upgrades`, APT timers, pending/security/manual updates, reboot state, stale data, and partial collection errors.
 - **OS update management**: Administrators can install dependencies, inspect repositories, validate/apply update policies, run dry-runs, and start updates from the Hub.
 - **Least-privilege maintenance**: The Agent remains unprivileged and delegates enumerated APT/systemd operations to a root one-shot helper over a protected local Unix socket.
+- **Self-repairing maintenance install**: Re-running the Agent installer repairs the v0.0.3 socket/template association, preserves the installed helper, verifies socket activation, and reapplies the initial policy only when its state is missing.
 <!-- - **REST API**: Use or update your data in your own scripts and applications. -->
 
 ## Beszel Plus update management
