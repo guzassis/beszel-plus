@@ -50,6 +50,10 @@ The main Agent remains the `beszel` user with its existing `ProtectSystem=strict
 
 The helper accepts only versioned operations defined in the maintenance protocol. Agent and helper must report the same Beszel Plus release, and protocol compatibility is negotiated before write operations. It rejects unknown JSON fields, unknown operations, malformed IDs, oversized requests, invalid policy modes, unsafe repository identifiers, control characters, path traversal, unconfirmed third-party repositories, replays, and concurrent changes. It never accepts a shell command, path, filename, environment map, or generic command arguments from the Hub. External tools are invoked with explicit argument arrays and no shell.
 
+From v0.1.3, upgrades are transactional. Detection of a legacy helper is time-bounded, Agent and helper binaries are validated before activation, and the previous binaries and managed systemd units are restored if installation fails or is interrupted. The maintenance socket and IPC smoke test run before the initial policy, and the Agent starts only after that attempt finishes.
+
+APT coordination uses ownership of the known dpkg/APT lock files reported by `/proc/locks`; a process name alone is never considered a lock. Update collection and maintenance are serialized inside the Agent. Eligibility is calculated through the privileged helper, and a temporary lock produces a partial snapshot while preserving other update data and the last successful eligibility result. If APT remains busy for the installer's bounded attempt, the helper persists the pending policy and the Agent retries it at a limited interval.
+
 Defense in depth consists of Hub administrator and system-membership checks, the authenticated Agent handler and typed payload validation, socket permissions, and a second allowlist/validation layer in the root helper. The helper logs request ID, enumerated operation, and result to journald without logging tokens, keys, or arbitrary command strings.
 
 ## Policies

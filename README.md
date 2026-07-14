@@ -5,7 +5,7 @@ Beszel Plus is a public fork of [Beszel](https://github.com/henrygd/beszel), a l
 The fork preserves compatibility with the original project while adding operational features used by Beszel Plus deployments.
 
 [![Fork original version](https://img.shields.io/badge/fork_original-v0.18.2-2563eb)](https://github.com/henrygd/beszel/releases/tag/v0.18.2)
-[![Beszel Plus version](https://img.shields.io/badge/Beszel_Plus-v0.1.2-7c3aed)](https://github.com/guzassis/beszel-plus/releases/tag/v0.1.2)
+[![Beszel Plus version](https://img.shields.io/badge/Beszel_Plus-v0.1.3-7c3aed)](https://github.com/guzassis/beszel-plus/releases/tag/v0.1.3)
 [![agent Docker Image Size](https://img.shields.io/docker/image-size/henrygd/beszel-agent/latest?logo=docker&label=agent%20image%20size)](https://hub.docker.com/r/henrygd/beszel-agent)
 [![hub Docker Image Size](https://img.shields.io/docker/image-size/henrygd/beszel/latest?logo=docker&label=hub%20image%20size)](https://hub.docker.com/r/henrygd/beszel)
 [![MIT license](https://img.shields.io/github/license/henrygd/beszel?color=%239944ee)](https://github.com/henrygd/beszel/blob/main/LICENSE)
@@ -26,8 +26,10 @@ The fork preserves compatibility with the original project while adding operatio
 - **OS update management**: Administrators can install dependencies, inspect repositories, validate/apply update policies, run dry-runs, and start updates from the Hub.
 - **Least-privilege maintenance**: The Agent remains unprivileged and delegates enumerated APT/systemd operations to a root one-shot helper over a protected local Unix socket.
 - **Self-repairing maintenance install**: Re-running the Agent installer repairs the v0.0.3 socket/template association, replaces the helper with the matching release, verifies socket activation, and reapplies the initial policy only when its state is missing.
-- **Versioned maintenance components**: Agent and privileged helper are released together, negotiate protocol and build versions, and the installer atomically replaces an outdated helper with rollback on smoke-test failure.
-- **Resilient APT policy setup**: Busy APT locks are classified as retryable, policy rollback remains explicit, and backups live in a protected state directory rather than the APT configuration directory.
+- **Transactional maintenance upgrades**: The v0.1.3 installer bounds legacy helper detection, validates both new binaries, installs them atomically, starts the Agent only after policy setup, and restores binaries and systemd units if installation fails or is interrupted.
+- **Resilient APT policy setup**: Real APT lock ownership is detected from known lock files and `/proc/locks`; simulations no longer count as blockers, installation uses a short bounded retry, and a busy policy remains pending for a limited Agent retry.
+- **Serialized update operations**: Collection and privileged maintenance share a local gate, preventing overlapping APT commands and duplicate collection cycles.
+- **Partial eligibility reporting**: Eligibility dry-runs use the privileged helper. Temporary lock or helper failures preserve the rest of the update snapshot and the last successful eligibility value instead of showing a global collection error.
 - **Safe connection refresh**: Re-running the systemd installer updates its managed Hub URL and token drop-in while preserving unrelated service customization and reports WebSocket authentication rejection clearly.
 <!-- - **REST API**: Use or update your data in your own scripts and applications. -->
 
@@ -79,7 +81,7 @@ The deprecated `--auto-update` flag remains an alias for `--agent-auto-update`. 
 
 ## Versioning
 
-Beszel Plus tracks the original fork baseline as `v0.18.2` and uses an independent release sequence for its own changes. The current Beszel Plus release is `v0.1.2`. The embedded upstream-compatible Beszel protocol version may remain on the corresponding compatibility version so gradual Hub/Agent upgrades and capability negotiation continue to work correctly.
+Beszel Plus tracks the original fork baseline as `v0.18.2` and uses an independent release sequence for its own changes. The current Beszel Plus release is `v0.1.3`. The embedded upstream-compatible Beszel protocol version may remain on the corresponding compatibility version so gradual Hub/Agent upgrades and capability negotiation continue to work correctly.
 
 Each Beszel Plus release must update this README whenever user-visible functionality, installation behavior, supported platforms, security architecture, or operational requirements change.
 

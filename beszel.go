@@ -9,7 +9,7 @@ const (
 	Version = "0.18.7"
 	// PlusVersion versions Beszel Plus release components independently from
 	// the upstream-compatible protocol version above.
-	PlusVersion = "0.1.2"
+	PlusVersion = "0.1.3"
 	// AppName is the name of the application.
 	AppName = "beszel"
 )
