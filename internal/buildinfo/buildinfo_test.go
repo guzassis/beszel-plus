@@ -14,7 +14,10 @@ func TestProductMetadata(t *testing.T) {
 	if RepositoryOwner != "guzassis" || RepositoryName != "beszel-plus" {
 		t.Fatal("unexpected repository identity")
 	}
-	if Version != "0.2.3-dev" {
+	if UpstreamVersion != "0.18.2" {
+		t.Fatalf("unexpected upstream compatibility version %q", UpstreamVersion)
+	}
+	if Version != "0.2.4-dev" {
 		t.Fatalf("unexpected development product version %q", Version)
 	}
 }
@@ -22,16 +25,16 @@ func TestProductMetadata(t *testing.T) {
 func TestVersionFallbacksAndInstallersStayAligned(t *testing.T) {
 	root := filepath.Join("..", "..")
 	for _, check := range []struct{ path, marker string }{
-		{"internal/site/src/lib/build-info.ts", `"0.2.3-dev"`},
-		{"supplemental/scripts/install-agent.sh", `PRODUCT_VERSION="0.2.3"`},
-		{"supplemental/scripts/install-hub.sh", `PRODUCT_VERSION="0.2.3"`},
+		{"internal/site/src/lib/build-info.ts", `"0.2.4-dev"`},
+		{"supplemental/scripts/install-agent.sh", `PRODUCT_VERSION="0.2.4"`},
+		{"supplemental/scripts/install-hub.sh", `PRODUCT_VERSION="0.2.4"`},
 	} {
 		data, err := os.ReadFile(filepath.Join(root, check.path))
 		if err != nil {
 			t.Fatal(err)
 		}
 		if !strings.Contains(string(data), check.marker) {
-			t.Errorf("%s is not aligned with v0.2.3", check.path)
+			t.Errorf("%s is not aligned with v0.2.4", check.path)
 		}
 	}
 }

@@ -142,6 +142,10 @@ msgstr "Aktivno stanje"
 msgid "Add {foo}"
 msgstr "Dodaj {foo}"
 
+#: src/components/add-system.tsx
+msgid "Add system and copy Linux command"
+msgstr ""
+
 #: src/components/routes/settings/notifications.tsx
 msgid "Add URL"
 msgstr "Dodaj URL"
@@ -993,6 +997,10 @@ msgstr "Preverjanje pristnosti ni uspelo"
 msgid "Failed to save settings"
 msgstr "Shranjevanje nastavitev ni uspelo"
 
+#: src/components/add-system.tsx
+msgid "Failed to save system"
+msgstr ""
+
 #: src/components/routes/settings/heartbeat.tsx
 msgid "Failed to send heartbeat"
 msgstr "Slanje srčnega utripa (heartbeat) ni uspelo"
@@ -1398,6 +1406,10 @@ msgstr "Never run"
 #: src/components/systemd-table/systemd-table.tsx
 msgid "No"
 msgstr "Ne"
+
+#: src/components/add-system.tsx
+msgid "No installation command was copied. Please retry."
+msgstr ""
 
 #: src/components/command-palette.tsx
 #: src/components/systemd-table/systemd-table.tsx

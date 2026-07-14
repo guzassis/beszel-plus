@@ -3,7 +3,7 @@ import { Trans } from "@lingui/react/macro"
 import { useStore } from "@nanostores/react"
 import { getPagePath } from "@nanostores/router"
 import { ChevronDownIcon, ExternalLinkIcon } from "lucide-react"
-import { memo, useEffect, useRef, useState } from "react"
+import { memo, type FormEvent, useEffect, useMemo, useRef, useState } from "react"
 import { Button } from "@/components/ui/button"
 import {
 	Dialog,
@@ -19,6 +19,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { isReadOnlyUser, pb } from "@/lib/api"
 import { SystemStatus } from "@/lib/enums"
 import { $publicKey } from "@/lib/stores"
+import { createExclusiveAction, persistSystemEnrollment } from "@/lib/system-enrollment"
 import { cn, generateToken, tokenMap, useBrowserStorage } from "@/lib/utils"
 import type { SystemRecord } from "@/types"
 import { copyLinuxCommand, type DropdownItem, InstallDropdown, type LinuxInstallOptions } from "./install-dropdowns"
@@ -26,6 +27,7 @@ import { $router, basePath, Link, navigate } from "./router"
 import { DropdownMenu, DropdownMenuTrigger } from "./ui/dropdown-menu"
 import { TuxIcon } from "./ui/icons"
 import { InputCopy } from "./ui/input-copy"
+import { toast } from "./ui/use-toast"
 
 // To avoid a refactor of the dialog, we will just keep this function as a "skeleton" for the actual dialog
 export function AddSystemDialog({ open, setOpen }: { open: boolean; setOpen: (open: boolean) => void }) {
@@ -59,6 +61,7 @@ let nextSystemToken: string | null = null
  */
 export const SystemDialog = ({ setOpen, system }: { setOpen: (open: boolean) => void; system?: SystemRecord }) => {
 	const publicKey = useStore($publicKey)
+	const form = useRef<HTMLFormElement>(null)
 	const port = useRef<HTMLInputElement>(null)
 	const [hostValue, setHostValue] = useState(system?.host ?? "")
 	const isUnixSocket = hostValue.startsWith("/")
@@ -70,6 +73,7 @@ export const SystemDialog = ({ setOpen, system }: { setOpen: (open: boolean) => 
 		powerManagement: true,
 		agentAutoUpdate: true,
 	})
+	const [saving, setSaving] = useState(false)
 
 	useEffect(() => {
 		;(async () => {
@@ -79,8 +83,9 @@ export const SystemDialog = ({ setOpen, system }: { setOpen: (open: boolean) => 
 				return setToken(nextSystemToken)
 			}
 			// if system exists,get the token from the fingerprint record
-			if (tokenMap.has(system.id)) {
-				return setToken(tokenMap.get(system.id)!)
+			const existingToken = tokenMap.get(system.id)
+			if (existingToken) {
+				return setToken(existingToken)
 			}
 			const { token } = await pb.collection("fingerprints").getFirstListItem(`system = "${system.id}"`, {
 				fields: "token",
@@ -90,29 +95,53 @@ export const SystemDialog = ({ setOpen, system }: { setOpen: (open: boolean) => 
 		})()
 	}, [system?.id, nextSystemToken])
 
-	async function handleSubmit(e: SubmitEvent) {
+	const persistSystem = useMemo(
+		() =>
+			createExclusiveAction(async (formElement: HTMLFormElement, copyAfterPersist: boolean) => {
+				setSaving(true)
+				try {
+					const userID = pb.authStore.record?.id
+					if (!userID) {
+						throw new Error("User session is unavailable")
+					}
+					const formData = new FormData(formElement)
+					const data = Object.fromEntries(formData) as Record<string, FormDataEntryValue>
+					data.users = userID
+					if (system) {
+						await pb.collection("systems").update(system.id, { ...data, status: SystemStatus.Pending })
+					} else {
+						const commandPort = String(data.host).startsWith("/") ? String(data.host) : String(data.port || "45876")
+						await persistSystemEnrollment(
+							{
+								createSystem: (systemData) => pb.collection("systems").create(systemData),
+								createFingerprint: (fingerprintData) => pb.collection("fingerprints").create(fingerprintData),
+								deleteSystem: (systemID) => pb.collection("systems").delete(systemID),
+							},
+							data,
+							token,
+							copyAfterPersist ? () => copyLinuxCommand(commandPort, publicKey, token, installOptions) : undefined
+						)
+						nextSystemToken = null
+					}
+					setOpen(false)
+					navigate(basePath)
+				} catch (error) {
+					console.error(error)
+					toast({
+						title: t`Failed to save system`,
+						description: t`No installation command was copied. Please retry.`,
+						variant: "destructive",
+					})
+				} finally {
+					setSaving(false)
+				}
+			}),
+		[installOptions, publicKey, setOpen, system, token]
+	)
+
+	function handleSubmit(e: FormEvent<HTMLFormElement>) {
 		e.preventDefault()
-		const formData = new FormData(e.target as HTMLFormElement)
-		const data = Object.fromEntries(formData) as Record<string, any>
-		data.users = pb.authStore.record!.id
-		try {
-			setOpen(false)
-			if (system) {
-				await pb.collection("systems").update(system.id, { ...data, status: SystemStatus.Pending })
-			} else {
-				const createdSystem = await pb.collection("systems").create(data)
-				await pb.collection("fingerprints").create({
-					system: createdSystem.id,
-					token,
-				})
-				// Reset the current token after successful system
-				// creation so next system gets a new token
-				nextSystemToken = null
-			}
-			navigate(basePath)
-		} catch (e) {
-			console.error(e)
-		}
+		persistSystem(e.currentTarget, false).catch(console.error)
 	}
 
 	const systemTranslation = t`System`
@@ -155,7 +184,7 @@ export const SystemDialog = ({ setOpen, system }: { setOpen: (open: boolean) => 
 						</Trans>
 					</DialogDescription>
 				</TabsContent>
-				<form onSubmit={handleSubmit as any}>
+				<form ref={form} onSubmit={handleSubmit}>
 					<div className="grid xs:grid-cols-[auto_1fr] gap-y-3 gap-x-4 items-center mt-1 mb-4">
 						<Label htmlFor="name" className="xs:text-end">
 							<Trans>Name</Trans>
@@ -248,11 +277,23 @@ export const SystemDialog = ({ setOpen, system }: { setOpen: (open: boolean) => 
 						{/* Binary */}
 						<TabsContent value="binary" className="contents">
 							<CopyButton
-								text={t`Copy Linux command`}
+								text={system ? t`Copy Linux command` : t`Add system and copy Linux command`}
 								icon={<TuxIcon className="size-4" />}
-								onClick={async () =>
-									copyLinuxCommand(isUnixSocket ? hostValue : port.current?.value, publicKey, token, installOptions)
-								}
+								disabled={saving}
+								onClick={() => {
+									if (system) {
+										copyLinuxCommand(
+											isUnixSocket ? hostValue : port.current?.value,
+											publicKey,
+											token,
+											installOptions
+										).catch(console.error)
+										return
+									}
+									if (form.current?.reportValidity()) {
+										persistSystem(form.current, true).catch(console.error)
+									}
+								}}
 								dropdownItems={[
 									{
 										text: t`Manual setup instructions`,
@@ -263,7 +304,7 @@ export const SystemDialog = ({ setOpen, system }: { setOpen: (open: boolean) => 
 							/>
 						</TabsContent>
 						{/* Save */}
-						<Button>
+						<Button disabled={saving}>
 							{system ? (
 								<Trans>Save {{ foo: systemTranslation }}</Trans>
 							) : (
@@ -281,7 +322,8 @@ interface CopyButtonProps {
 	text: string
 	onClick: () => void
 	dropdownItems: DropdownItem[]
-	icon?: React.ReactElement<any>
+	icon?: React.ReactElement
+	disabled?: boolean
 }
 
 const CopyButton = memo((props: CopyButtonProps) => {
@@ -290,6 +332,7 @@ const CopyButton = memo((props: CopyButtonProps) => {
 			<Button
 				type="button"
 				variant="outline"
+				disabled={props.disabled}
 				onClick={props.onClick}
 				className="rounded-e-none dark:border-e-0 grow flex items-center gap-2"
 			>

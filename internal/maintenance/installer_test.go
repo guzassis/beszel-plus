@@ -3,6 +3,7 @@ package maintenance
 import (
 	"bufio"
 	"encoding/json"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -530,5 +531,136 @@ func TestInstallerExecutesConfiguredHelperForInitialPolicy(t *testing.T) {
 	}
 	if !strings.Contains(string(request), `"operation":"apply-update-policy"`) || !strings.Contains(string(request), `"mode":"security"`) {
 		t.Fatalf("unexpected helper request: %s", request)
+	}
+}
+
+func TestInstallerMigratesPrefixedConnectionSettings(t *testing.T) {
+	data, err := os.ReadFile("../../supplemental/scripts/install-agent.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	script := string(data)
+	start := strings.Index(script, "read_existing_connection_value() {")
+	end := strings.Index(script[start:], "\nif [ \"$EXISTING_INSTALLATION\" = \"true\" ]; then")
+	if start < 0 || end < 0 {
+		t.Fatal("connection migration functions not found")
+	}
+	functions := script[start : start+end]
+	dir := t.TempDir()
+	envFile := filepath.Join(dir, "agent.env")
+	if err := os.WriteFile(envFile, []byte("TOKEN=unprefixed\nBESZEL_AGENT_TOKEN=prefixed\n"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command("sh", "-c", functions+"\nprintf 'VALUE=%s\\n' \"$(read_existing_connection_value TOKEN)\"")
+	cmd.Env = append(os.Environ(), "AGENT_ENV_PATH="+envFile)
+	output, err := cmd.CombinedOutput()
+	if err != nil || string(output) != "VALUE=prefixed\n" {
+		t.Fatalf("prefixed setting did not preserve Agent precedence: output=%q err=%v", output, err)
+	}
+	for _, required := range []string{
+		`\(BESZEL_AGENT_\)\?\(PORT\|KEY\|TOKEN\|HUB_URL\)`,
+		"UnsetEnvironment=BESZEL_AGENT_PORT BESZEL_AGENT_KEY BESZEL_AGENT_TOKEN BESZEL_AGENT_HUB_URL",
+	} {
+		if !strings.Contains(script, required) {
+			t.Fatalf("installer does not neutralize legacy prefixed settings: missing %q", required)
+		}
+	}
+}
+
+func TestInstallerValidatesEffectiveAgentEnvironmentWithoutLeakingSecrets(t *testing.T) {
+	data, err := os.ReadFile("../../supplemental/scripts/install-agent.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	script := string(data)
+	start := strings.Index(script, "process_environment_value() {")
+	end := strings.Index(script[start:], "\nagent_journal_after_restart() {")
+	if start < 0 || end < 0 {
+		t.Fatal("process environment validation functions not found")
+	}
+	functions := script[start : start+end]
+	running := exec.Command("sleep", "30")
+	running.Env = []string{"PORT=45876", "KEY=actual-key", "TOKEN=actual-secret", "HUB_URL=http://hub:8090"}
+	if err := running.Start(); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = running.Process.Kill(); _ = running.Wait() }()
+	harness := functions + `
+systemctl() { printf '%s\n' "$TEST_PID"; }
+verify_agent_process_environment
+`
+	cmd := exec.Command("sh", "-c", harness)
+	cmd.Env = append(os.Environ(),
+		fmt.Sprintf("TEST_PID=%d", running.Process.Pid),
+		"PORT=45876", "KEY=actual-key", "TOKEN=expected-secret", "HUB_URL=http://hub:8090",
+	)
+	output, err := cmd.CombinedOutput()
+	if err == nil || !strings.Contains(string(output), "setting TOKEN") {
+		t.Fatalf("effective environment mismatch was not rejected: output=%q err=%v", output, err)
+	}
+	if strings.Contains(string(output), "actual-secret") || strings.Contains(string(output), "expected-secret") {
+		t.Fatalf("connection secret leaked in diagnostics: %q", output)
+	}
+}
+
+func TestInstallerUsesOnlyPostRestartJournalForEnrollment(t *testing.T) {
+	data, err := os.ReadFile("../../supplemental/scripts/install-agent.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	script := string(data)
+	start := strings.Index(script, "agent_journal_after_restart() {")
+	end := strings.Index(script[start:], "\nif [ \"$EXISTING_INSTALLATION\" = \"true\" ]; then")
+	if start < 0 || end < 0 {
+		t.Fatal("enrollment verification functions not found")
+	}
+	functions := script[start : start+end]
+	for _, test := range []struct {
+		name, journal, wantReason string
+		wantSuccess               bool
+	}{
+		{name: "connected", journal: "level=INFO msg=\"WebSocket connected\"", wantSuccess: true},
+		{name: "new 401", journal: "unexpected status code: 401", wantReason: "token_rejected"},
+		{name: "key mismatch", journal: "invalid signature - check KEY value", wantReason: "key_mismatch"},
+		{name: "fingerprint mismatch", journal: "Connection closed err=\"fingerprint mismatch\"", wantReason: "fingerprint_mismatch"},
+		{name: "timeout", journal: "SSH server listening", wantReason: "connection_timeout"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			fixture := filepath.Join(t.TempDir(), "journal")
+			if err := os.WriteFile(fixture, []byte(test.journal+"\n"), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			harness := functions + `
+journalctl() {
+  case "$*" in *--after-cursor=restart-cursor*) cat "$JOURNAL_FIXTURE" ;; *) return 99 ;; esac
+}
+sleep() { :; }
+AGENT_JOURNAL_CURSOR=restart-cursor
+AGENT_JOURNAL_SINCE=unused
+if verify_websocket_enrollment; then result=success; else result=failure; fi
+printf 'RESULT=%s REASON=%s\n' "$result" "$ENROLLMENT_FAILURE_REASON"
+`
+			cmd := exec.Command("sh", "-c", harness)
+			cmd.Env = append(os.Environ(), "JOURNAL_FIXTURE="+fixture)
+			output, err := cmd.CombinedOutput()
+			if err != nil {
+				t.Fatalf("verification harness failed: %v: %s", err, output)
+			}
+			if test.wantSuccess {
+				if !strings.Contains(string(output), "RESULT=success") {
+					t.Fatalf("successful handshake was not accepted: %s", output)
+				}
+			} else if !strings.Contains(string(output), "RESULT=failure REASON="+test.wantReason) {
+				t.Fatalf("failure was misclassified: %s", output)
+			}
+		})
+	}
+	if strings.Contains(script, "--since '1 minute ago'") {
+		t.Fatal("installer still scans stale pre-restart journal entries")
+	}
+	failure := strings.Index(script, `if [ "$ENROLLMENT_FAILURE" = "true" ]; then`)
+	success := strings.LastIndex(script, "Beszel Plus Agent has been installed successfully")
+	if failure < 0 || success < 0 || failure >= success || !strings.Contains(script[failure:success], "exit 69") {
+		t.Fatal("installer can report success after enrollment failure")
 	}
 }

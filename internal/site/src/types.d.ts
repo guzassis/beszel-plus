@@ -74,6 +74,8 @@ export interface SystemInfo {
 	bb?: number
 	/** agent version */
 	v: string
+	/** upstream feature/protocol compatibility version */
+	pv?: string
 	/** system is using podman */
 	p?: boolean
 	/** highest gpu utilization */

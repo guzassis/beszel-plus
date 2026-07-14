@@ -13,6 +13,7 @@ import (
 
 	"github.com/henrygd/beszel"
 	"github.com/henrygd/beszel/agent/utils"
+	"github.com/henrygd/beszel/internal/buildinfo"
 	"github.com/henrygd/beszel/internal/common"
 	"github.com/henrygd/beszel/internal/entities/system"
 
@@ -62,7 +63,9 @@ func (a *Agent) StartServer(opts ServerOptions) error {
 
 	// base config (limit to allowed algorithms)
 	config := &gossh.ServerConfig{
-		ServerVersion: fmt.Sprintf("SSH-2.0-%s_%s", beszel.AppName, beszel.Version),
+		// SSH negotiation uses the upstream compatibility version. The independent
+		// Beszel Plus product version is reported in system data and --version.
+		ServerVersion: fmt.Sprintf("SSH-2.0-%s_%s", beszel.AppName, buildinfo.UpstreamVersion),
 	}
 	config.KeyExchanges = common.DefaultKeyExchanges
 	config.MACs = common.DefaultMACs

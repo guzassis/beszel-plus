@@ -142,6 +142,10 @@ msgstr "מצב פעיל"
 msgid "Add {foo}"
 msgstr "הוסף {foo}"
 
+#: src/components/add-system.tsx
+msgid "Add system and copy Linux command"
+msgstr ""
+
 #: src/components/routes/settings/notifications.tsx
 msgid "Add URL"
 msgstr "הוסף URL"
@@ -993,6 +997,10 @@ msgstr "אימות נכשל"
 msgid "Failed to save settings"
 msgstr "שמירת הגדרות נכשלה"
 
+#: src/components/add-system.tsx
+msgid "Failed to save system"
+msgstr ""
+
 #: src/components/routes/settings/heartbeat.tsx
 msgid "Failed to send heartbeat"
 msgstr "שליחת פעימת הלב נכשלה"
@@ -1398,6 +1406,10 @@ msgstr "Never run"
 #: src/components/systemd-table/systemd-table.tsx
 msgid "No"
 msgstr "לא"
+
+#: src/components/add-system.tsx
+msgid "No installation command was copied. Please retry."
+msgstr ""
 
 #: src/components/command-palette.tsx
 #: src/components/systemd-table/systemd-table.tsx

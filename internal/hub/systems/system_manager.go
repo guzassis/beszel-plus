@@ -7,6 +7,7 @@ import (
 
 	"github.com/henrygd/beszel/internal/hub/ws"
 
+	"github.com/henrygd/beszel/internal/buildinfo"
 	"github.com/henrygd/beszel/internal/entities/system"
 	"github.com/henrygd/beszel/internal/hub/expirymap"
 
@@ -347,7 +348,7 @@ func (sm *SystemManager) createSSHClientConfig() error {
 			MACs:         common.DefaultMACs,
 		},
 		HostKeyCallback: ssh.InsecureIgnoreHostKey(),
-		ClientVersion:   fmt.Sprintf("SSH-2.0-%s_%s", beszel.AppName, beszel.Version),
+		ClientVersion:   fmt.Sprintf("SSH-2.0-%s_%s", beszel.AppName, buildinfo.UpstreamVersion),
 		Timeout:         sessionTimeout,
 	}
 	return nil

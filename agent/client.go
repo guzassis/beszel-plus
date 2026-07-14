@@ -13,8 +13,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/henrygd/beszel"
 	"github.com/henrygd/beszel/agent/utils"
+	"github.com/henrygd/beszel/internal/buildinfo"
 	"github.com/henrygd/beszel/internal/common"
 
 	"github.com/fxamacker/cbor/v2"
@@ -114,9 +114,10 @@ func (client *WebSocketClient) getOptions() *gws.ClientOption {
 		Addr:      client.hubURL.String(),
 		TlsConfig: &tls.Config{InsecureSkipVerify: true},
 		RequestHeader: http.Header{
-			"User-Agent": []string{getUserAgent()},
-			"X-Token":    []string{client.token},
-			"X-Beszel":   []string{beszel.Version},
+			"User-Agent":    []string{getUserAgent()},
+			"X-Token":       []string{client.token},
+			"X-Beszel":      []string{buildinfo.UpstreamVersion},
+			"X-Beszel-Plus": []string{buildinfo.Version},
 		},
 		NewDialer: func() (gws.Dialer, error) {
 			return proxy.FromEnvironment(), nil

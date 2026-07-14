@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/henrygd/beszel"
+	"github.com/henrygd/beszel/internal/buildinfo"
 
 	"github.com/henrygd/beszel/internal/common"
 
@@ -147,7 +148,8 @@ func TestWebSocketClient_GetOptions(t *testing.T) {
 
 			// Check headers
 			assert.Equal(t, "test-token", options.RequestHeader.Get("X-Token"))
-			assert.Equal(t, beszel.Version, options.RequestHeader.Get("X-Beszel"))
+			assert.Equal(t, buildinfo.UpstreamVersion, options.RequestHeader.Get("X-Beszel"))
+			assert.Equal(t, beszel.Version, options.RequestHeader.Get("X-Beszel-Plus"))
 			assert.Contains(t, options.RequestHeader.Get("User-Agent"), "Mozilla/5.0")
 
 			// Test options caching

@@ -359,6 +359,12 @@ func (h *Helper) applyPolicy(ctx context.Context, req entity.Request) (*entity.R
 	if err := h.validatePolicy(policy); err != nil {
 		return nil, false, err
 	}
+	runSystemCommands := h.Root == "" || h.Root == "/" || h.RunSystemCommands
+	if runSystemCommands {
+		if lock := h.aptActivity(); lock != nil {
+			return nil, false, &operationError{code: "apt_lock_busy", stage: "unattended_upgrade_dry_run", retryable: true, message: "APT is currently in use; policy validation was postponed", lock: lock}
+		}
+	}
 	unattended, err := h.renderUnattendedConfig(policy)
 	if err != nil {
 		return nil, false, err
@@ -380,7 +386,6 @@ func (h *Helper) applyPolicy(ctx context.Context, req entity.Request) (*entity.R
 	if policyReadErr != nil && !os.IsNotExist(policyReadErr) {
 		return nil, false, policyReadErr
 	}
-	runSystemCommands := h.Root == "" || h.Root == "/" || h.RunSystemCommands
 	var aptDailyEnabled, aptUpgradeEnabled *bool
 	if runSystemCommands {
 		aptDailyEnabled = h.unitEnabled(ctx, "apt-daily.timer")
@@ -520,6 +525,9 @@ func (h *Helper) command(ctx context.Context, timeout time.Duration, name string
 }
 
 func (h *Helper) unattendedDryRun(ctx context.Context) ([]byte, error) {
+	if lock := h.aptActivity(); lock != nil {
+		return nil, &operationError{code: "apt_lock_busy", stage: "unattended_upgrade_dry_run", retryable: true, message: "APT is currently in use; dry-run was not started", lock: lock}
+	}
 	timeout := h.APTLockTimeout
 	if timeout <= 0 {
 		timeout = 75 * time.Second
@@ -528,12 +536,11 @@ func (h *Helper) unattendedDryRun(ctx context.Context) ([]byte, error) {
 	if base <= 0 {
 		base = 2 * time.Second
 	}
-	started := time.Now()
 	deadline := time.Now().Add(timeout)
-	for attempt := 0; ; attempt++ {
+	for attempt := 0; attempt < 2; attempt++ {
 		remaining := time.Until(deadline)
 		if remaining <= 0 {
-			return nil, &operationError{code: "apt_lock_busy", stage: "unattended_upgrade_dry_run", retryable: true, message: "APT remained busy until the installation timeout", lock: h.aptActivity()}
+			return nil, &operationError{code: "timeout", stage: "unattended_upgrade_dry_run", retryable: true, message: "unattended-upgrade dry-run timed out"}
 		}
 		stepCtx, cancel := context.WithTimeout(ctx, remaining)
 		output, err := h.Runner.Run(stepCtx, "unattended-upgrade", "--dry-run", "--debug")
@@ -542,25 +549,23 @@ func (h *Helper) unattendedDryRun(ctx context.Context) ([]byte, error) {
 		if err == nil {
 			return output, nil
 		}
-		if stepErr != nil && !aptLockBusy(output) {
+		if stepErr != nil {
 			return output, &operationError{code: "timeout", stage: "unattended_upgrade_dry_run", retryable: true, message: "unattended-upgrade dry-run timed out"}
 		}
 		if !aptLockBusy(output) {
 			return output, classifyDryRunFailure(output, err)
 		}
-		lock := h.aptActivity()
-		wait := base * time.Duration(attempt+1)
-		if wait > 5*time.Second {
-			wait = 5 * time.Second
+		if lock := h.aptActivity(); lock != nil {
+			return output, &operationError{code: "apt_lock_busy", stage: "unattended_upgrade_dry_run", retryable: true, message: "APT became busy during policy validation", lock: lock}
 		}
+		if attempt == 1 {
+			return output, classifyDryRunFailure(output, err)
+		}
+		wait := min(base, 2*time.Second)
 		if !time.Now().Add(wait).Before(deadline) {
-			return output, &operationError{code: "apt_lock_busy", stage: "unattended_upgrade_dry_run", retryable: true, message: "APT remained busy until the installation timeout", lock: lock}
+			return output, &operationError{code: "timeout", stage: "unattended_upgrade_dry_run", retryable: true, message: "unattended-upgrade dry-run timed out"}
 		}
-		attributes := []any{"stage", "unattended_upgrade_dry_run", "retry_in", wait, "attempt", attempt + 1, "elapsed", time.Since(started), "remaining", time.Until(deadline)}
-		if lock != nil {
-			attributes = append(attributes, "lock_file", lock.File, "holder_pid", lock.PID, "holder_command", lock.Command, "holder_unit", lock.Unit)
-		}
-		slog.Info("waiting for APT lock", attributes...)
+		slog.Warn("unattended-upgrade reported an unconfirmed APT lock; retrying once", "stage", "unattended_upgrade_dry_run", "retry_in", wait)
 		timer := time.NewTimer(wait)
 		select {
 		case <-ctx.Done():
@@ -569,6 +574,7 @@ func (h *Helper) unattendedDryRun(ctx context.Context) ([]byte, error) {
 		case <-timer.C:
 		}
 	}
+	return nil, &operationError{code: "apt_dry_run_failed", stage: "unattended_upgrade_dry_run", message: "unattended-upgrade dry-run failed"}
 }
 
 func classifyDryRunFailure(output []byte, err error) *operationError {

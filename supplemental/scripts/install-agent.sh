@@ -1,7 +1,7 @@
 #!/bin/sh
 
 PRODUCT_NAME="Beszel Plus"
-PRODUCT_VERSION="0.2.3"
+PRODUCT_VERSION="0.2.4"
 REPOSITORY="guzassis/beszel-plus"
 
 is_alpine() {
@@ -250,7 +250,8 @@ OS_UPDATE_MANAGEMENT_FLAG=""
 POWER_MANAGEMENT_FLAG=""
 OS_UPDATE_POLICY="security"
 VERSION="latest"
-WEBSOCKET_AUTH_WARNING=false
+ENROLLMENT_FAILURE=false
+ENROLLMENT_FAILURE_REASON=""
 POLICY_PENDING=false
 WAIT_FOR_MAINTENANCE=5
 WAIT_FOR_APT=60
@@ -903,7 +904,102 @@ read_existing_connection_value() {
   connection_name="$1"
   connection_value=$(sed -n "s/^${connection_name}=\"\(.*\)\"$/\1/p; s/^${connection_name}=\(.*\)$/\1/p; s/^Environment=\"${connection_name}=\(.*\)\"$/\1/p" \
     "$AGENT_ENV_PATH" /etc/systemd/system/beszel-agent.service /etc/systemd/system/beszel-agent.service.d/*.conf 2>/dev/null | tail -n 1)
+  prefixed_value=$(sed -n "s/^BESZEL_AGENT_${connection_name}=\"\(.*\)\"$/\1/p; s/^BESZEL_AGENT_${connection_name}=\(.*\)$/\1/p; s/^Environment=\"BESZEL_AGENT_${connection_name}=\(.*\)\"$/\1/p" \
+    "$AGENT_ENV_PATH" /etc/systemd/system/beszel-agent.service /etc/systemd/system/beszel-agent.service.d/*.conf 2>/dev/null | tail -n 1)
+  [ -z "$prefixed_value" ] || connection_value="$prefixed_value"
   printf '%s' "$connection_value" | sed 's/\\"/"/g; s/\\\\/\\/g'
+}
+
+process_environment_value() {
+  environment_pid="$1"
+  environment_name="$2"
+  tr '\000' '\n' <"/proc/$environment_pid/environ" 2>/dev/null | sed -n "s/^${environment_name}=//p" | tail -n 1
+}
+
+verify_agent_process_environment() {
+  environment_pid=$(systemctl show beszel-agent.service -p MainPID --value 2>/dev/null || true)
+  case "$environment_pid" in ''|0|*[!0-9]*)
+    echo "Error: Beszel Plus Agent has no running process to validate." >&2
+    return 1
+    ;;
+  esac
+  if [ ! -r "/proc/$environment_pid/environ" ]; then
+    echo "Error: Cannot inspect the effective Beszel Plus Agent environment." >&2
+    return 1
+  fi
+  for environment_name in PORT KEY TOKEN HUB_URL; do
+    case "$environment_name" in
+      PORT) environment_expected="$PORT" ;;
+      KEY) environment_expected="$KEY" ;;
+      TOKEN) environment_expected="$TOKEN" ;;
+      HUB_URL) environment_expected="$HUB_URL" ;;
+    esac
+    environment_actual=$(process_environment_value "$environment_pid" "$environment_name")
+    environment_prefixed=$(process_environment_value "$environment_pid" "BESZEL_AGENT_$environment_name")
+    if [ "$environment_actual" != "$environment_expected" ] || [ -n "$environment_prefixed" ]; then
+      echo "Error: Effective Agent setting $environment_name does not match the protected installer configuration." >&2
+      echo "No connection secret was printed. Remove conflicting systemd overrides and retry." >&2
+      return 1
+    fi
+  done
+  echo "Protected Agent connection settings verified in the running process."
+}
+
+agent_journal_after_restart() {
+  if [ -n "$AGENT_JOURNAL_CURSOR" ]; then
+    journalctl -u beszel-agent.service --after-cursor="$AGENT_JOURNAL_CURSOR" --no-pager 2>/dev/null || true
+  else
+    journalctl -u beszel-agent.service --since "$AGENT_JOURNAL_SINCE" --no-pager 2>/dev/null || true
+  fi
+}
+
+verify_websocket_enrollment() {
+  enrollment_waited=0
+  while [ "$enrollment_waited" -lt 20 ]; do
+    enrollment_log=$(agent_journal_after_restart)
+    if printf '%s\n' "$enrollment_log" | grep -q 'WebSocket connected'; then
+      echo "Hub WebSocket connection verified."
+      return 0
+    fi
+    if printf '%s\n' "$enrollment_log" | grep -qE 'unexpected status code: 401|status code.? 401|Invalid token'; then
+      ENROLLMENT_FAILURE_REASON="token_rejected"
+      return 1
+    fi
+    if printf '%s\n' "$enrollment_log" | grep -qi 'invalid signature'; then
+      ENROLLMENT_FAILURE_REASON="key_mismatch"
+      return 1
+    fi
+    if printf '%s\n' "$enrollment_log" | grep -qi 'fingerprint mismatch'; then
+      ENROLLMENT_FAILURE_REASON="fingerprint_mismatch"
+      return 1
+    fi
+    if printf '%s\n' "$enrollment_log" | grep -qiE 'invalid hub URL|HUB_URL environment variable not set'; then
+      ENROLLMENT_FAILURE_REASON="hub_url_invalid"
+      return 1
+    fi
+    sleep 1
+    enrollment_waited=$((enrollment_waited + 1))
+  done
+  enrollment_log=$(agent_journal_after_restart)
+  if printf '%s\n' "$enrollment_log" | grep -qiE 'no such host|connection refused|network is unreachable|i/o timeout|dial tcp'; then
+    ENROLLMENT_FAILURE_REASON="hub_unreachable"
+  else
+    ENROLLMENT_FAILURE_REASON="connection_timeout"
+  fi
+  return 1
+}
+
+report_websocket_failure() {
+  case "$ENROLLMENT_FAILURE_REASON" in
+    token_rejected) echo "Hub enrollment failed: TOKEN was rejected (401). Save the system/fingerprint in the Hub or generate a new token." >&2 ;;
+    key_mismatch) echo "Hub enrollment failed: KEY does not match the Hub signing key." >&2 ;;
+    fingerprint_mismatch) echo "Hub enrollment failed: this token is registered to another machine fingerprint." >&2 ;;
+    hub_url_invalid) echo "Hub enrollment failed: HUB_URL is invalid." >&2 ;;
+    hub_unreachable) echo "Hub enrollment failed: the configured Hub is unreachable from this host." >&2 ;;
+    *) echo "Hub enrollment failed: a complete WebSocket handshake was not observed within 20 seconds." >&2 ;;
+  esac
+  echo "The Agent service remains installed and SSH fallback may still be available." >&2
+  echo "No connection secret was printed." >&2
 }
 
 if [ "$EXISTING_INSTALLATION" = "true" ]; then
@@ -1737,7 +1833,7 @@ EOF
   else
     echo "Migrating existing systemd service away from inline connection secrets."
     AGENT_SERVICE_NEW="/etc/systemd/system/beszel-agent.service.new.$$"
-    if sed '/^[[:space:]]*Environment="\?\(PORT\|KEY\|TOKEN\|HUB_URL\)=/d' /etc/systemd/system/beszel-agent.service >"$AGENT_SERVICE_NEW"; then
+    if sed '/^[[:space:]]*Environment="\?\(BESZEL_AGENT_\)\?\(PORT\|KEY\|TOKEN\|HUB_URL\)=/d' /etc/systemd/system/beszel-agent.service >"$AGENT_SERVICE_NEW"; then
       chmod --reference=/etc/systemd/system/beszel-agent.service "$AGENT_SERVICE_NEW" 2>/dev/null || chmod 0644 "$AGENT_SERVICE_NEW"
       chown --reference=/etc/systemd/system/beszel-agent.service "$AGENT_SERVICE_NEW" 2>/dev/null || chown root:root "$AGENT_SERVICE_NEW"
       AGENT_SERVICE_CHANGED=true
@@ -1757,6 +1853,7 @@ EOF
   cat >"$CONNECTION_DROPIN_NEW" <<EOF
 [Service]
 EnvironmentFile=-$AGENT_ENV_PATH
+UnsetEnvironment=BESZEL_AGENT_PORT BESZEL_AGENT_KEY BESZEL_AGENT_TOKEN BESZEL_AGENT_HUB_URL
 EOF
   chown root:root "$CONNECTION_DROPIN_NEW"
   chmod 0644 "$CONNECTION_DROPIN_NEW"
@@ -1891,8 +1988,13 @@ EOF
     fi
   fi
   echo "Starting Beszel Plus Agent..."
+  AGENT_JOURNAL_CURSOR=$(journalctl -u beszel-agent.service -n 0 --show-cursor --no-pager 2>/dev/null | sed -n 's/^-- cursor: //p' | tail -n 1)
+  AGENT_JOURNAL_SINCE=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
   systemctl enable beszel-agent.service >/dev/null 2>&1
-  systemctl restart beszel-agent.service
+  if ! systemctl restart beszel-agent.service; then
+    echo "Error: Failed to restart the Beszel Plus Agent service." >&2
+    exit 1
+  fi
 
 
 
@@ -1946,19 +2048,18 @@ EOF
   esac
 
   # Wait for the service to start or fail
-  if [ "$(systemctl is-active beszel-agent.service)" != "active" ]; then
+  if ! systemctl is-active --quiet beszel-agent.service; then
     echo "Error: The Beszel Plus Agent service is not running."
-    systemctl status beszel-agent.service
+    systemctl status beszel-agent.service --no-pager 2>/dev/null || true
+    exit 1
+  fi
+  if ! verify_agent_process_environment; then
     exit 1
   fi
   if [ -n "$TOKEN" ] && [ -n "$HUB_URL" ]; then
-    sleep 2
-    if journalctl -u beszel-agent.service --since '1 minute ago' --no-pager 2>/dev/null | grep -qE 'unexpected status code: 401|status code.? 401'; then
-      WEBSOCKET_AUTH_WARNING=true
-      echo "Warning: Hub WebSocket authentication returned 401. Verify that TOKEN belongs to this Agent and HUB_URL points to the correct Hub." >&2
-      echo "The Agent remains running and SSH fallback may still be available." >&2
-    else
-      echo "No WebSocket authentication rejection was detected after restart."
+    if ! verify_websocket_enrollment; then
+      ENROLLMENT_FAILURE=true
+      report_websocket_failure
     fi
   fi
 fi
@@ -1975,14 +2076,18 @@ PHASE="PHASE_COMPLETE"
 if [ "$POLICY_PENDING" = "true" ]; then
   echo "Agent v${INSTALL_VERSION} installed."
   echo "Maintenance helper v${INSTALL_VERSION} installed."
-  echo "APT is currently busy."
+  if [ "$POLICY_ERROR_CODE" = "apt_lock_busy" ]; then
+    echo "APT/dpkg currently holds a real kernel lock."
+  else
+    echo "Initial policy validation is temporarily pending (${POLICY_ERROR_CODE:-unknown reason})."
+  fi
   echo "The initial update policy was not applied yet."
-  echo "The policy will be retried after the current APT operation finishes."
+  echo "The policy will be retried automatically by the Agent."
   echo "Installation completed with a pending maintenance policy."
 fi
-echo "Installation completed."
-
-printf "\n\033[32mBeszel Plus Agent has been installed successfully! It is now running on %s.\033[0m\n" "$PORT"
-if [ "$WEBSOCKET_AUTH_WARNING" = "true" ]; then
-  printf "\033[33mInstallation completed with a WebSocket authentication warning (401); review TOKEN and HUB_URL.\033[0m\n"
+if [ "$ENROLLMENT_FAILURE" = "true" ]; then
+  echo "Local installation completed, but Hub enrollment failed." >&2
+  exit 69
 fi
+echo "Installation completed."
+printf "\n\033[32mBeszel Plus Agent has been installed successfully! It is now running on %s.\033[0m\n" "$PORT"

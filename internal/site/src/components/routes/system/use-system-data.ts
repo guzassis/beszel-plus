@@ -83,12 +83,14 @@ export function useSystemData(id: string) {
 		})
 	}, [id, systems.length])
 
-	// hide 1m chart time if system agent version is less than 0.13.0
+	const agentProtocolVersion = system?.info?.pv || system?.info?.v
+
+	// hide 1m chart time if system agent protocol version is less than 0.13.0
 	useEffect(() => {
-		if (parseSemVer(system?.info?.v) < parseSemVer("0.13.0")) {
+		if (parseSemVer(agentProtocolVersion) < parseSemVer("0.13.0")) {
 			$chartTime.set("1h")
 		}
-	}, [system?.info?.v])
+	}, [agentProtocolVersion])
 
 	// fetch system details
 	useEffect(() => {
@@ -112,7 +114,7 @@ export function useSystemData(id: string) {
 		if (!system.id || chartTime !== "1m") {
 			return
 		}
-		if (system.status !== SystemStatus.Up || parseSemVer(system?.info?.v).minor < 13) {
+		if (system.status !== SystemStatus.Up || parseSemVer(agentProtocolVersion).minor < 13) {
 			$chartTime.set("1h")
 			return
 		}
@@ -147,9 +149,9 @@ export function useSystemData(id: string) {
 		return () => {
 			unsub?.()
 		}
-	}, [chartTime, system.id])
+	}, [agentProtocolVersion, chartTime, system.id])
 
-	const agentVersion = useMemo(() => parseSemVer(system?.info?.v), [system?.info?.v])
+	const agentVersion = useMemo(() => parseSemVer(agentProtocolVersion), [agentProtocolVersion])
 
 	const chartData: ChartData = useMemo(() => {
 		const lastCreated = Math.max(

@@ -137,6 +137,10 @@ msgstr "Active state"
 msgid "Add {foo}"
 msgstr "Add {foo}"
 
+#: src/components/add-system.tsx
+msgid "Add system and copy Linux command"
+msgstr "Add system and copy Linux command"
+
 #: src/components/routes/settings/notifications.tsx
 msgid "Add URL"
 msgstr "Add URL"
@@ -988,6 +992,10 @@ msgstr "Failed to authenticate"
 msgid "Failed to save settings"
 msgstr "Failed to save settings"
 
+#: src/components/add-system.tsx
+msgid "Failed to save system"
+msgstr "Failed to save system"
+
 #: src/components/routes/settings/heartbeat.tsx
 msgid "Failed to send heartbeat"
 msgstr "Failed to send heartbeat"
@@ -1393,6 +1401,10 @@ msgstr "Never run"
 #: src/components/systemd-table/systemd-table.tsx
 msgid "No"
 msgstr "No"
+
+#: src/components/add-system.tsx
+msgid "No installation command was copied. Please retry."
+msgstr "No installation command was copied. Please retry."
 
 #: src/components/command-palette.tsx
 #: src/components/systemd-table/systemd-table.tsx

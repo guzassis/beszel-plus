@@ -49,6 +49,35 @@ func testHelper(t *testing.T) *Helper {
 	return &Helper{Root: root, Runner: &fakeRunner{}, Now: func() time.Time { return time.Unix(100, 0).UTC() }}
 }
 
+func setAPTLock(t *testing.T, h *Helper, lockPath string, pid int, command, unit string) {
+	t.Helper()
+	if err := os.MkdirAll(filepath.Dir(h.path(lockPath)), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(h.path(lockPath), nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	procDir := h.path(fmt.Sprintf("/proc/%d", pid))
+	if err := os.MkdirAll(procDir, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(procDir, "comm"), []byte(command+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(procDir, "cgroup"), []byte("0::/system.slice/"+unit+"\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	info, err := os.Stat(h.path(lockPath))
+	if err != nil {
+		t.Fatal(err)
+	}
+	stat := info.Sys().(*syscall.Stat_t)
+	line := fmt.Sprintf("1: POSIX ADVISORY WRITE %d %x:%x:%d 0 EOF\n", pid, unix.Major(uint64(stat.Dev)), unix.Minor(uint64(stat.Dev)), stat.Ino)
+	if err := os.WriteFile(h.path("/proc/locks"), []byte(line), 0o644); err != nil {
+		t.Fatal(err)
+	}
+}
+
 func TestAPTActivityRequiresARealKnownLock(t *testing.T) {
 	h := testHelper(t)
 	if err := os.MkdirAll(h.path("/proc/4242"), 0o755); err != nil {
@@ -279,34 +308,47 @@ func TestUnattendedDryRunRetriesTransientAPTLock(t *testing.T) {
 	}
 }
 
-func TestUnattendedDryRunReturnsTypedBusyErrorAtTimeout(t *testing.T) {
+func TestUnattendedDryRunDoesNotTrustUnconfirmedLockOutput(t *testing.T) {
 	h := testHelper(t)
-	h.APTLockTimeout = time.Millisecond
-	h.APTRetryBase = 2 * time.Millisecond
+	h.APTLockTimeout = time.Second
+	h.APTRetryBase = time.Millisecond
+	attempts := 0
 	h.Runner = helperRunnerFunc(func(_ context.Context, name string, _ ...string) ([]byte, error) {
 		if name != "unattended-upgrade" {
 			return nil, errors.New("inactive")
 		}
+		attempts++
 		return []byte("Could not get lock /var/lib/dpkg/lock-frontend"), errors.New("exit 100")
 	})
 	_, err := h.unattendedDryRun(context.Background())
 	var typed *operationError
-	if !errors.As(err, &typed) || typed.code != "apt_lock_busy" || !typed.retryable || typed.stage != "unattended_upgrade_dry_run" {
+	if !errors.As(err, &typed) || typed.code != "apt_dry_run_failed" || typed.retryable || typed.lock != nil || attempts != 2 {
 		t.Fatalf("unexpected error: %#v", err)
+	}
+}
+
+func TestUnattendedDryRunDoesNotStartWithRealAPTLock(t *testing.T) {
+	h := testHelper(t)
+	setAPTLock(t, h, "/run/unattended-upgrades.lock", 48640, "unattended-upgr", "unattended-upgrades.service")
+	attempts := 0
+	h.Runner = helperRunnerFunc(func(context.Context, string, ...string) ([]byte, error) {
+		attempts++
+		return nil, nil
+	})
+	_, err := h.unattendedDryRun(context.Background())
+	var typed *operationError
+	if !errors.As(err, &typed) || typed.code != "apt_lock_busy" || !typed.retryable || typed.lock == nil || typed.lock.PID != 48640 || attempts != 0 {
+		t.Fatalf("unexpected result: attempts=%d err=%#v", attempts, err)
 	}
 }
 
 func TestRetryablePolicyPersistsUntilSuccessfulRetry(t *testing.T) {
 	h := testHelper(t)
 	h.RunSystemCommands = true
-	h.APTLockTimeout = time.Millisecond
-	h.APTRetryBase = 2 * time.Millisecond
+	setAPTLock(t, h, "/var/lib/dpkg/lock-frontend", 48640, "unattended-upgr", "unattended-upgrades.service")
 	h.Runner = helperRunnerFunc(func(_ context.Context, name string, args ...string) ([]byte, error) {
 		if name == "systemctl" && len(args) > 0 && args[0] == "is-enabled" {
 			return []byte("disabled\n"), nil
-		}
-		if name == "unattended-upgrade" {
-			return []byte("Could not get lock /var/lib/dpkg/lock-frontend"), errors.New("exit 1")
 		}
 		return nil, nil
 	})
@@ -324,6 +366,9 @@ func TestRetryablePolicyPersistsUntilSuccessfulRetry(t *testing.T) {
 		t.Fatalf("pending policy was not persisted: %#v", status)
 	}
 
+	if err := os.WriteFile(h.path("/proc/locks"), nil, 0o644); err != nil {
+		t.Fatal(err)
+	}
 	h.Runner = helperRunnerFunc(func(context.Context, string, ...string) ([]byte, error) { return []byte("dry-run complete"), nil })
 	request.RequestID = "request-retry"
 	request.IdempotencyKey = "idem-retry"

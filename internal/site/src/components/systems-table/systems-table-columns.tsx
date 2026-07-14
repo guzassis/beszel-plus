@@ -211,7 +211,7 @@ export function SystemsTableColumns(viewMode: "table" | "grid"): ColumnDef<Syste
 			header: sortableHeader,
 			cell(info: CellContext<SystemRecord, unknown>) {
 				const { info: sysInfo, status } = info.row.original
-				const { major, minor } = parseSemVer(sysInfo.v)
+				const { major, minor } = parseSemVer(sysInfo.pv || sysInfo.v)
 				const { colorWarn = 65, colorCrit = 90 } = useStore($userSettings, { keys: ["colorWarn", "colorCrit"] })
 				const loadAverages = sysInfo.la || []
 

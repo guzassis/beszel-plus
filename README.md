@@ -5,7 +5,7 @@ Beszel Plus is a public fork of [Beszel](https://github.com/henrygd/beszel), a l
 The fork preserves compatibility with the original project while adding operational features used by Beszel Plus deployments.
 
 [![Fork original version](https://img.shields.io/badge/fork_original-v0.18.2-2563eb)](https://github.com/henrygd/beszel/releases/tag/v0.18.2)
-[![Beszel Plus version](https://img.shields.io/badge/Beszel_Plus-v0.2.3-7c3aed)](https://github.com/guzassis/beszel-plus/releases/tag/v0.2.3)
+[![Beszel Plus version](https://img.shields.io/badge/Beszel_Plus-v0.2.4-7c3aed)](https://github.com/guzassis/beszel-plus/releases/tag/v0.2.4)
 [![MIT license](https://img.shields.io/github/license/henrygd/beszel?color=%239944ee)](https://github.com/henrygd/beszel/blob/main/LICENSE)
 [![Crowdin](https://badges.crowdin.net/beszel/localized.svg)](https://crowdin.com/project/beszel)
 
@@ -25,17 +25,19 @@ The fork preserves compatibility with the original project while adding operatio
 - **Least-privilege maintenance**: The Agent remains unprivileged and delegates enumerated APT/systemd operations to a root one-shot helper over a protected local Unix socket.
 - **Self-repairing maintenance install**: Re-running the Agent installer repairs the v0.0.3 socket/template association, replaces the helper with the matching release, verifies socket activation, and reapplies the initial policy only when its state is missing.
 - **Transactional maintenance upgrades**: The v0.1.3 installer bounds legacy helper detection, validates both new binaries, installs them atomically, starts the Agent only after policy setup, and restores binaries and systemd units if installation fails or is interrupted.
-- **Resilient APT policy setup**: Real APT lock ownership is detected from known lock files and `/proc/locks`; simulations no longer count as blockers, installation uses a short bounded retry, and a busy policy remains pending for a limited Agent retry.
+- **Resilient APT policy setup**: Real APT lock ownership is detected from known lock files and `/proc/locks`; lock-like output without a kernel holder is retried only once and reported as a dry-run error instead of causing a false 75-second wait, while genuinely blocked policies remain pending for Agent retry.
 - **Serialized update operations**: Collection and privileged maintenance share a local gate, preventing overlapping APT commands and duplicate collection cycles.
 - **Partial eligibility reporting**: Eligibility dry-runs use the privileged helper. Temporary lock or helper failures preserve the rest of the update snapshot and the last successful eligibility value instead of showing a global collection error.
-- **Safe connection refresh**: Re-running the systemd installer updates its managed Hub URL and token drop-in while preserving unrelated service customization and reports WebSocket authentication rejection clearly.
+- **Verified connection refresh**: Re-running the systemd installer neutralizes stale `BESZEL_AGENT_*` overrides, verifies the running process configuration without printing secrets, and requires a post-restart WebSocket handshake before reporting complete success.
+- **Independent version compatibility**: WebSocket and SSH negotiation advertise the preserved upstream protocol baseline (`v0.18.2`) while Hub, Agent, helper, installers, UI, and system data report the independent Beszel Plus release (`v0.2.4`).
+- **Enrollment-safe install commands**: New systems and fingerprints are persisted in the Hub before the Linux command is copied; failed fingerprint creation removes the incomplete system and concurrent submissions are ignored.
 - **Power management**: Administrators can configure a local power network, inspect Agent network/WOL readiness, send Wake-on-LAN from the Hub, schedule a safe shutdown, and cancel a pending shutdown from the system page.
 - **Hub-local WOL**: Magic packets are generated directly by the Hub and sent three times over UDP 7 or 9. No root process, external command, listening port, or Tailscale-specific dependency is required.
 - **Guarded shutdown**: Shutdown requests travel over the existing authenticated Hub ↔ Agent channel and the restricted helper refuses them while APT/dpkg or another maintenance operation is active. systemd owns the timer; no sleeping process is left behind.
 - **Transactional Agent upgrades**: The v0.2.1 installer drains new maintenance requests, postpones safely when a critical operation is active, preserves omitted management flags, replaces executables atomically, and validates rollback before reporting success.
 - **Context-aware APT coordination**: The v0.2.2 installer identifies actual kernel lock owners, waits up to 60 seconds only when a missing dependency requires APT, and otherwise continues safely alongside `unattended-upgrades`. It never kills or suspends package-management processes.
 - **Hardened native installers**: Agent connection credentials are stored in a root-only environment file, omitted upgrade settings are preserved, and both Agent and Hub installers serialize concurrent runs, validate checksums and component versions, write atomically, and roll back failed transactions.
-- **Reproducible native releases**: The v0.2.3 pipeline builds complete Go command packages with a pinned GoReleaser version, validates the full six-archive Linux matrix, and runs the same release as a non-publishing snapshot on every push to `main`.
+- **Reproducible native releases**: The v0.2.4 pipeline builds complete Go command packages with a pinned GoReleaser version, validates the full six-archive Linux matrix, and runs the same release as a non-publishing snapshot on every push to `main`.
 - **Upgrade diagnostics**: Run the Agent installer with `--diagnose` to inspect installed component versions, service state, active maintenance, APT locks, pending policy, power management, and upgrade readiness without changing the installation.
 <!-- - **REST API**: Use or update your data in your own scripts and applications. -->
 
@@ -95,7 +97,7 @@ The deprecated `--auto-update` flag remains an alias for `--agent-auto-update`. 
 
 ## Versioning
 
-Beszel Plus tracks the original fork baseline as `v0.18.2` and uses an independent release sequence for its own changes. The current Beszel Plus release is `v0.2.3`. Hub, Agent, maintenance helper, frontend, installers, update checks, and release assets use the same product version injected from `internal/buildinfo`; upstream protocol and Go module compatibility are tracked separately and are not displayed as the Beszel Plus product version.
+Beszel Plus tracks the original fork baseline as `v0.18.2` and uses an independent release sequence for its own changes. The current Beszel Plus release is `v0.2.4`. Hub, Agent, maintenance helper, frontend, installers, update checks, and release assets use the same product version injected from `internal/buildinfo`; upstream protocol and Go module compatibility are tracked separately and are not displayed as the Beszel Plus product version.
 
 Each Beszel Plus release must update this README whenever user-visible functionality, installation behavior, supported platforms, security architecture, or operational requirements change.
 

@@ -101,7 +101,7 @@ func (s *Service) UpdateCPUPercent(cpuUsage uint64) {
 
 	usageDelta := cpuUsage - s.PrevCpuUsage
 	cpuPercent := float64(usageDelta) / float64(duration)
-	s.Cpu = twoDecimals(cpuPercent * 100)
+	s.Cpu = twoDecimals(math.Min(cpuPercent*100, 100))
 
 	if s.Cpu > s.CpuPeak {
 		s.CpuPeak = s.Cpu
