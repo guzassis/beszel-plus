@@ -100,6 +100,82 @@ func TestFallbackLeavesSecurityCountUnknown(t *testing.T) {
 	if status.PendingUpdatesTotal == nil || *status.PendingUpdatesTotal != 1 || status.PendingSecurityUpdates != nil {
 		t.Fatalf("fallback counts are misleading: %#v", status)
 	}
+	if status.CollectionStatus != "partial" || status.EligibilityErrorCode != "helper_unavailable" {
+		t.Fatalf("unprivileged eligibility was not isolated: %#v", status)
+	}
+	if status.LastError != "" || len(status.CollectionErrors) != 0 {
+		t.Fatalf("partial eligibility became a global collection error: %#v", status)
+	}
+}
+
+func TestEligibilityFailurePreservesLastSuccessfulValue(t *testing.T) {
+	last := uint16(3)
+	checked := time.Unix(1_700_000_000, 0).UTC()
+	previous := &updateentity.Status{PendingUpdatesEligible: &last, LastEligibilityCheck: &checked, EligibilityStatus: "available"}
+	current := &updateentity.Status{CollectionStatus: "partial", EligibilityStatus: "busy", EligibilityErrorCode: "apt_lock_busy", EligibilityRetryable: true}
+	mergeEligibility(current, previous, checked.Add(time.Hour))
+	if current.PendingUpdatesEligible == nil || *current.PendingUpdatesEligible != last || current.EligibilityStatus != "stale" || current.LastEligibilityCheck == nil || !current.LastEligibilityCheck.Equal(checked) {
+		t.Fatalf("last eligibility result was lost: %#v", current)
+	}
+}
+
+func TestPrivilegedEligibilitySuccessAndBusyState(t *testing.T) {
+	m := &updateManager{}
+	m.setEligibilityCheck(func(context.Context) eligibilityCheckResult {
+		return eligibilityCheckResult{status: "available", output: []byte("Packages that will be upgraded: ['curl', 'openssl']\n")}
+	})
+	total := uint16(3)
+	status := &updateentity.Status{Supported: true, InstallationState: updateentity.InstallationInstalled, PendingUpdatesTotal: &total}
+	m.collectPrivilegedEligibility(context.Background(), status)
+	if status.PendingUpdatesEligible == nil || *status.PendingUpdatesEligible != 2 || status.CollectionStatus != "complete" || status.EligibilityStatus != "available" {
+		t.Fatalf("helper eligibility result was not applied: %#v", status)
+	}
+	m.setEligibilityCheck(func(context.Context) eligibilityCheckResult {
+		return eligibilityCheckResult{status: "busy", errorCode: "apt_lock_busy", retryable: true}
+	})
+	status = &updateentity.Status{Supported: true, InstallationState: updateentity.InstallationInstalled, PendingUpdatesTotal: &total}
+	m.collectPrivilegedEligibility(context.Background(), status)
+	if status.CollectionStatus != "partial" || status.EligibilityStatus != "busy" || !status.EligibilityRetryable {
+		t.Fatalf("temporary helper failure became a global failure: %#v", status)
+	}
+}
+
+func TestCollectionAndMaintenanceAreSerialized(t *testing.T) {
+	m := &updateManager{gate: make(chan struct{}, 1)}
+	if !m.beginCollection() || m.beginCollection() {
+		t.Fatal("overlapping collection was not rejected")
+	}
+	acquired := make(chan error, 1)
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), time.Second)
+		defer cancel()
+		acquired <- m.beginMaintenance(ctx)
+	}()
+	time.Sleep(10 * time.Millisecond)
+	if !m.maintenanceIsActive() || m.beginCollection() {
+		t.Fatal("maintenance did not block a new collection")
+	}
+	m.endCollection()
+	if err := <-acquired; err != nil {
+		t.Fatal(err)
+	}
+	m.endMaintenance()
+	if m.maintenanceIsActive() || !m.beginCollection() {
+		t.Fatal("coordination state was not released")
+	}
+	m.endCollection()
+}
+
+func TestCollectionRetryUsesBoundedBackoffAndJitter(t *testing.T) {
+	first := updateCollectionDelay(6*time.Hour, 1, 1)
+	second := updateCollectionDelay(6*time.Hour, 2, 1)
+	capped := updateCollectionDelay(20*time.Minute, 7, 1)
+	if first < 5*time.Minute || first > 6*time.Minute || second < 10*time.Minute || second > 11*time.Minute {
+		t.Fatalf("unexpected retry backoff: first=%v second=%v", first, second)
+	}
+	if capped < 20*time.Minute || capped > 22*time.Minute {
+		t.Fatalf("retry backoff exceeded configured interval: %v", capped)
+	}
 }
 
 func TestPendingTimeoutPreservesPartialSnapshot(t *testing.T) {

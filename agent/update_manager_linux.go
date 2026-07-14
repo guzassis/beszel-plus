@@ -282,10 +282,10 @@ func collectPending(ctx context.Context, s *updateentity.Status, executor update
 		if total, security, ok := parseAptCheck(output); ok {
 			s.PendingUpdatesTotal, s.PendingSecurityUpdates = &total, &security
 			s.DataSources = append(s.DataSources, "apt-check")
-			collectEligible(ctx, s, executor, opts)
+			collectEligible(s)
 			return
 		} else if runErr == nil {
-			collectEligible(ctx, s, executor, opts)
+			collectEligible(s)
 			return
 		}
 	}
@@ -298,26 +298,56 @@ func collectPending(ctx context.Context, s *updateentity.Status, executor update
 		s.PendingUpdatesTotal = &count
 		s.DataSources = append(s.DataSources, "apt-get-simulation")
 	}
-	collectEligible(ctx, s, executor, opts)
+	collectEligible(s)
 }
 
-func collectEligible(ctx context.Context, s *updateentity.Status, executor updateCommandExecutor, opts updateOptions) {
-	output, err := runUpdateStep(ctx, executor, opts.aptTimeout, "unattended-upgrade", "--dry-run", "--debug")
-	if err != nil {
-		s.CollectionErrors = append(s.CollectionErrors, "eligibility dry-run: "+sanitizeUpdateText(err.Error(), 256))
+func collectEligible(s *updateentity.Status) {
+	// unattended-upgrade is not reliably safe as the unprivileged beszel user.
+	// The update manager replaces this partial state through the root-owned helper.
+	s.CollectionStatus = "partial"
+	s.EligibilityStatus = "unavailable"
+	s.EligibilityErrorCode = "helper_unavailable"
+}
+
+func (m *updateManager) collectPrivilegedEligibility(ctx context.Context, s *updateentity.Status) {
+	if s == nil || !s.Supported || s.InstallationState != updateentity.InstallationInstalled {
 		return
 	}
-	if count, ok := parseEligibleUpdates(output); ok {
+	check := m.eligibilityCheck()
+	if check == nil {
+		return
+	}
+	result := check(ctx)
+	if result.status != "available" {
+		s.CollectionStatus = "partial"
+		s.EligibilityStatus = result.status
+		s.EligibilityErrorCode = result.errorCode
+		s.EligibilityRetryable = result.retryable
+		return
+	}
+	if count, ok := parseEligibleUpdates(result.output); ok {
 		s.PendingUpdatesEligible, s.PendingUpdates = &count, &count
 		if s.PendingUpdatesTotal != nil && *s.PendingUpdatesTotal >= count {
 			excluded := *s.PendingUpdatesTotal - count
 			s.PendingUpdatesExcluded = &excluded
 		}
-		s.DataSources = append(s.DataSources, "unattended-upgrade-dry-run")
-		if s.PendingUpdatesExcluded != nil && *s.PendingUpdatesExcluded > 0 {
-			s.ExcludedRepositories = parseExcludedRepositories(output)
+		s.DataSources = append(s.DataSources, "maintenance-helper-dry-run")
+		s.EligibilityStatus = "available"
+		s.EligibilityErrorCode = ""
+		s.EligibilityRetryable = false
+		if len(s.CollectionErrors) == 0 {
+			s.CollectionStatus = "complete"
+		} else {
+			s.CollectionStatus = "partial"
 		}
+		if s.PendingUpdatesExcluded != nil && *s.PendingUpdatesExcluded > 0 {
+			s.ExcludedRepositories = parseExcludedRepositories(result.output)
+		}
+		return
 	}
+	s.CollectionStatus = "partial"
+	s.EligibilityStatus = "unavailable"
+	s.EligibilityErrorCode = "invalid_helper_output"
 }
 
 func parseExcludedRepositories(output []byte) []string {

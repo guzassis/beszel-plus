@@ -8,6 +8,8 @@ import (
 	updateentity "github.com/henrygd/beszel/internal/entities/update"
 )
 
+func (m *updateManager) collectPrivilegedEligibility(context.Context, *updateentity.Status) {}
+
 func collectUpdateStatus(_ context.Context, _ updateOptions, _ *systemdManager) (*updateentity.Status, error) {
 	return &updateentity.Status{
 		Supported: false, InstallationState: updateentity.InstallationUnknown,

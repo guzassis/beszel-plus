@@ -37,6 +37,17 @@ type updateManager struct {
 	systemd     *systemdManager
 	statePath   string
 	persisted   updatePersistentState
+	gate        chan struct{}
+	stateMu     sync.Mutex
+	maintenance bool
+	eligibility func(context.Context) eligibilityCheckResult
+}
+
+type eligibilityCheckResult struct {
+	output    []byte
+	status    string
+	errorCode string
+	retryable bool
 }
 
 func newUpdateManager(systemd *systemdManager, dataDirs ...string) *updateManager {
@@ -73,7 +84,7 @@ func newUpdateManager(systemd *systemdManager, dataDirs ...string) *updateManage
 			slog.Warn("Invalid UPDATE_APT_TIMEOUT", "value", raw)
 		}
 	}
-	m := &updateManager{options: opts, systemd: systemd}
+	m := &updateManager{options: opts, systemd: systemd, gate: make(chan struct{}, 1)}
 	dataDir := ""
 	if len(dataDirs) > 0 {
 		dataDir = dataDirs[0]
@@ -88,20 +99,74 @@ func newUpdateManager(systemd *systemdManager, dataDirs ...string) *updateManage
 
 func (m *updateManager) run() {
 	m.refresh()
-	ticker := time.NewTicker(m.options.interval)
-	defer ticker.Stop()
-	for range ticker.C {
+	failures := 0
+	for {
+		if m.lastCollectionRetryable() {
+			failures++
+		} else {
+			failures = 0
+		}
+		delay := updateCollectionDelay(m.options.interval, failures, time.Now().UnixNano())
+		timer := time.NewTimer(delay)
+		<-timer.C
 		m.refresh()
 	}
 }
 
+func (m *updateManager) lastCollectionRetryable() bool {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+	return m.status != nil && m.status.EligibilityRetryable
+}
+
+func updateCollectionDelay(interval time.Duration, failures int, seed int64) time.Duration {
+	delay := interval
+	if failures > 0 {
+		shift := min(failures-1, 6)
+		delay = 5 * time.Minute * time.Duration(1<<shift)
+		if delay > interval {
+			delay = interval
+		}
+	}
+	if delay <= 0 {
+		return time.Minute
+	}
+	spread := delay / 10
+	if spread <= 0 {
+		return delay
+	}
+	if seed < 0 {
+		seed = -seed
+	}
+	return delay + time.Duration(seed%int64(spread+1))
+}
+
 func (m *updateManager) refresh() {
-	status, err := collectUpdateStatus(context.Background(), m.options, m.systemd)
+	if !m.beginCollection() {
+		maintenanceActive := m.maintenanceIsActive()
+		if maintenanceActive {
+			m.mu.Lock()
+			if m.status != nil {
+				m.status.CollectionStatus = "collection_skipped_maintenance_active"
+			}
+			m.mu.Unlock()
+		}
+		slog.Info("collection skipped: update collection already running", "collection_skipped", true, "maintenance_active", maintenanceActive)
+		return
+	}
+	defer m.endCollection()
+	ctx, cancel := context.WithTimeout(context.Background(), m.options.aptTimeout)
+	defer cancel()
+	status, err := collectUpdateStatus(ctx, m.options, m.systemd)
+	m.collectPrivilegedEligibility(ctx, status)
 	now := time.Now().UTC()
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.lastAttempt = now
 	if status != nil {
+		if status.CollectionStatus == "" {
+			status.CollectionStatus = "complete"
+		}
 		status.CollectedAt = now
 		status.CacheAgeSeconds = 0
 		if status.PendingSecurityUpdates != nil && *status.PendingSecurityUpdates > 0 {
@@ -123,6 +188,7 @@ func (m *updateManager) refresh() {
 		if err != nil {
 			status.LastError = sanitizeUpdateText(err.Error(), 512)
 		}
+		mergeEligibility(status, m.status, now)
 		status.OverallState = updateentity.DeriveOverallState(status)
 		if status.LastUpgradeAt != nil && m.persisted.LastManualUpgradeAt != nil {
 			delta := status.LastUpgradeAt.Sub(*m.persisted.LastManualUpgradeAt)
@@ -141,6 +207,72 @@ func (m *updateManager) refresh() {
 	if m.status != nil && err != nil {
 		m.status.LastError = sanitizeUpdateText(err.Error(), 512)
 	}
+}
+
+func mergeEligibility(status, previous *updateentity.Status, now time.Time) {
+	if status.EligibilityStatus == "available" {
+		status.LastEligibilityCheck = &now
+		return
+	}
+	if previous != nil && previous.PendingUpdatesEligible != nil {
+		value := *previous.PendingUpdatesEligible
+		status.PendingUpdatesEligible = &value
+		status.EligibilityStatus = "stale"
+		status.LastEligibilityCheck = previous.LastEligibilityCheck
+	}
+}
+
+func (m *updateManager) setEligibilityCheck(check func(context.Context) eligibilityCheckResult) {
+	m.stateMu.Lock()
+	m.eligibility = check
+	m.stateMu.Unlock()
+}
+
+func (m *updateManager) eligibilityCheck() func(context.Context) eligibilityCheckResult {
+	m.stateMu.Lock()
+	defer m.stateMu.Unlock()
+	return m.eligibility
+}
+
+func (m *updateManager) beginCollection() bool {
+	m.stateMu.Lock()
+	if m.maintenance {
+		m.stateMu.Unlock()
+		return false
+	}
+	m.stateMu.Unlock()
+	select {
+	case m.gate <- struct{}{}:
+		return true
+	default:
+		return false
+	}
+}
+func (m *updateManager) endCollection() { <-m.gate }
+func (m *updateManager) maintenanceIsActive() bool {
+	m.stateMu.Lock()
+	defer m.stateMu.Unlock()
+	return m.maintenance
+}
+func (m *updateManager) beginMaintenance(ctx context.Context) error {
+	m.stateMu.Lock()
+	m.maintenance = true
+	m.stateMu.Unlock()
+	select {
+	case m.gate <- struct{}{}:
+		return nil
+	case <-ctx.Done():
+		m.stateMu.Lock()
+		m.maintenance = false
+		m.stateMu.Unlock()
+		return ctx.Err()
+	}
+}
+func (m *updateManager) endMaintenance() {
+	<-m.gate
+	m.stateMu.Lock()
+	m.maintenance = false
+	m.stateMu.Unlock()
 }
 
 func (m *updateManager) snapshot() *updateentity.Status {

@@ -48,6 +48,27 @@ func newMaintenanceManager(agent *Agent) *maintenanceManager {
 	raw, _ := utils.GetEnv("OS_UPDATE_MANAGEMENT")
 	m := &maintenanceManager{agent: agent, socket: maintenanceSocket, enabled: strings.EqualFold(raw, "true"), replays: make(map[string]entity.Response)}
 	m.caps = &entity.Capabilities{UpdateMonitoring: agent.updateManager != nil}
+	if agent.updateManager != nil {
+		agent.updateManager.setEligibilityCheck(func(ctx context.Context) eligibilityCheckResult {
+			now := time.Now().UTC().Format("20060102T150405.000000000")
+			response, err := m.call(ctx, entity.Request{Version: entity.ProtocolVersion, RequestID: "eligibility-" + now, Operation: entity.RunUpdateDryRun})
+			if err != nil {
+				return eligibilityCheckResult{status: "unavailable", errorCode: "helper_unavailable", retryable: true}
+			}
+			if response.Status != entity.StateCompleted || response.Result == nil {
+				code := response.ErrorCode
+				if code == "" {
+					code = "helper_dry_run_failed"
+				}
+				status := "unavailable"
+				if code == "apt_lock_busy" {
+					status = "busy"
+				}
+				return eligibilityCheckResult{status: status, errorCode: code, retryable: response.Retryable}
+			}
+			return eligibilityCheckResult{output: []byte(response.Result.Output), status: "available"}
+		})
+	}
 	go m.runCapabilityRefresh()
 	return m
 }
@@ -180,6 +201,26 @@ func (m *maintenanceManager) handle(req entity.Request) entity.Response {
 func (m *maintenanceManager) run(req entity.Request) {
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Hour)
 	defer cancel()
+	if m.agent.updateManager != nil {
+		gateCtx, gateCancel := context.WithTimeout(ctx, 10*time.Second)
+		if err := m.agent.updateManager.beginMaintenance(gateCtx); err != nil {
+			gateCancel()
+			response := maintenanceFailure(req, "update collection is still running")
+			response.ErrorCode = "update_collection_busy"
+			response.Stage = "agent_coordination"
+			response.Retryable = true
+			m.mu.Lock()
+			m.running = false
+			m.last = response
+			if req.IdempotencyKey != "" {
+				m.replays[req.IdempotencyKey] = response
+			}
+			m.mu.Unlock()
+			return
+		}
+		gateCancel()
+		defer m.agent.updateManager.endMaintenance()
+	}
 	response, err := m.call(ctx, req)
 	if err != nil {
 		response = maintenanceFailure(req, err.Error())
@@ -206,7 +247,7 @@ func (m *maintenanceManager) run(req entity.Request) {
 	}
 	go m.refreshCapabilities()
 	if req.Operation == entity.ApplyUpdatePolicy && response.Status == entity.StateFailed && response.Retryable {
-		time.AfterFunc(time.Minute, func() {
+		time.AfterFunc(5*time.Minute, func() {
 			retry := req
 			suffix := time.Now().UTC().Format("20060102T150405.000000000")
 			retry.RequestID = "policy-retry-" + suffix

@@ -95,6 +95,11 @@ type Status struct {
 	CollectionErrors        []string                        `json:"collection_errors,omitempty" cbor:"27,keyasint,omitempty"`
 	Capabilities            *maintenanceentity.Capabilities `json:"capabilities,omitempty" cbor:"28,keyasint,omitempty"`
 	LastUpgradeSource       string                          `json:"last_upgrade_source,omitempty" cbor:"29,keyasint,omitempty"`
+	CollectionStatus        string                          `json:"collection_status,omitempty" cbor:"30,keyasint,omitempty"`
+	EligibilityStatus       string                          `json:"eligibility_status,omitempty" cbor:"31,keyasint,omitempty"`
+	EligibilityErrorCode    string                          `json:"eligibility_error_code,omitempty" cbor:"32,keyasint,omitempty"`
+	EligibilityRetryable    bool                            `json:"eligibility_retryable,omitempty" cbor:"33,keyasint,omitempty"`
+	LastEligibilityCheck    *time.Time                      `json:"last_successful_eligibility_check,omitempty" cbor:"34,keyasint,omitempty"`
 }
 
 // DeriveOverallState is the single precedence definition used by agent and hub.
