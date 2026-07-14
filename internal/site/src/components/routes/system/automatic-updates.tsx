@@ -437,6 +437,21 @@ export default function AutomaticUpdates({ status, systemId }: { status?: Update
 				<Row label={<Trans>Service</Trans>}>{valueLabel(status.service_state)}</Row>
 				<Row label={<Trans>Available updates</Trans>}>{status.pending_updates_total ?? t`Unknown`}</Row>
 				<Row label={<Trans>Eligible updates</Trans>}>{status.pending_updates_eligible ?? t`Unknown`}</Row>
+				{status.eligibility_status === "busy" && (
+					<Row label={<Trans>Eligibility status</Trans>}>
+						<Trans>Eligibility is temporarily unavailable because APT is in use.</Trans>
+					</Row>
+				)}
+				{status.eligibility_status === "stale" && (
+					<Row label={<Trans>Eligibility status</Trans>}>
+						<Trans>Showing the last successful eligibility result.</Trans>
+					</Row>
+				)}
+				{status.eligibility_status === "unavailable" && (
+					<Row label={<Trans>Eligibility status</Trans>}>
+						<Trans>Eligibility is unavailable; other update information is still current.</Trans>
+					</Row>
+				)}
 				<Row label={<Trans>Manual updates</Trans>}>{status.pending_updates_excluded ?? t`Unknown`}</Row>
 				<Row label={<Trans>Security updates</Trans>}>{status.pending_security_updates ?? t`Unknown`}</Row>
 				{!!status.excluded_repositories?.length && (

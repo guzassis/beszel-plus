@@ -131,6 +131,11 @@ export interface UpdateStatus {
 	excluded_repositories?: string[]
 	data_stale?: boolean
 	collection_errors?: string[]
+	collection_status?: "complete" | "partial" | "collection_skipped_maintenance_active"
+	eligibility_status?: "available" | "busy" | "unavailable" | "stale"
+	eligibility_error_code?: string
+	eligibility_retryable?: boolean
+	last_successful_eligibility_check?: string
 	capabilities?: MaintenanceCapabilities
 	last_upgrade_source?: "automatic" | "manual"
 }

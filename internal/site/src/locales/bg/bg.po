@@ -799,6 +799,20 @@ msgid "Edit {foo}"
 msgstr "Редактиране на {foo}"
 
 #: src/components/routes/system/automatic-updates.tsx
+msgid "Eligibility is temporarily unavailable because APT is in use."
+msgstr ""
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Eligibility is unavailable; other update information is still current."
+msgstr ""
+
+#: src/components/routes/system/automatic-updates.tsx
+#: src/components/routes/system/automatic-updates.tsx
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Eligibility status"
+msgstr ""
+
+#: src/components/routes/system/automatic-updates.tsx
 msgid "Eligible updates"
 msgstr "Eligible updates"
 
@@ -1863,6 +1877,10 @@ msgstr "Настройки"
 #: src/components/routes/settings/layout.tsx
 msgid "Settings saved"
 msgstr "Настройките са запазени"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Showing the last successful eligibility result."
+msgstr ""
 
 #: src/components/login/auth-form.tsx
 msgid "Sign in"
