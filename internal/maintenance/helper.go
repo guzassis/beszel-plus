@@ -15,11 +15,13 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
+	"strconv"
 	"strings"
 	"syscall"
 	"time"
 
 	entity "github.com/henrygd/beszel/internal/entities/maintenance"
+	"golang.org/x/sys/unix"
 )
 
 const maxIPCRequestBytes = 64 * 1024
@@ -49,7 +51,7 @@ type Helper struct {
 }
 
 func NewHelper() *Helper {
-	return &Helper{Root: "/", Runner: ExecRunner{}, Now: func() time.Time { return time.Now().UTC() }, RunSystemCommands: true, APTLockTimeout: 7 * time.Minute, APTRetryBase: 5 * time.Second}
+	return &Helper{Root: "/", Runner: ExecRunner{}, Now: func() time.Time { return time.Now().UTC() }, RunSystemCommands: true, APTLockTimeout: 75 * time.Second, APTRetryBase: 2 * time.Second}
 }
 
 func (h *Helper) path(value string) string {
@@ -94,6 +96,7 @@ type operationError struct {
 	code, stage, message string
 	retryable            bool
 	rollback             *entity.Rollback
+	lock                 *aptLockInfo
 }
 
 func (e *operationError) Error() string { return e.message }
@@ -106,6 +109,12 @@ func failureFor(req entity.Request, err error) entity.Response {
 		response.Stage = typed.stage
 		response.Retryable = typed.retryable
 		response.Rollback = typed.rollback
+		if typed.lock != nil {
+			response.LockFile = typed.lock.File
+			response.HolderPID = typed.lock.PID
+			response.HolderCommand = typed.lock.Command
+			response.HolderUnit = typed.lock.Unit
+		}
 	}
 	return response
 }
@@ -129,6 +138,9 @@ func (h *Helper) Execute(ctx context.Context, req entity.Request) entity.Respons
 		return h.complete(req, &entity.Result{Capabilities: h.capabilities()}, false)
 	}
 	if req.Operation == entity.GetOperationStatus {
+		if pending, err := h.readPendingPolicy(); err == nil {
+			return pending
+		}
 		if status, err := h.readStatus(); err == nil {
 			return status
 		}
@@ -157,10 +169,35 @@ func (h *Helper) Execute(ctx context.Context, req entity.Request) entity.Respons
 		response = h.complete(req, result, changed)
 		response.StartedAt = &start
 	}
+	if req.Operation == entity.ApplyUpdatePolicy {
+		if response.Status == entity.StateFailed && response.Retryable && response.Result != nil && response.Result.Policy != nil {
+			_ = h.savePendingPolicy(response)
+		} else {
+			_ = os.Remove(filepath.Join(h.stateDir(), "pending-policy.json"))
+		}
+	}
 	_ = h.saveStatus(response)
 	duration := h.Now().Sub(start)
 	slog.Info("maintenance operation finished", "operation", req.Operation, "request_id", req.RequestID, "status", response.Status, "error_code", response.ErrorCode, "stage", response.Stage, "retryable", response.Retryable, "rollback_attempted", response.Rollback != nil && response.Rollback.Attempted, "rollback_succeeded", response.Rollback != nil && response.Rollback.Succeeded, "duration", duration, "helper_version", HelperVersion(), "protocol_version", entity.ProtocolVersion)
 	return response
+}
+
+func (h *Helper) savePendingPolicy(response entity.Response) error {
+	data, err := json.Marshal(response)
+	if err != nil {
+		return err
+	}
+	return atomicWrite(filepath.Join(h.stateDir(), "pending-policy.json"), append(data, '\n'), 0o600)
+}
+
+func (h *Helper) readPendingPolicy() (entity.Response, error) {
+	data, err := readLimited(filepath.Join(h.stateDir(), "pending-policy.json"), 64*1024)
+	if err != nil {
+		return entity.Response{}, err
+	}
+	var response entity.Response
+	err = json.Unmarshal(data, &response)
+	return response, err
 }
 
 func (h *Helper) run(ctx context.Context, req entity.Request) (*entity.Result, bool, error) {
@@ -407,34 +444,45 @@ func (h *Helper) command(ctx context.Context, timeout time.Duration, name string
 func (h *Helper) unattendedDryRun(ctx context.Context) ([]byte, error) {
 	timeout := h.APTLockTimeout
 	if timeout <= 0 {
-		timeout = 7 * time.Minute
+		timeout = 75 * time.Second
 	}
 	base := h.APTRetryBase
 	if base <= 0 {
-		base = 5 * time.Second
+		base = 2 * time.Second
 	}
+	started := time.Now()
 	deadline := time.Now().Add(timeout)
 	for attempt := 0; ; attempt++ {
-		if err := h.waitForAPTUntil(ctx, deadline, base); err != nil {
-			return nil, err
+		remaining := time.Until(deadline)
+		if remaining <= 0 {
+			return nil, &operationError{code: "apt_lock_busy", stage: "unattended_upgrade_dry_run", retryable: true, message: "APT remained busy until the installation timeout", lock: h.aptActivity()}
 		}
-		stepCtx, cancel := context.WithTimeout(ctx, 30*time.Minute)
+		stepCtx, cancel := context.WithTimeout(ctx, remaining)
 		output, err := h.Runner.Run(stepCtx, "unattended-upgrade", "--dry-run", "--debug")
+		stepErr := stepCtx.Err()
 		cancel()
 		if err == nil {
 			return output, nil
 		}
-		if !aptLockBusy(output) {
-			return output, fmt.Errorf("unattended-upgrade failed: %s", sanitize(string(output), 1024))
+		if stepErr != nil && !aptLockBusy(output) {
+			return output, &operationError{code: "timeout", stage: "unattended_upgrade_dry_run", retryable: true, message: "unattended-upgrade dry-run timed out"}
 		}
+		if !aptLockBusy(output) {
+			return output, classifyDryRunFailure(output, err)
+		}
+		lock := h.aptActivity()
 		wait := base * time.Duration(attempt+1)
-		if wait > time.Minute {
-			wait = time.Minute
+		if wait > 5*time.Second {
+			wait = 5 * time.Second
 		}
 		if !time.Now().Add(wait).Before(deadline) {
-			return output, &operationError{code: "apt_lock_busy", stage: "unattended_upgrade_dry_run", retryable: true, message: "APT is currently in use; lock remained busy until timeout"}
+			return output, &operationError{code: "apt_lock_busy", stage: "unattended_upgrade_dry_run", retryable: true, message: "APT remained busy until the installation timeout", lock: lock}
 		}
-		slog.Info("waiting for APT lock", "stage", "unattended_upgrade_dry_run", "retry_in", wait, "attempt", attempt+1)
+		attributes := []any{"stage", "unattended_upgrade_dry_run", "retry_in", wait, "attempt", attempt + 1, "elapsed", time.Since(started), "remaining", time.Until(deadline)}
+		if lock != nil {
+			attributes = append(attributes, "lock_file", lock.File, "holder_pid", lock.PID, "holder_command", lock.Command, "holder_unit", lock.Unit)
+		}
+		slog.Info("waiting for APT lock", attributes...)
 		timer := time.NewTimer(wait)
 		select {
 		case <-ctx.Done():
@@ -445,32 +493,47 @@ func (h *Helper) unattendedDryRun(ctx context.Context) ([]byte, error) {
 	}
 }
 
+func classifyDryRunFailure(output []byte, err error) *operationError {
+	text := strings.ToLower(string(output) + " " + err.Error())
+	result := &operationError{code: "apt_dry_run_failed", stage: "unattended_upgrade_dry_run", message: "unattended-upgrade dry-run failed: " + sanitize(string(output), 1024)}
+	switch {
+	case errors.Is(err, exec.ErrNotFound) || strings.Contains(text, "executable file not found") || strings.Contains(text, "not found"):
+		result.code = "command_missing"
+	case strings.Contains(text, "permission denied") || strings.Contains(text, "must be root") || strings.Contains(text, "operation not permitted"):
+		result.code = "permission_denied"
+	case strings.Contains(text, "syntax error") || strings.Contains(text, "invalid configuration") || strings.Contains(text, "error in file"):
+		result.code = "invalid_configuration"
+	}
+	return result
+}
+
 func (h *Helper) waitForAPT(ctx context.Context) error {
 	timeout := h.APTLockTimeout
 	if timeout <= 0 {
-		timeout = 7 * time.Minute
+		timeout = 75 * time.Second
 	}
 	base := h.APTRetryBase
 	if base <= 0 {
-		base = 5 * time.Second
+		base = 2 * time.Second
 	}
 	return h.waitForAPTUntil(ctx, time.Now().Add(timeout), base)
 }
 
 func (h *Helper) waitForAPTUntil(ctx context.Context, deadline time.Time, base time.Duration) error {
+	started := time.Now()
 	for attempt := 0; ; attempt++ {
-		reason := h.aptActivity(ctx)
-		if reason == "" {
+		lock := h.aptActivity()
+		if lock == nil {
 			return nil
 		}
 		wait := base * time.Duration(attempt+1)
-		if wait > time.Minute {
-			wait = time.Minute
+		if wait > 5*time.Second {
+			wait = 5 * time.Second
 		}
 		if !time.Now().Add(wait).Before(deadline) {
-			return &operationError{code: "apt_lock_busy", stage: "apt_lock_wait", retryable: true, message: "APT is currently in use by " + reason}
+			return &operationError{code: "apt_lock_busy", stage: "apt_lock_wait", retryable: true, message: "APT is currently in use", lock: lock}
 		}
-		slog.Info("waiting for APT lock", "holder", reason, "retry_in", wait, "attempt", attempt+1)
+		slog.Info("waiting for APT lock", "lock_file", lock.File, "holder_pid", lock.PID, "holder_command", lock.Command, "retry_in", wait, "attempt", attempt+1, "elapsed", time.Since(started), "remaining", time.Until(deadline))
 		timer := time.NewTimer(wait)
 		select {
 		case <-ctx.Done():
@@ -481,21 +544,60 @@ func (h *Helper) waitForAPTUntil(ctx context.Context, deadline time.Time, base t
 	}
 }
 
-func (h *Helper) aptActivity(ctx context.Context) string {
-	for _, unit := range []string{"apt-daily.service", "apt-daily-upgrade.service"} {
-		stepCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
-		output, err := h.Runner.Run(stepCtx, "systemctl", "is-active", unit)
-		cancel()
-		if err == nil && strings.TrimSpace(string(output)) == "active" {
-			return unit
+type aptLockInfo struct {
+	File          string
+	PID           int
+	Command, Unit string
+}
+
+func (h *Helper) aptActivity() *aptLockInfo {
+	data, err := os.ReadFile(h.path("/proc/locks"))
+	if err != nil {
+		return nil
+	}
+	for _, path := range []string{"/var/lib/dpkg/lock", "/var/lib/dpkg/lock-frontend", "/var/lib/apt/lists/lock", "/var/cache/apt/archives/lock", "/run/unattended-upgrades.lock"} {
+		info, err := os.Stat(h.path(path))
+		if err != nil {
+			continue
+		}
+		stat, ok := info.Sys().(*syscall.Stat_t)
+		if !ok {
+			continue
+		}
+		for line := range strings.Lines(string(data)) {
+			fields := strings.Fields(line)
+			if len(fields) < 6 {
+				continue
+			}
+			parts := strings.Split(fields[5], ":")
+			if len(parts) != 3 {
+				continue
+			}
+			major, e1 := strconv.ParseUint(parts[0], 16, 32)
+			minor, e2 := strconv.ParseUint(parts[1], 16, 32)
+			inode, e3 := strconv.ParseUint(parts[2], 10, 64)
+			if e1 != nil || e2 != nil || e3 != nil || uint32(major) != unix.Major(uint64(stat.Dev)) || uint32(minor) != unix.Minor(uint64(stat.Dev)) || inode != stat.Ino {
+				continue
+			}
+			pid, _ := strconv.Atoi(fields[4])
+			command, _ := os.ReadFile(h.path(fmt.Sprintf("/proc/%d/comm", pid)))
+			return &aptLockInfo{File: path, PID: pid, Command: sanitize(string(command), 80), Unit: h.processUnit(pid)}
 		}
 	}
-	for _, process := range []string{"apt", "apt-get", "dpkg", "unattended-upgrade"} {
-		stepCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
-		output, err := h.Runner.Run(stepCtx, "pgrep", "-x", process)
-		cancel()
-		if err == nil && strings.TrimSpace(string(output)) != "" {
-			return process
+	return nil
+}
+
+func (h *Helper) processUnit(pid int) string {
+	data, err := os.ReadFile(h.path(fmt.Sprintf("/proc/%d/cgroup", pid)))
+	if err != nil {
+		return ""
+	}
+	for line := range strings.Lines(string(data)) {
+		for part := range strings.SplitSeq(line, "/") {
+			part = strings.TrimSpace(part)
+			if strings.HasSuffix(part, ".service") {
+				return sanitize(part, 120)
+			}
 		}
 	}
 	return ""
@@ -503,7 +605,7 @@ func (h *Helper) aptActivity(ctx context.Context) string {
 
 func aptLockBusy(output []byte) bool {
 	value := strings.ToLower(string(output))
-	for _, marker := range []string{"lock file is already taken", "could not get lock", "unable to acquire", "is another process using it"} {
+	for _, marker := range []string{"lock file is already taken", "could not get lock", "unable to acquire", "unable to lock", "failed to lock", "is another process using it"} {
 		if strings.Contains(value, marker) {
 			return true
 		}

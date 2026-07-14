@@ -116,6 +116,10 @@ type Response struct {
 	Stage          string         `json:"stage,omitempty" cbor:"12,keyasint,omitempty"`
 	Retryable      bool           `json:"retryable,omitempty" cbor:"13,keyasint,omitempty"`
 	Rollback       *Rollback      `json:"rollback,omitempty" cbor:"14,keyasint,omitempty"`
+	LockFile       string         `json:"lock_file,omitempty" cbor:"15,keyasint,omitempty"`
+	HolderPID      int            `json:"holder_pid,omitempty" cbor:"16,keyasint,omitempty"`
+	HolderCommand  string         `json:"holder_command,omitempty" cbor:"17,keyasint,omitempty"`
+	HolderUnit     string         `json:"holder_unit,omitempty" cbor:"18,keyasint,omitempty"`
 }
 
 type Rollback struct {

@@ -5,13 +5,17 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
+	"syscall"
 	"testing"
 	"time"
 
 	entity "github.com/henrygd/beszel/internal/entities/maintenance"
+	"golang.org/x/sys/unix"
 )
 
 type fakeRunner struct {
@@ -34,7 +38,7 @@ func (r *fakeRunner) Run(_ context.Context, name string, args ...string) ([]byte
 func testHelper(t *testing.T) *Helper {
 	t.Helper()
 	root := t.TempDir()
-	for _, dir := range []string{"etc/apt/apt.conf.d", "etc", "var/lib/apt/lists", "var/lib/beszel-maintenance", "run"} {
+	for _, dir := range []string{"etc/apt/apt.conf.d", "etc", "proc", "var/lib/apt/lists", "var/lib/beszel-maintenance", "run"} {
 		if err := os.MkdirAll(filepath.Join(root, dir), 0o755); err != nil {
 			t.Fatal(err)
 		}
@@ -43,6 +47,124 @@ func testHelper(t *testing.T) *Helper {
 		t.Fatal(err)
 	}
 	return &Helper{Root: root, Runner: &fakeRunner{}, Now: func() time.Time { return time.Unix(100, 0).UTC() }}
+}
+
+func TestAPTActivityRequiresARealKnownLock(t *testing.T) {
+	h := testHelper(t)
+	if err := os.MkdirAll(h.path("/proc/4242"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(h.path("/proc/4242/comm"), []byte("apt-get\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(h.path("/proc/4242/cgroup"), []byte("0::/system.slice/apt-daily.service\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if lock := h.aptActivity(); lock != nil {
+		t.Fatalf("process name without a lock was treated as busy: %#v", lock)
+	}
+
+	for _, lockPath := range []string{"/var/lib/dpkg/lock-frontend", "/var/lib/apt/lists/lock"} {
+		t.Run(filepath.Base(lockPath), func(t *testing.T) {
+			if err := os.MkdirAll(filepath.Dir(h.path(lockPath)), 0o755); err != nil {
+				t.Fatal(err)
+			}
+			if err := os.WriteFile(h.path(lockPath), nil, 0o600); err != nil {
+				t.Fatal(err)
+			}
+			info, err := os.Stat(h.path(lockPath))
+			if err != nil {
+				t.Fatal(err)
+			}
+			stat := info.Sys().(*syscall.Stat_t)
+			line := fmt.Sprintf("1: POSIX ADVISORY WRITE 4242 %x:%x:%d 0 EOF\n", unix.Major(uint64(stat.Dev)), unix.Minor(uint64(stat.Dev)), stat.Ino)
+			if err := os.WriteFile(h.path("/proc/locks"), []byte(line), 0o644); err != nil {
+				t.Fatal(err)
+			}
+			lock := h.aptActivity()
+			if lock == nil || lock.File != lockPath || lock.PID != 4242 || lock.Command != "apt-get" || lock.Unit != "apt-daily.service" {
+				t.Fatalf("real lock was not attributed: %#v", lock)
+			}
+			if err := os.Remove(h.path(lockPath)); err != nil {
+				t.Fatal(err)
+			}
+		})
+	}
+}
+
+func TestAPTLockMessagesAreNarrowlyClassified(t *testing.T) {
+	for _, output := range []string{"Could not get lock /var/lib/dpkg/lock-frontend", "Unable to lock directory /var/lib/apt/lists", "Lock file is already taken, exiting"} {
+		if !aptLockBusy([]byte(output)) {
+			t.Fatalf("lock output not recognized: %q", output)
+		}
+	}
+	for _, output := range []string{"apt-get --simulate", "apt-get -o Debug::NoLocking=true upgrade", "permission denied", "invalid configuration"} {
+		if aptLockBusy([]byte(output)) {
+			t.Fatalf("non-lock output treated as busy: %q", output)
+		}
+	}
+}
+
+func TestDryRunFailuresAreStructured(t *testing.T) {
+	for _, test := range []struct {
+		output string
+		err    error
+		code   string
+	}{
+		{"permission denied", errors.New("exit 1"), "permission_denied"},
+		{"syntax error in configuration", errors.New("exit 1"), "invalid_configuration"},
+		{"unattended-upgrade: not found", exec.ErrNotFound, "command_missing"},
+		{"unexpected permanent failure", errors.New("exit 1"), "apt_dry_run_failed"},
+	} {
+		failure := classifyDryRunFailure([]byte(test.output), test.err)
+		if failure.code != test.code || failure.retryable {
+			t.Fatalf("output %q classified as %#v", test.output, failure)
+		}
+	}
+}
+
+func TestRealAPTLockReleaseAndTimeout(t *testing.T) {
+	prepare := func(t *testing.T, h *Helper) {
+		t.Helper()
+		lockPath := h.path("/var/lib/dpkg/lock-frontend")
+		if err := os.MkdirAll(filepath.Dir(lockPath), 0o755); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(lockPath, nil, 0o600); err != nil {
+			t.Fatal(err)
+		}
+		info, err := os.Stat(lockPath)
+		if err != nil {
+			t.Fatal(err)
+		}
+		stat := info.Sys().(*syscall.Stat_t)
+		line := fmt.Sprintf("1: POSIX ADVISORY WRITE 4242 %x:%x:%d 0 EOF\n", unix.Major(uint64(stat.Dev)), unix.Minor(uint64(stat.Dev)), stat.Ino)
+		if err := os.WriteFile(h.path("/proc/locks"), []byte(line), 0o644); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	h := testHelper(t)
+	prepare(t, h)
+	h.APTLockTimeout = 100 * time.Millisecond
+	h.APTRetryBase = time.Millisecond
+	go func() {
+		time.Sleep(5 * time.Millisecond)
+		_ = os.WriteFile(h.path("/proc/locks"), nil, 0o644)
+	}()
+	if err := h.waitForAPT(context.Background()); err != nil {
+		t.Fatalf("released lock did not unblock retry: %v", err)
+	}
+
+	h = testHelper(t)
+	prepare(t, h)
+	h.APTLockTimeout = time.Millisecond
+	h.APTRetryBase = 2 * time.Millisecond
+	err := h.waitForAPT(context.Background())
+	var typed *operationError
+	if !errors.As(err, &typed) || typed.code != "apt_lock_busy" || typed.lock == nil || typed.lock.File != "/var/lib/dpkg/lock-frontend" {
+		t.Fatalf("held lock did not return structured timeout: %#v", err)
+	}
 }
 
 func req(op entity.Operation) entity.Request {
@@ -122,6 +244,46 @@ func TestUnattendedDryRunReturnsTypedBusyErrorAtTimeout(t *testing.T) {
 	var typed *operationError
 	if !errors.As(err, &typed) || typed.code != "apt_lock_busy" || !typed.retryable || typed.stage != "unattended_upgrade_dry_run" {
 		t.Fatalf("unexpected error: %#v", err)
+	}
+}
+
+func TestRetryablePolicyPersistsUntilSuccessfulRetry(t *testing.T) {
+	h := testHelper(t)
+	h.RunSystemCommands = true
+	h.APTLockTimeout = time.Millisecond
+	h.APTRetryBase = 2 * time.Millisecond
+	h.Runner = helperRunnerFunc(func(_ context.Context, name string, args ...string) ([]byte, error) {
+		if name == "systemctl" && len(args) > 0 && args[0] == "is-enabled" {
+			return []byte("disabled\n"), nil
+		}
+		if name == "unattended-upgrade" {
+			return []byte("Could not get lock /var/lib/dpkg/lock-frontend"), errors.New("exit 1")
+		}
+		return nil, nil
+	})
+	policy := entity.DefaultPolicy()
+	request := req(entity.ApplyUpdatePolicy)
+	request.Policy = &policy
+	failed := h.Execute(context.Background(), request)
+	if failed.Status != entity.StateFailed || !failed.Retryable {
+		t.Fatalf("expected retryable policy result: %#v", failed)
+	}
+	statusRequest := req(entity.GetOperationStatus)
+	statusRequest.IdempotencyKey = ""
+	status := h.Execute(context.Background(), statusRequest)
+	if status.Result == nil || status.Result.Policy == nil || !status.Retryable {
+		t.Fatalf("pending policy was not persisted: %#v", status)
+	}
+
+	h.Runner = helperRunnerFunc(func(context.Context, string, ...string) ([]byte, error) { return []byte("dry-run complete"), nil })
+	request.RequestID = "request-retry"
+	request.IdempotencyKey = "idem-retry"
+	completed := h.Execute(context.Background(), request)
+	if completed.Status != entity.StateCompleted {
+		t.Fatalf("policy retry failed: %#v", completed)
+	}
+	if _, err := os.Stat(filepath.Join(h.stateDir(), "pending-policy.json")); !os.IsNotExist(err) {
+		t.Fatalf("successful retry did not clear pending state: %v", err)
 	}
 }
 
