@@ -14,8 +14,25 @@ func TestProductMetadata(t *testing.T) {
 	if RepositoryOwner != "guzassis" || RepositoryName != "beszel-plus" {
 		t.Fatal("unexpected repository identity")
 	}
-	if Version == "0.18.7" || Version == "0.18.2" {
-		t.Fatal("product version silently fell back to upstream")
+	if Version != "0.2.1-dev" {
+		t.Fatalf("unexpected development product version %q", Version)
+	}
+}
+
+func TestVersionFallbacksAndInstallersStayAligned(t *testing.T) {
+	root := filepath.Join("..", "..")
+	for _, check := range []struct{ path, marker string }{
+		{"internal/site/src/lib/build-info.ts", `"0.2.1-dev"`},
+		{"supplemental/scripts/install-agent.sh", `PRODUCT_VERSION="0.2.1"`},
+		{"supplemental/scripts/install-hub.sh", `PRODUCT_VERSION="0.2.1"`},
+	} {
+		data, err := os.ReadFile(filepath.Join(root, check.path))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if !strings.Contains(string(data), check.marker) {
+			t.Errorf("%s is not aligned with v0.2.1", check.path)
+		}
 	}
 }
 
@@ -34,6 +51,29 @@ func TestVisibleBrandingDoesNotPointAtUpstreamRepository(t *testing.T) {
 		}
 		if strings.Contains(string(data), "github.com/henrygd/beszel") {
 			t.Errorf("visible upstream repository reference in %s", name)
+		}
+	}
+}
+
+func TestGeneratedLinuxInstallCommandExposesManagementChoices(t *testing.T) {
+	root := filepath.Join("..", "..")
+	commandSource, err := os.ReadFile(filepath.Join(root, "internal/site/src/components/install-dropdowns.tsx"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	text := string(commandSource)
+	for _, flag := range []string{"--agent-auto-update=${options.agentAutoUpdate}", "--os-update-management=${options.osUpdateManagement}", "--os-update-policy=${options.osUpdatePolicy}", "--power-management=${options.powerManagement}"} {
+		if !strings.Contains(text, flag) {
+			t.Errorf("generated command is missing %q", flag)
+		}
+	}
+	controls, err := os.ReadFile(filepath.Join(root, "internal/site/src/components/add-system.tsx"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, option := range []string{"osUpdateManagement", "osUpdatePolicy", "powerManagement", "agentAutoUpdate"} {
+		if !strings.Contains(string(controls), option) {
+			t.Errorf("install UI is missing %q control", option)
 		}
 	}
 }

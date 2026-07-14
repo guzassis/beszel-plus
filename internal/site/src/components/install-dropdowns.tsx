@@ -21,8 +21,27 @@ const getScriptUrl = () => {
 	// return url.toString()
 }
 
-export function copyLinuxCommand(port = "45876", publicKey: string, token: string) {
-	let cmd = `curl -sL ${getScriptUrl()} -o /tmp/install-agent.sh && chmod +x /tmp/install-agent.sh && /tmp/install-agent.sh -p ${port} -k "${publicKey}" -t "${token}" -url "${getHubURL()}" --os-update-management=true --os-update-policy=security --power-management=true`
+export type LinuxInstallOptions = {
+	osUpdateManagement: boolean
+	osUpdatePolicy: "monitor" | "security" | "official-all"
+	powerManagement: boolean
+	agentAutoUpdate: boolean
+}
+
+const defaultLinuxInstallOptions: LinuxInstallOptions = {
+	osUpdateManagement: true,
+	osUpdatePolicy: "security",
+	powerManagement: true,
+	agentAutoUpdate: true,
+}
+
+export function copyLinuxCommand(
+	port = "45876",
+	publicKey: string,
+	token: string,
+	options: LinuxInstallOptions = defaultLinuxInstallOptions
+) {
+	let cmd = `curl -sL ${getScriptUrl()} -o /tmp/install-agent.sh && chmod +x /tmp/install-agent.sh && /tmp/install-agent.sh -p ${port} -k "${publicKey}" -t "${token}" -url "${getHubURL()}" --agent-auto-update=${options.agentAutoUpdate} --os-update-management=${options.osUpdateManagement} --os-update-policy=${options.osUpdatePolicy} --power-management=${options.powerManagement}`
 	if ((i18n.locale + navigator.language).includes("zh-CN")) {
 		cmd += ` --china-mirrors`
 	}

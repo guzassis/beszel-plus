@@ -5,6 +5,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net"
 	"strings"
 	"sync"
@@ -124,6 +125,10 @@ func (m *maintenanceManager) refreshCapabilities() {
 }
 
 func (m *maintenanceManager) retryPersistedPolicy() {
+	if upgradeDrainActive() {
+		slog.Info("pending policy retry suspended: Agent upgrade in progress")
+		return
+	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	req := entity.Request{Version: entity.ProtocolVersion, RequestID: "pending-policy-status", Operation: entity.GetOperationStatus}
@@ -144,6 +149,13 @@ func (m *maintenanceManager) retryPersistedPolicy() {
 func (m *maintenanceManager) handle(req entity.Request) entity.Response {
 	if err := entity.ValidateRequest(req); err != nil {
 		return maintenanceFailure(req, err.Error())
+	}
+	if upgradeDrainActive() {
+		response := maintenanceFailure(req, "Agent upgrade is in progress; maintenance is temporarily unavailable")
+		response.ErrorCode = "upgrade_in_progress"
+		response.Stage = "agent_drain"
+		response.Retryable = true
+		return response
 	}
 	if !m.enabled {
 		if req.Operation == entity.GetCapabilities {

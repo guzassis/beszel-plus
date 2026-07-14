@@ -142,6 +142,10 @@ func updateCollectionDelay(interval time.Duration, failures int, seed int64) tim
 }
 
 func (m *updateManager) refresh() {
+	if upgradeDrainActive() {
+		slog.Info("update collection suspended: Agent upgrade in progress")
+		return
+	}
 	if !m.beginCollection() {
 		maintenanceActive := m.maintenanceIsActive()
 		if maintenanceActive {

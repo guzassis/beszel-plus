@@ -180,6 +180,10 @@ msgstr "Агент"
 msgid "Agent incompatible with maintenance operations"
 msgstr "Agent incompatible with maintenance operations"
 
+#: src/components/add-system.tsx
+msgid "Agent installation options"
+msgstr ""
+
 #: src/components/command-palette.tsx
 #: src/components/routes/settings/alerts-history-data-table.tsx
 #: src/components/routes/settings/layout.tsx
@@ -239,6 +243,10 @@ msgstr "Сигурни ли сте?"
 #: src/components/routes/system/automatic-updates.tsx
 msgid "Automatic"
 msgstr "Automatic"
+
+#: src/components/add-system.tsx
+msgid "Automatic Agent updates"
+msgstr ""
 
 #: src/components/copy-to-clipboard.tsx
 msgid "Automatic copy requires a secure context."
@@ -1142,6 +1150,10 @@ msgstr "Образ"
 msgid "Inactive"
 msgstr "Неактивен"
 
+#: src/components/add-system.tsx
+msgid "Initial update policy"
+msgstr ""
+
 #: src/components/routes/system/automatic-updates.tsx
 msgid "Install required dependencies"
 msgstr "Install required dependencies"
@@ -1617,6 +1629,7 @@ msgctxt "Container ports"
 msgid "Ports"
 msgstr "Портове"
 
+#: src/components/add-system.tsx
 #: src/components/routes/system/power-management.tsx
 msgid "Power management"
 msgstr ""
@@ -2052,6 +2065,10 @@ msgstr "Система"
 #: src/components/routes/system/charts/load-average-chart.tsx
 msgid "System load averages over time"
 msgstr "Средно натоварване на системата във времето"
+
+#: src/components/add-system.tsx
+msgid "System update management"
+msgstr ""
 
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Systemd Services"

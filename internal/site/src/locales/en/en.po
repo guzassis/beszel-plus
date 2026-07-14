@@ -175,6 +175,10 @@ msgstr "Agent"
 msgid "Agent incompatible with maintenance operations"
 msgstr "Agent incompatible with maintenance operations"
 
+#: src/components/add-system.tsx
+msgid "Agent installation options"
+msgstr "Agent installation options"
+
 #: src/components/command-palette.tsx
 #: src/components/routes/settings/alerts-history-data-table.tsx
 #: src/components/routes/settings/layout.tsx
@@ -234,6 +238,10 @@ msgstr "Are you sure?"
 #: src/components/routes/system/automatic-updates.tsx
 msgid "Automatic"
 msgstr "Automatic"
+
+#: src/components/add-system.tsx
+msgid "Automatic Agent updates"
+msgstr "Automatic Agent updates"
 
 #: src/components/copy-to-clipboard.tsx
 msgid "Automatic copy requires a secure context."
@@ -1137,6 +1145,10 @@ msgstr "Image"
 msgid "Inactive"
 msgstr "Inactive"
 
+#: src/components/add-system.tsx
+msgid "Initial update policy"
+msgstr "Initial update policy"
+
 #: src/components/routes/system/automatic-updates.tsx
 msgid "Install required dependencies"
 msgstr "Install required dependencies"
@@ -1612,6 +1624,7 @@ msgctxt "Container ports"
 msgid "Ports"
 msgstr "Ports"
 
+#: src/components/add-system.tsx
 #: src/components/routes/system/power-management.tsx
 msgid "Power management"
 msgstr "Power management"
@@ -2047,6 +2060,10 @@ msgstr "System"
 #: src/components/routes/system/charts/load-average-chart.tsx
 msgid "System load averages over time"
 msgstr "System load averages over time"
+
+#: src/components/add-system.tsx
+msgid "System update management"
+msgstr "System update management"
 
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Systemd Services"

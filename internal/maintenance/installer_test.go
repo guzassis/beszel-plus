@@ -1,6 +1,8 @@
 package maintenance
 
 import (
+	"bufio"
+	"encoding/json"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -21,7 +23,7 @@ func TestInstallerContainsSafeMaintenanceUpgradeFlow(t *testing.T) {
 			t.Fatalf("installer missing %q", required)
 		}
 	}
-	for _, required := range []string{"10-beszel-connection.conf", "maintenance-smoke", "TRANSACTION_DIR", "rollback_install", "Maintenance helper protocol compatibility verified", `"retryable":true`, "cleanup_stale_maintenance_validations", "operation=run-update-dry-run", "non-validation Beszel Plus maintenance operation is active"} {
+	for _, required := range []string{"10-beszel-connection.conf", "maintenance-smoke", "TRANSACTION_DIR", "rollback_install", "Maintenance helper protocol compatibility verified", `"retryable":true`, "maintenance_preflight", "PHASE_PREFLIGHT", "PHASE_QUIESCE", "PHASE_TRANSACTION", "PHASE_ROLLBACK", "upgrade postponed", "No binaries or configuration files were changed", "--wait-for-maintenance", "--diagnose", "upgrade-in-progress", "beszel-plus-agent-install.lock"} {
 		if !strings.Contains(script, required) {
 			t.Fatalf("installer missing upgrade safeguard %q", required)
 		}
@@ -40,8 +42,23 @@ func TestInstallerContainsSafeMaintenanceUpgradeFlow(t *testing.T) {
 	if !strings.Contains(script, `chown root:root "$MAINTENANCE_HELPER_PATH"`) {
 		t.Fatal("privileged helper is not protected from replacement by the Agent user")
 	}
-	if !strings.Contains(script, `trap 'rollback_install $?' 0`) || !strings.Contains(script, `trap 'exit 130' INT`) || !strings.Contains(script, `restore_transaction_file "$BIN_PATH" agent`) {
+	if !strings.Contains(script, `trap 'on_installer_exit $?' 0`) || !strings.Contains(script, `trap 'exit 130' INT`) || !strings.Contains(script, `restore_transaction_file "$restore_path" "$restore_name" "$restore_changed"`) {
 		t.Fatal("installer does not arm rollback for exit and interruption")
+	}
+	preflight := strings.Index(script, "prepare_transaction_quiesce || exit $?")
+	transaction := strings.Index(script, "begin_install_transaction || exit 1")
+	if preflight < 0 || transaction < 0 || preflight >= transaction {
+		t.Fatal("transaction starts before maintenance preflight")
+	}
+	assetValidation := strings.Index(script, `Downloaded Agent does not report Beszel Plus v${INSTALL_VERSION}.`)
+	if assetValidation < 0 || assetValidation >= preflight {
+		t.Fatal("existing services may be quiesced before release assets are validated")
+	}
+	if strings.Contains(script, "systemctl list-units --all --no-legend 'beszel-maintenance@*.service' 2>/dev/null |") {
+		t.Fatal("maintenance unit loop still runs in a POSIX pipeline subshell")
+	}
+	if strings.Contains(script, `cp -p "$TRANSACTION_DIR/$transaction_name" "$transaction_path"`) {
+		t.Fatal("rollback still copies directly over an executable")
 	}
 	policy := strings.Index(script, `"operation":"apply-update-policy"`)
 	startLog := strings.Index(script, `echo "Starting Beszel Plus Agent..."`)
@@ -145,7 +162,7 @@ func TestInstallerRollbackRestoresAgentAndHelper(t *testing.T) {
 		t.Fatal(err)
 	}
 	script := string(data)
-	start := strings.Index(script, "backup_transaction_file() {")
+	start := strings.Index(script, "append_component() {")
 	end := strings.Index(script[start:], "\nEXISTING_INSTALLATION=false")
 	if start < 0 || end < 0 {
 		t.Fatal("transaction functions not found")
@@ -171,10 +188,26 @@ is_openwrt() { return 1; }
 is_freebsd() { return 1; }
 ` + functions + `
 TRANSACTION_ACTIVE=true
-AGENT_WAS_RUNNING=true
-SOCKET_WAS_RUNNING=false
+QUIESCE_ACTIVE=false
 EXISTING_INSTALLATION=true
+AGENT_REPLACED=true
+HELPER_REPLACED=true
+AGENT_SERVICE_CHANGED=false
+SOCKET_CHANGED=false
+TEMPLATE_CHANGED=false
+MONITORING_DROPIN_CHANGED=false
+CONNECTION_DROPIN_CHANGED=false
+UPDATE_SERVICE_CHANGED=false
+UPDATE_TIMER_CHANGED=false
+ROLLBACK_FAILED_COMPONENTS=""
+ROLLBACK_RESTORED_COMPONENTS=""
+INSTALL_VERSION=0.2.1
+OLD_AGENT_VERSION=0.2.0
+ROLLBACK_REPORT_PATH="$TRANSACTION_DIR/rollback-report.json"
 TEMP_DIR=""
+systemctl() { return 0; }
+service_state() { echo inactive; }
+restore_quiesced_services() { return 0; }
 backup_transaction_file "$BIN_PATH" agent
 backup_transaction_file "$MAINTENANCE_HELPER_PATH" helper
 cp "$NEW_AGENT" "$BIN_PATH"
@@ -192,8 +225,247 @@ rollback_install 1
 			t.Fatalf("%s was not restored: %q, %v", path, contents, err)
 		}
 	}
-	if _, err := os.Stat(transaction); !os.IsNotExist(err) {
-		t.Fatalf("transaction files were not cleaned: %v", err)
+	reportData, err := os.ReadFile(filepath.Join(transaction, "rollback-report.json"))
+	if err != nil {
+		t.Fatal("rollback report missing:", err)
+	}
+	var report struct {
+		Restored []string `json:"restored_components"`
+		Failed   []string `json:"failed_components"`
+	}
+	if err := json.Unmarshal(reportData, &report); err != nil {
+		t.Fatalf("invalid rollback report: %v: %s", err, reportData)
+	}
+	if len(report.Failed) != 0 || len(report.Restored) != 2 {
+		t.Fatalf("unexpected rollback report: %#v", report)
+	}
+}
+
+func TestMaintenancePreflightClassifiesProtocolOperation(t *testing.T) {
+	data, err := os.ReadFile("../../supplemental/scripts/install-agent.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	script := string(data)
+	start := strings.Index(script, "json_string_value() {")
+	end := strings.Index(script[start:], "\nrestore_transaction_file() {")
+	if start < 0 || end < 0 {
+		t.Fatal("preflight functions not found")
+	}
+	functions := script[start : start+end]
+	for _, tc := range []struct {
+		name, operation string
+		wantStatus      int
+		wantStop        bool
+	}{
+		{name: "critical upgrade", operation: "run-unattended-upgrades", wantStatus: 75},
+		{name: "transactional policy", operation: "apply-update-policy", wantStatus: 75},
+		{name: "cancelable validation", operation: "run-update-dry-run", wantStatus: 0, wantStop: true},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			statusPath := filepath.Join(dir, "status.json")
+			stopPath := filepath.Join(dir, "stopped")
+			if err := os.WriteFile(statusPath, []byte(`{"operation":"`+tc.operation+`","request_id":"request-123","status":"running","started_at":"2026-07-14T10:00:00Z"}`), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			harness := functions + `
+systemctl() {
+  if [ "$1" = "list-units" ]; then echo "beszel-maintenance@1.service loaded active running"; return 0; fi
+  if [ "$1" = "stop" ]; then : > "$STOP_PATH"; return 0; fi
+  if [ "$1" = "show" ]; then
+    property=""
+    while [ $# -gt 0 ]; do [ "$1" = "-p" ] && { shift; property="$1"; }; shift; done
+    if [ -f "$STOP_PATH" ] && [ "$property" = "ActiveState" ]; then echo inactive; return 0; fi
+    case "$property" in ActiveState) echo active ;; SubState) echo running ;; MainPID|ExecMainPID) echo 4242 ;; ActiveEnterTimestamp) echo "Tue 2026-07-14 10:00:00 UTC" ;; esac
+  fi
+}
+readlink() { echo "$MAINTENANCE_HELPER_PATH"; }
+cat() { case "$1" in /proc/*/cgroup) echo "0::/system.slice/beszel-maintenance@1.service" ;; *) command cat "$@" ;; esac; }
+maintenance_preflight
+`
+			cmd := exec.Command("sh", "-c", harness)
+			cmd.Env = append(os.Environ(),
+				"MAINTENANCE_STATUS_PATH="+statusPath,
+				"MAINTENANCE_HELPER_PATH=/usr/local/libexec/beszel/maintenance-helper",
+				"STOP_PATH="+stopPath,
+				"WAIT_FOR_MAINTENANCE=1",
+				"VERBOSE=false",
+			)
+			output, runErr := cmd.CombinedOutput()
+			status := 0
+			if exitErr, ok := runErr.(*exec.ExitError); ok {
+				status = exitErr.ExitCode()
+			} else if runErr != nil {
+				t.Fatal(runErr)
+			}
+			if status != tc.wantStatus {
+				t.Fatalf("status=%d output=%s", status, output)
+			}
+			if tc.wantStatus == 75 && (!strings.Contains(string(output), tc.operation) || !strings.Contains(string(output), "No binaries or configuration files were changed")) {
+				t.Fatalf("blocking diagnostic is incomplete: %s", output)
+			}
+			_, stopErr := os.Stat(stopPath)
+			if tc.wantStop != (stopErr == nil) {
+				t.Fatalf("stop=%v want=%v output=%s", stopErr == nil, tc.wantStop, output)
+			}
+		})
+	}
+}
+
+func TestInstallerManagementFlagsAreTriState(t *testing.T) {
+	data, err := os.ReadFile("../../supplemental/scripts/install-agent.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	script := string(data)
+	if !strings.Contains(script, `OS_UPDATE_MANAGEMENT_FLAG=""`) || !strings.Contains(script, `POWER_MANAGEMENT_FLAG=""`) {
+		t.Fatal("management flags do not have an unset state")
+	}
+	for _, required := range []string{
+		"preserving existing setting: $OS_UPDATE_MANAGEMENT_FLAG",
+		"preserving existing setting: $POWER_MANAGEMENT_FLAG",
+		"read_existing_management_flag OS_UPDATE_MANAGEMENT",
+		"read_existing_management_flag POWER_MANAGEMENT",
+	} {
+		if !strings.Contains(script, required) {
+			t.Fatalf("tri-state preservation is missing %q", required)
+		}
+	}
+}
+
+func TestAtomicRollbackWorksWhilePreviousExecutableIsRunning(t *testing.T) {
+	data, err := os.ReadFile("../../supplemental/scripts/install-agent.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	script := string(data)
+	start := strings.Index(script, "restore_transaction_file() {")
+	end := strings.Index(script[start:], "\nrollback_install() {")
+	if start < 0 || end < 0 {
+		t.Fatal("atomic restore function not found")
+	}
+	function := script[start : start+end]
+	dir := t.TempDir()
+	target := filepath.Join(dir, "beszel-agent")
+	transaction := filepath.Join(dir, "transaction")
+	if err := os.Mkdir(transaction, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	oldBinary, err := os.ReadFile("/bin/sleep")
+	if err != nil {
+		t.Skip("/bin/sleep unavailable")
+	}
+	newBinary, err := os.ReadFile("/bin/true")
+	if err != nil {
+		t.Skip("/bin/true unavailable")
+	}
+	if err := os.WriteFile(target, oldBinary, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(transaction, "agent"), oldBinary, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	running := exec.Command(target, "10")
+	if err := running.Start(); err != nil {
+		t.Skipf("cannot execute fixture: %v", err)
+	}
+	defer func() { _ = running.Process.Kill(); _ = running.Wait() }()
+	replacement := target + ".new"
+	if err := os.WriteFile(replacement, newBinary, 0o755); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Rename(replacement, target); err != nil {
+		t.Fatal(err)
+	}
+	cmd := exec.Command("sh", "-c", function+"\n"+`restore_transaction_file "$BIN_PATH" agent true`)
+	cmd.Env = append(os.Environ(), "BIN_PATH="+target, "TRANSACTION_DIR="+transaction)
+	if output, err := cmd.CombinedOutput(); err != nil {
+		t.Fatalf("atomic restore failed while executable was active: %v: %s", err, output)
+	}
+	restored, err := os.ReadFile(target)
+	if err != nil || string(restored) != string(oldBinary) {
+		t.Fatal("running executable was not restored atomically")
+	}
+}
+
+func TestQuiesceRestoresOnlyPreviouslyActiveServices(t *testing.T) {
+	data, err := os.ReadFile("../../supplemental/scripts/install-agent.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	script := string(data)
+	start := strings.Index(script, "restore_quiesced_services() {")
+	end := strings.Index(script[start:], "\nclear_upgrade_drain() {")
+	if start < 0 || end < 0 {
+		t.Fatal("service restoration function not found")
+	}
+	function := script[start : start+end]
+	for _, tc := range []struct {
+		name, agent, socket, want string
+	}{
+		{"both active", "active", "active", "beszel-maintenance.socket\nbeszel-agent.service\n"},
+		{"inactive preserved", "inactive", "inactive", ""},
+		{"failed preserved", "failed", "failed", ""},
+		{"only agent active", "active", "inactive", "beszel-agent.service\n"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			capture := filepath.Join(t.TempDir(), "starts")
+			harness := function + `
+systemctl() { [ "$1" = "start" ] && printf '%s\n' "$2" >> "$CAPTURE"; return 0; }
+QUIESCE_ACTIVE=true
+restore_quiesced_services
+`
+			cmd := exec.Command("sh", "-c", harness)
+			cmd.Env = append(os.Environ(), "AGENT_PREVIOUS_STATE="+tc.agent, "SOCKET_PREVIOUS_STATE="+tc.socket, "CAPTURE="+capture)
+			if output, err := cmd.CombinedOutput(); err != nil {
+				t.Fatalf("restore failed: %v: %s", err, output)
+			}
+			got, _ := os.ReadFile(capture)
+			if string(got) != tc.want {
+				t.Fatalf("starts=%q want=%q", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestInstallerLockRejectsConcurrentRun(t *testing.T) {
+	if _, err := exec.LookPath("flock"); err != nil {
+		t.Skip("flock unavailable")
+	}
+	data, err := os.ReadFile("../../supplemental/scripts/install-agent.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	script := string(data)
+	start := strings.Index(script, "acquire_installer_lock() {")
+	end := strings.Index(script[start:], "\nwrite_upgrade_drain() {")
+	if start < 0 || end < 0 {
+		t.Fatal("installer lock function not found")
+	}
+	function := script[start : start+end]
+	lockPath := filepath.Join(t.TempDir(), "install.lock")
+	env := append(os.Environ(), "INSTALL_LOCK_PATH="+lockPath, "LOCK_KIND=", "LOCK_DIR=")
+	first := exec.Command("sh", "-c", function+"\nacquire_installer_lock || exit $?\necho ready\nsleep 30")
+	first.Env = env
+	stdout, err := first.StdoutPipe()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := first.Start(); err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = first.Process.Kill(); _ = first.Wait() }()
+	scanner := bufio.NewScanner(stdout)
+	if !scanner.Scan() || scanner.Text() != "ready" {
+		t.Fatal("first installer did not acquire lock")
+	}
+	second := exec.Command("sh", "-c", function+"\nacquire_installer_lock")
+	second.Env = env
+	output, err := second.CombinedOutput()
+	exitErr, ok := err.(*exec.ExitError)
+	if !ok || exitErr.ExitCode() != 75 || !strings.Contains(string(output), "already running") {
+		t.Fatalf("concurrent installer was not rejected: err=%v output=%s", err, output)
 	}
 }
 

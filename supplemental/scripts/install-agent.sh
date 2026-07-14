@@ -1,7 +1,7 @@
 #!/bin/sh
 
 PRODUCT_NAME="Beszel Plus"
-PRODUCT_VERSION="0.2.0"
+PRODUCT_VERSION="0.2.1"
 REPOSITORY="guzassis/beszel-plus"
 
 is_alpine() {
@@ -242,12 +242,15 @@ KEY=""
 TOKEN=""
 HUB_URL=""
 AUTO_UPDATE_FLAG="" # empty string means prompt, "true" means auto-enable, "false" means skip
-OS_UPDATE_MANAGEMENT_FLAG="false"
-POWER_MANAGEMENT_FLAG="false"
+OS_UPDATE_MANAGEMENT_FLAG=""
+POWER_MANAGEMENT_FLAG=""
 OS_UPDATE_POLICY="security"
 VERSION="latest"
 WEBSOCKET_AUTH_WARNING=false
 POLICY_PENDING=false
+WAIT_FOR_MAINTENANCE=5
+VERBOSE=false
+DIAGNOSE=false
 
 # Check for help flag
 case "$1" in
@@ -266,6 +269,9 @@ case "$1" in
 	printf "  --os-update-management=true|false : Install OS update management components\n"
 	printf "  --power-management=true|false : Enable WOL diagnostics and secure shutdown\n"
 	printf "  --os-update-policy=monitor|security|official-all : Initial policy for new installations\n"
+	printf "  --wait-for-maintenance=SECONDS : Wait up to 5 seconds by default (maximum 300)\n"
+	printf "  --verbose             : Show detailed maintenance preflight diagnostics\n"
+	printf "  --diagnose            : Print install readiness without changing the system\n"
   printf "                          VALUE can be true (enable) or false (disable). If not specified, will prompt.\n"
   printf "  --mirror [URL]        : Use GitHub proxy to resolve network timeout issues in mainland China\n"
   printf "                          URL: optional custom proxy URL (default: https://gh.beszel.dev)\n"
@@ -404,6 +410,17 @@ while [ $# -gt 0 ]; do
 		if echo "$1" | grep -q "="; then POWER_VALUE=$(echo "$1" | cut -d'=' -f2); else POWER_VALUE="$2"; shift; fi
 		if [ "$POWER_VALUE" = "true" ] || [ "$POWER_VALUE" = "false" ]; then POWER_MANAGEMENT_FLAG="$POWER_VALUE"; else echo "Invalid --power-management value" >&2; exit 1; fi
 		;;
+	--wait-for-maintenance*)
+		if echo "$1" | grep -q "="; then WAIT_FOR_MAINTENANCE=$(echo "$1" | cut -d'=' -f2); else WAIT_FOR_MAINTENANCE="$2"; shift; fi
+		case "$WAIT_FOR_MAINTENANCE" in ''|*[!0-9]*) echo "Invalid --wait-for-maintenance value" >&2; exit 1 ;; esac
+		if [ "$WAIT_FOR_MAINTENANCE" -gt 300 ]; then echo "--wait-for-maintenance cannot exceed 300 seconds" >&2; exit 1; fi
+		;;
+	--verbose)
+		VERBOSE=true
+		;;
+	--diagnose)
+		DIAGNOSE=true
+		;;
   --auto-update*)
 		echo "Warning: --auto-update is deprecated; use --agent-auto-update." >&2
     # Check if there's a value after the = sign
@@ -453,10 +470,77 @@ else
 fi
 MAINTENANCE_HELPER_PATH="/usr/local/libexec/beszel/maintenance-helper"
 MAINTENANCE_POLICY_PATH="/var/lib/beszel-maintenance/policy.json"
+MAINTENANCE_STATUS_PATH="/var/lib/beszel-maintenance/status.json"
+DRAIN_PATH="/run/beszel-agent/upgrade-in-progress"
+INSTALL_LOCK_PATH="/run/lock/beszel-plus-agent-install.lock"
+ROLLBACK_REPORT_PATH="/var/lib/beszel-maintenance/last-install-rollback.json"
+PHASE="PHASE_INITIAL"
 TRANSACTION_ACTIVE=false
 TRANSACTION_DIR=""
-AGENT_WAS_RUNNING=false
-SOCKET_WAS_RUNNING=false
+QUIESCE_ACTIVE=false
+AGENT_PREVIOUS_STATE="not-found"
+SOCKET_PREVIOUS_STATE="not-found"
+LOCK_KIND=""
+LOCK_DIR=""
+AGENT_REPLACED=false
+HELPER_REPLACED=false
+AGENT_SERVICE_CHANGED=false
+SOCKET_CHANGED=false
+TEMPLATE_CHANGED=false
+MONITORING_DROPIN_CHANGED=false
+CONNECTION_DROPIN_CHANGED=false
+UPDATE_SERVICE_CHANGED=false
+UPDATE_TIMER_CHANGED=false
+ROLLBACK_FAILED_COMPONENTS=""
+ROLLBACK_RESTORED_COMPONENTS=""
+
+json_string_value() {
+  json_file="$1"
+  json_key="$2"
+  [ -r "$json_file" ] || return 1
+  sed -n "s/.*\"${json_key}\":\"\([^\"]*\)\".*/\1/p" "$json_file" | head -n 1
+}
+
+service_state() {
+  state_unit="$1"
+  [ "$(systemctl show "$state_unit" -p LoadState --value 2>/dev/null)" != "not-found" ] || { echo "not-found"; return; }
+  systemctl show "$state_unit" -p ActiveState --value 2>/dev/null || echo "unknown"
+}
+
+restore_quiesced_services() {
+  [ "$QUIESCE_ACTIVE" = "true" ] || return 0
+  restore_services_ok=true
+  if [ "$SOCKET_PREVIOUS_STATE" = "active" ]; then
+    systemctl start beszel-maintenance.socket >/dev/null 2>&1 || restore_services_ok=false
+  fi
+  if [ "$AGENT_PREVIOUS_STATE" = "active" ]; then
+    systemctl start beszel-agent.service >/dev/null 2>&1 || restore_services_ok=false
+  fi
+  QUIESCE_ACTIVE=false
+  [ "$restore_services_ok" = "true" ]
+}
+
+clear_upgrade_drain() {
+  if [ -f "$DRAIN_PATH" ] && grep -q "\"pid\":$$" "$DRAIN_PATH" 2>/dev/null; then
+    rm -f "$DRAIN_PATH"
+  fi
+}
+
+append_component() {
+  append_kind="$1"
+  append_name="$2"
+  if [ "$append_kind" = "restored" ]; then
+    if [ -n "$ROLLBACK_RESTORED_COMPONENTS" ]; then ROLLBACK_RESTORED_COMPONENTS="$ROLLBACK_RESTORED_COMPONENTS,$append_name"; else ROLLBACK_RESTORED_COMPONENTS="$append_name"; fi
+  else
+    if [ -n "$ROLLBACK_FAILED_COMPONENTS" ]; then ROLLBACK_FAILED_COMPONENTS="$ROLLBACK_FAILED_COMPONENTS,$append_name"; else ROLLBACK_FAILED_COMPONENTS="$append_name"; fi
+  fi
+}
+
+csv_json_array() {
+  csv_value="$1"
+  if [ -z "$csv_value" ]; then printf '[]'; return; fi
+  printf '["%s"]' "$(printf '%s' "$csv_value" | sed 's/,/","/g')"
+}
 
 backup_transaction_file() {
   transaction_path="$1"
@@ -468,37 +552,118 @@ backup_transaction_file() {
   fi
 }
 
-cleanup_stale_maintenance_validations() {
-  command -v systemctl >/dev/null 2>&1 || return 0
-  systemctl list-units --all --no-legend 'beszel-maintenance@*.service' 2>/dev/null |
+wait_unit_inactive() {
+  wait_unit="$1"
+  wait_limit="$2"
+  waited=0
+  while [ "$waited" -lt "$wait_limit" ]; do
+    [ "$(systemctl show "$wait_unit" -p ActiveState --value 2>/dev/null)" = "active" ] || return 0
+    sleep 1
+    waited=$((waited + 1))
+    if [ "$VERBOSE" = "true" ]; then echo "Maintenance preflight: $wait_unit still active after ${waited}s."; fi
+  done
+  [ "$(systemctl show "$wait_unit" -p ActiveState --value 2>/dev/null)" != "active" ]
+}
+
+maintenance_preflight() {
+  PREFLIGHT_UNITS_FILE=$(mktemp)
+  systemctl list-units --all --no-legend 'beszel-maintenance@*.service' 2>/dev/null >"$PREFLIGHT_UNITS_FILE" || true
+  status_operation=$(json_string_value "$MAINTENANCE_STATUS_PATH" operation 2>/dev/null || true)
+  status_request_id=$(json_string_value "$MAINTENANCE_STATUS_PATH" request_id 2>/dev/null || true)
+  status_started_at=$(json_string_value "$MAINTENANCE_STATUS_PATH" started_at 2>/dev/null || true)
+  status_state=$(json_string_value "$MAINTENANCE_STATUS_PATH" status 2>/dev/null || true)
   while IFS=' ' read -r unit _rest; do
     case "$unit" in beszel-maintenance@*.service) ;; *) continue ;; esac
+    active_state=$(systemctl show "$unit" -p ActiveState --value 2>/dev/null || true)
+    sub_state=$(systemctl show "$unit" -p SubState --value 2>/dev/null || true)
     pid=$(systemctl show "$unit" -p MainPID --value 2>/dev/null || true)
-    case "$pid" in ''|0|*[!0-9]*) continue ;; esac
-    exe=$(readlink "/proc/$pid/exe" 2>/dev/null || true)
-    cmdline=$(tr '\000' ' ' <"/proc/$pid/cmdline" 2>/dev/null || true)
-    cgroup=$(cat "/proc/$pid/cgroup" 2>/dev/null || true)
-    journal=$(journalctl -u "$unit" -n 30 --no-pager 2>/dev/null || true)
-    owned=false
-    validation=false
-    if [ "$exe" = "$MAINTENANCE_HELPER_PATH" ] && printf '%s' "$cgroup" | grep -Fq "$unit"; then owned=true; fi
-    if printf '%s' "$cmdline" | grep -Eq 'run-update-dry-run|dry-run' || printf '%s' "$journal" | grep -Fq 'operation=run-update-dry-run'; then validation=true; fi
-    if [ "$owned" = "true" ] && [ "$validation" = "true" ]; then
-      echo "Stopping stale Beszel Plus validation unit $unit (PID $pid)..."
-      systemctl stop "$unit" || { echo "Could not stop $unit safely; upgrade aborted." >&2; return 1; }
-    elif [ "$owned" = "true" ]; then
-      echo "A non-validation Beszel Plus maintenance operation is active in $unit; upgrade aborted without killing it." >&2
-      return 1
+    exec_pid=$(systemctl show "$unit" -p ExecMainPID --value 2>/dev/null || true)
+    started=$(systemctl show "$unit" -p ActiveEnterTimestamp --value 2>/dev/null || true)
+    elapsed="unknown"
+    children="none"
+    held_locks="none"
+    cmdline="unknown"
+    [ "$active_state" = "active" ] || continue
+    case "$pid" in ''|0|*[!0-9]*) operation="unknown" ;; *)
+      exe=$(readlink "/proc/$pid/exe" 2>/dev/null || true)
+      cmdline=$(tr '\000' ' ' <"/proc/$pid/cmdline" 2>/dev/null || true)
+      [ -n "$cmdline" ] || cmdline="unknown"
+      elapsed=$(ps -o etime= -p "$pid" 2>/dev/null | tr -d ' ' || true)
+      [ -n "$elapsed" ] || elapsed="unknown"
+      if command -v pgrep >/dev/null 2>&1; then children=$(pgrep -P "$pid" 2>/dev/null | tr '\n' ' ' || true); [ -n "$children" ] || children="none"; fi
+      if command -v fuser >/dev/null 2>&1; then held_locks=$(fuser /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock /var/cache/apt/archives/lock 2>/dev/null | tr '\n' ' ' || true); [ -n "$held_locks" ] || held_locks="none"; fi
+      cgroup=$(cat "/proc/$pid/cgroup" 2>/dev/null || true)
+      if [ "$exe" != "$MAINTENANCE_HELPER_PATH" ] || ! printf '%s' "$cgroup" | grep -Fq "$unit"; then
+        operation="unknown"
+      elif [ "$status_state" = "running" ] && [ -n "$status_operation" ]; then
+        operation="$status_operation"
+      else
+        operation="unknown"
+      fi
+      ;;
+    esac
+    if [ "$VERBOSE" = "true" ]; then
+      echo "Maintenance unit: $unit MainPID=$pid ExecMainPID=$exec_pid state=$active_state/$sub_state operation=$operation request_id=${status_request_id:-unknown} started=${status_started_at:-$started} elapsed=$elapsed executable=${exe:-unknown} cmdline=$cmdline children=$children apt_lock_pids=$held_locks"
     fi
-  done
+    case "$operation" in
+      get-capabilities|get-update-policy|detect-repositories|get-operation-status|get-power-capabilities|get-poweroff-status)
+        echo "Waiting briefly for the active maintenance operation to finish..."
+        if wait_unit_inactive "$unit" "$WAIT_FOR_MAINTENANCE"; then continue; fi
+        ;;
+      validate-update-policy|run-update-dry-run)
+        echo "A short maintenance validation is active."
+        echo "Waiting up to $WAIT_FOR_MAINTENANCE seconds for it to finish..."
+        systemctl stop "$unit" >/dev/null 2>&1 || true
+        if wait_unit_inactive "$unit" "$WAIT_FOR_MAINTENANCE"; then continue; fi
+        ;;
+    esac
+    BLOCKING_OPERATION="$operation"
+    BLOCKING_UNIT="$unit"
+    BLOCKING_PID="$pid"
+    BLOCKING_REQUEST_ID="$status_request_id"
+    BLOCKING_STARTED_AT="${status_started_at:-$started}"
+    BLOCKING_ELAPSED="$elapsed"
+    BLOCKING_CHILDREN="$children"
+    BLOCKING_LOCKS="$held_locks"
+    echo "Beszel Plus Agent upgrade postponed." >&2
+    echo "" >&2
+    echo "Active maintenance operation:" >&2
+    echo "  Operation: $BLOCKING_OPERATION" >&2
+    echo "  Unit: $BLOCKING_UNIT" >&2
+    echo "  PID: ${BLOCKING_PID:-unknown}" >&2
+    echo "  ExecMainPID: ${exec_pid:-unknown}" >&2
+    echo "  Request ID: ${BLOCKING_REQUEST_ID:-unknown}" >&2
+    echo "  Started: ${BLOCKING_STARTED_AT:-unknown}" >&2
+    echo "  Elapsed: ${BLOCKING_ELAPSED:-unknown}" >&2
+    echo "  Child PIDs: ${BLOCKING_CHILDREN:-none}" >&2
+    echo "  APT lock holder PIDs: ${BLOCKING_LOCKS:-none}" >&2
+    echo "" >&2
+    echo "No binaries or configuration files were changed." >&2
+    echo "Run the installer again after the operation finishes." >&2
+    return 75
+  done <"$PREFLIGHT_UNITS_FILE"
+  rm -f "$PREFLIGHT_UNITS_FILE"
+  if command -v fuser >/dev/null 2>&1; then
+    external_lock_pids=$(fuser /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock /var/cache/apt/archives/lock 2>/dev/null | tr '\n' ' ' || true)
+    if [ -n "$external_lock_pids" ]; then
+      echo "Upgrade not started: APT/dpkg is active (lock holder PIDs: $external_lock_pids)." >&2
+      echo "No binaries or configuration files were changed." >&2
+      return 75
+    fi
+  fi
+  return 0
 }
 
 restore_transaction_file() {
   transaction_path="$1"
   transaction_name="$2"
+  transaction_changed="$3"
+  [ "$transaction_changed" = "true" ] || return 0
   if [ -e "$TRANSACTION_DIR/$transaction_name" ]; then
     mkdir -p "$(dirname "$transaction_path")"
-    cp -p "$TRANSACTION_DIR/$transaction_name" "$transaction_path"
+    rollback_new="${transaction_path}.rollback.$$"
+    rm -f "$rollback_new"
+    cp -p "$TRANSACTION_DIR/$transaction_name" "$rollback_new" && mv -f "$rollback_new" "$transaction_path"
   elif [ -e "$TRANSACTION_DIR/$transaction_name.missing" ]; then
     rm -f "$transaction_path"
   fi
@@ -508,38 +673,155 @@ rollback_install() {
   transaction_status="$1"
   [ "$TRANSACTION_ACTIVE" = "true" ] || return "$transaction_status"
   TRANSACTION_ACTIVE=false
-  trap - 0 INT TERM HUP
-  echo "Installation failed; rolling back the previous Beszel installation." >&2
-  restore_transaction_file "$BIN_PATH" agent
-  restore_transaction_file "$MAINTENANCE_HELPER_PATH" helper
-  if ! is_alpine && ! is_openwrt && ! is_freebsd; then
-    restore_transaction_file /etc/systemd/system/beszel-agent.service agent-service
-    restore_transaction_file /etc/systemd/system/beszel-maintenance.socket maintenance-socket
-    restore_transaction_file /etc/systemd/system/beszel-maintenance@.service maintenance-template
-    restore_transaction_file /etc/systemd/system/beszel-maintenance-helper@.service maintenance-legacy-template
-    restore_transaction_file /etc/systemd/system/beszel-agent.service.d/update-monitoring.conf update-monitoring
-    restore_transaction_file /etc/systemd/system/beszel-agent.service.d/10-beszel-connection.conf connection-settings
-    restore_transaction_file /etc/systemd/system/beszel-agent-update.service agent-update-service
-    restore_transaction_file /etc/systemd/system/beszel-agent-update.timer agent-update-timer
-    systemctl daemon-reload 2>/dev/null || true
-    systemctl stop beszel-maintenance.socket 2>/dev/null || true
-    if [ "$SOCKET_WAS_RUNNING" = "true" ]; then
-      systemctl restart beszel-maintenance.socket 2>/dev/null || echo "Warning: previous maintenance socket could not be restarted." >&2
+  PHASE="PHASE_ROLLBACK"
+  echo "Installation failed after the transaction started; restoring the previous Beszel Plus installation." >&2
+  systemctl stop beszel-agent.service >/dev/null 2>&1 || true
+  systemctl stop beszel-maintenance.socket >/dev/null 2>&1 || true
+  systemctl list-units --all --no-legend 'beszel-maintenance@*.service' 2>/dev/null >"${TRANSACTION_DIR}/rollback-units" || true
+  while IFS=' ' read -r rollback_unit _rest; do
+    case "$rollback_unit" in beszel-maintenance@*.service) systemctl stop "$rollback_unit" >/dev/null 2>&1 || true ;; esac
+  done <"${TRANSACTION_DIR}/rollback-units"
+  for restore_spec in \
+    "$BIN_PATH|agent|$AGENT_REPLACED|Agent" \
+    "$MAINTENANCE_HELPER_PATH|helper|$HELPER_REPLACED|Maintenance helper" \
+    "/etc/systemd/system/beszel-agent.service|agent-service|$AGENT_SERVICE_CHANGED|Agent service" \
+    "/etc/systemd/system/beszel-maintenance.socket|maintenance-socket|$SOCKET_CHANGED|Maintenance socket" \
+    "/etc/systemd/system/beszel-maintenance@.service|maintenance-template|$TEMPLATE_CHANGED|Maintenance template" \
+    "/etc/systemd/system/beszel-maintenance-helper@.service|maintenance-legacy-template|$TEMPLATE_CHANGED|Legacy template" \
+    "/etc/systemd/system/beszel-agent.service.d/update-monitoring.conf|update-monitoring|$MONITORING_DROPIN_CHANGED|Monitoring drop-in" \
+    "/etc/systemd/system/beszel-agent.service.d/10-beszel-connection.conf|connection-settings|$CONNECTION_DROPIN_CHANGED|Connection drop-in" \
+    "/etc/systemd/system/beszel-agent-update.service|agent-update-service|$UPDATE_SERVICE_CHANGED|Update service" \
+    "/etc/systemd/system/beszel-agent-update.timer|agent-update-timer|$UPDATE_TIMER_CHANGED|Update timer"
+  do
+    restore_path=$(printf '%s' "$restore_spec" | cut -d'|' -f1)
+    restore_name=$(printf '%s' "$restore_spec" | cut -d'|' -f2)
+    restore_changed=$(printf '%s' "$restore_spec" | cut -d'|' -f3)
+    restore_label=$(printf '%s' "$restore_spec" | cut -d'|' -f4)
+    [ "$restore_changed" = "true" ] || continue
+    if restore_transaction_file "$restore_path" "$restore_name" "$restore_changed"; then
+      echo "✓ $restore_label restored" >&2
+      append_component restored "$restore_name"
+    else
+      echo "✗ $restore_label restoration failed" >&2
+      append_component failed "$restore_name"
     fi
-    if [ "$AGENT_WAS_RUNNING" = "true" ] || [ "$EXISTING_INSTALLATION" = "true" ]; then
-      systemctl restart beszel-agent.service 2>/dev/null || echo "Error: previous Agent could not be restarted after rollback." >&2
-    fi
-  elif [ "$EXISTING_INSTALLATION" = "true" ]; then
-    if is_alpine; then rc-service beszel-agent restart 2>/dev/null || true
-    elif is_openwrt; then /etc/init.d/beszel-agent restart 2>/dev/null || true
-    else service beszel-agent restart 2>/dev/null || true
-    fi
-  fi
+  done
+  if systemctl daemon-reload >/dev/null 2>&1; then echo "✓ daemon-reload completed" >&2; else append_component failed daemon-reload; fi
+  if restore_quiesced_services; then echo "✓ Previous service state restored" >&2; else append_component failed service-state; fi
+  mkdir -p "$(dirname "$ROLLBACK_REPORT_PATH")"
+  rollback_timestamp=$(date -u '+%Y-%m-%dT%H:%M:%SZ')
+  rollback_restored_json=$(csv_json_array "$ROLLBACK_RESTORED_COMPONENTS")
+  rollback_failed_json=$(csv_json_array "$ROLLBACK_FAILED_COMPONENTS")
+  printf '{"timestamp":"%s","target_version":"%s","previous_version":"%s","restored_components":%s,"failed_components":%s,"final_service_state":{"agent":"%s","socket":"%s"}}\n' \
+    "$rollback_timestamp" "${INSTALL_VERSION:-unknown}" "${OLD_AGENT_VERSION:-unknown}" "$rollback_restored_json" "$rollback_failed_json" "$(service_state beszel-agent.service)" "$(service_state beszel-maintenance.socket)" \
+    >"$ROLLBACK_REPORT_PATH" 2>/dev/null || append_component failed rollback-report
   rm -f "${BIN_PATH}.new.$$" "${MAINTENANCE_HELPER_PATH}.new.$$"
-  [ -z "$TEMP_DIR" ] || rm -rf "$TEMP_DIR"
-  [ -z "$TRANSACTION_DIR" ] || rm -rf "$TRANSACTION_DIR"
-  echo "Rollback completed; the installer did not leave the previous Agent stopped." >&2
+  if [ -n "$ROLLBACK_FAILED_COMPONENTS" ]; then
+    echo "CRITICAL: Rollback was incomplete. Manual recovery is required." >&2
+    return 70
+  fi
+  echo "Rollback completed and validated." >&2
   return "$transaction_status"
+}
+
+on_installer_exit() {
+  exit_status="$1"
+  trap - 0 INT TERM HUP
+  if [ "$VERBOSE" = "true" ]; then echo "Installer exit from $PHASE with status $exit_status." >&2; fi
+  if [ "$TRANSACTION_ACTIVE" = "true" ]; then
+    rollback_install "$exit_status"
+    rollback_status=$?
+    if [ "$rollback_status" -eq 70 ]; then exit_status=70; fi
+  elif [ "$QUIESCE_ACTIVE" = "true" ]; then
+    restore_quiesced_services || exit_status=70
+  fi
+  clear_upgrade_drain
+  rm -f "${DRAIN_PATH}.new.$$"
+  [ -z "${TEMP_DIR:-}" ] || rm -rf "$TEMP_DIR"
+  [ -z "${PREFLIGHT_UNITS_FILE:-}" ] || rm -f "$PREFLIGHT_UNITS_FILE"
+  [ -z "$TRANSACTION_DIR" ] || rm -rf "$TRANSACTION_DIR"
+  if [ "$LOCK_KIND" = "mkdir" ] && [ -n "$LOCK_DIR" ]; then rm -rf "$LOCK_DIR"; fi
+  exit "$exit_status"
+}
+
+acquire_installer_lock() {
+  mkdir -p /run/lock
+  if command -v flock >/dev/null 2>&1; then
+    eval "exec 9>\"$INSTALL_LOCK_PATH\""
+    if ! flock -n 9; then echo "Another Beszel Plus Agent installation is already running." >&2; return 75; fi
+    LOCK_KIND="flock"
+    return 0
+  fi
+  LOCK_DIR="${INSTALL_LOCK_PATH}.d"
+  if mkdir "$LOCK_DIR" 2>/dev/null; then
+    printf '%s\n%s\n' "$$" "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" >"$LOCK_DIR/owner"
+    LOCK_KIND="mkdir"
+    return 0
+  fi
+  lock_pid=$(sed -n '1p' "$LOCK_DIR/owner" 2>/dev/null || true)
+  case "$lock_pid" in ''|*[!0-9]*) lock_stale=true ;; *) if kill -0 "$lock_pid" 2>/dev/null; then lock_stale=false; else lock_stale=true; fi ;; esac
+  if [ "$lock_stale" = "true" ]; then
+    rm -rf "$LOCK_DIR"
+    mkdir "$LOCK_DIR" 2>/dev/null && { printf '%s\n%s\n' "$$" "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" >"$LOCK_DIR/owner"; LOCK_KIND="mkdir"; return 0; }
+  fi
+  echo "Another Beszel Plus Agent installation is already running." >&2
+  return 75
+}
+
+write_upgrade_drain() {
+  mkdir -p "$(dirname "$DRAIN_PATH")"
+  umask 022
+  drain_new="${DRAIN_PATH}.new.$$"
+  printf '{"pid":%s,"started_at":"%s","target_version":"%s"}\n' "$$" "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "${INSTALL_VERSION:-unknown}" >"$drain_new" || return 1
+  mv -f "$drain_new" "$DRAIN_PATH"
+}
+
+quiesce_for_upgrade() {
+  PHASE="PHASE_QUIESCE"
+  AGENT_PREVIOUS_STATE=$(service_state beszel-agent.service)
+  SOCKET_PREVIOUS_STATE=$(service_state beszel-maintenance.socket)
+  QUIESCE_ACTIVE=true
+  write_upgrade_drain || return 1
+  if [ "$AGENT_PREVIOUS_STATE" = "active" ] && ! systemctl stop beszel-agent.service; then
+    echo "Upgrade not started: the Agent could not be stopped safely." >&2
+    echo "No binaries or configuration files were changed." >&2
+    return 75
+  fi
+  if [ "$SOCKET_PREVIOUS_STATE" = "active" ] && ! systemctl stop beszel-maintenance.socket; then
+    echo "Upgrade not started: the maintenance socket could not be stopped safely." >&2
+    echo "No binaries or configuration files were changed." >&2
+    return 75
+  fi
+  maintenance_preflight
+}
+
+prepare_transaction_quiesce() {
+  if [ "$EXISTING_INSTALLATION" = "true" ]; then
+    quiesce_for_upgrade
+    return $?
+  fi
+  PHASE="PHASE_QUIESCE"
+  QUIESCE_ACTIVE=true
+  AGENT_PREVIOUS_STATE="not-found"
+  SOCKET_PREVIOUS_STATE="not-found"
+  write_upgrade_drain || return 1
+  maintenance_preflight
+}
+
+begin_install_transaction() {
+  TRANSACTION_DIR=$(mktemp -d)
+  backup_transaction_file "$BIN_PATH" agent || return 1
+  backup_transaction_file "$MAINTENANCE_HELPER_PATH" helper || return 1
+  backup_transaction_file /etc/systemd/system/beszel-agent.service agent-service || return 1
+  backup_transaction_file /etc/systemd/system/beszel-maintenance.socket maintenance-socket || return 1
+  backup_transaction_file /etc/systemd/system/beszel-maintenance@.service maintenance-template || return 1
+  backup_transaction_file /etc/systemd/system/beszel-maintenance-helper@.service maintenance-legacy-template || return 1
+  backup_transaction_file /etc/systemd/system/beszel-agent.service.d/update-monitoring.conf update-monitoring || return 1
+  backup_transaction_file /etc/systemd/system/beszel-agent.service.d/10-beszel-connection.conf connection-settings || return 1
+  backup_transaction_file /etc/systemd/system/beszel-agent-update.service agent-update-service || return 1
+  backup_transaction_file /etc/systemd/system/beszel-agent-update.timer agent-update-timer || return 1
+  PHASE="PHASE_TRANSACTION"
+  TRANSACTION_ACTIVE=true
 }
 
 install_agent_binary() {
@@ -547,20 +829,36 @@ install_agent_binary() {
   if [ -f "$BIN_PATH" ]; then echo "Backing up existing Agent..."; fi
   echo "Installing Agent v${INSTALL_VERSION}..."
   AGENT_NEW_PATH="${BIN_PATH}.new.$$"
-  if ! cp "$TEMP_DIR/beszel-agent" "$AGENT_NEW_PATH" ||
-    ! chown beszel:beszel "$AGENT_NEW_PATH" ||
-    ! chmod 755 "$AGENT_NEW_PATH" ||
-    ! mv -f "$AGENT_NEW_PATH" "$BIN_PATH" ||
+  if ! install -m 0755 -o beszel -g beszel "$TEMP_DIR/beszel-agent" "$AGENT_NEW_PATH" ||
+    ! { AGENT_REPLACED=true; mv -f "$AGENT_NEW_PATH" "$BIN_PATH"; } ||
     ! chown beszel:beszel "$BIN_PATH" ||
     ! chmod 755 "$BIN_PATH"; then
     echo "Failed to install Agent v${INSTALL_VERSION}." >&2
     return 1
   fi
+  AGENT_REPLACED=true
   AGENT_INSTALLED=true
 }
 
 EXISTING_INSTALLATION=false
 if [ -f "$BIN_PATH" ]; then EXISTING_INSTALLATION=true; fi
+OLD_AGENT_VERSION="none"
+if [ -x "$BIN_PATH" ]; then OLD_AGENT_VERSION=$($BIN_PATH --version 2>/dev/null | sed -n 's/^Beszel Plus Agent v//p' | head -n 1); [ -n "$OLD_AGENT_VERSION" ] || OLD_AGENT_VERSION="legacy"; fi
+EXISTING_HELPER_VERSION="none"
+EXISTING_HELPER_PROTOCOL="none"
+if [ -x "$MAINTENANCE_HELPER_PATH" ]; then
+  EXISTING_HELPER_OUTPUT=$($MAINTENANCE_HELPER_PATH --version 2>/dev/null || true)
+  EXISTING_HELPER_VERSION=$(printf '%s\n' "$EXISTING_HELPER_OUTPUT" | sed -n -e 's/^Beszel Plus Maintenance Helper v//p' -e 's/^beszel-maintenance-helper v//p' | head -n 1)
+  EXISTING_HELPER_PROTOCOL=$(printf '%s\n' "$EXISTING_HELPER_OUTPUT" | sed -n 's/^protocol //p' | head -n 1)
+  [ -n "$EXISTING_HELPER_VERSION" ] || EXISTING_HELPER_VERSION="legacy"
+  [ -n "$EXISTING_HELPER_PROTOCOL" ] || EXISTING_HELPER_PROTOCOL="unknown"
+fi
+if [ "$EXISTING_INSTALLATION" = "true" ] && [ "$EXISTING_HELPER_VERSION" != "none" ] && { [ "$OLD_AGENT_VERSION" != "$EXISTING_HELPER_VERSION" ] || [ "$EXISTING_HELPER_PROTOCOL" != "2" ]; }; then
+  echo "Existing installation is inconsistent:"
+  echo "Agent: v$OLD_AGENT_VERSION"
+  echo "Maintenance Helper: v$EXISTING_HELPER_VERSION (protocol $EXISTING_HELPER_PROTOCOL)"
+  echo "The installer will repair and validate both components transactionally."
+fi
 MAINTENANCE_CONFIGURED_BEFORE=false
 if [ -e "$MAINTENANCE_HELPER_PATH" ] || [ -e /etc/systemd/system/beszel-maintenance.socket ] || [ -e /etc/systemd/system/beszel-maintenance@.service ] || [ -e /etc/systemd/system/beszel-maintenance-helper@.service ] || grep -qs 'OS_UPDATE_MANAGEMENT=true' /etc/systemd/system/beszel-agent.service.d/update-monitoring.conf; then
   MAINTENANCE_CONFIGURED_BEFORE=true
@@ -568,44 +866,68 @@ fi
 MAINTENANCE_POLICY_EXISTED=false
 if [ -f "$MAINTENANCE_POLICY_PATH" ]; then MAINTENANCE_POLICY_EXISTED=true; fi
 
-# Stop existing service if it exists (for upgrades)
-if [ "$UNINSTALL" != true ]; then
-  TRANSACTION_DIR=$(mktemp -d)
-  backup_transaction_file "$BIN_PATH" agent || exit 1
-  backup_transaction_file "$MAINTENANCE_HELPER_PATH" helper || exit 1
-  if ! is_alpine && ! is_openwrt && ! is_freebsd; then
-    backup_transaction_file /etc/systemd/system/beszel-agent.service agent-service || exit 1
-    backup_transaction_file /etc/systemd/system/beszel-maintenance.socket maintenance-socket || exit 1
-    backup_transaction_file /etc/systemd/system/beszel-maintenance@.service maintenance-template || exit 1
-    backup_transaction_file /etc/systemd/system/beszel-maintenance-helper@.service maintenance-legacy-template || exit 1
-    backup_transaction_file /etc/systemd/system/beszel-agent.service.d/update-monitoring.conf update-monitoring || exit 1
-    backup_transaction_file /etc/systemd/system/beszel-agent.service.d/10-beszel-connection.conf connection-settings || exit 1
-    backup_transaction_file /etc/systemd/system/beszel-agent-update.service agent-update-service || exit 1
-    backup_transaction_file /etc/systemd/system/beszel-agent-update.timer agent-update-timer || exit 1
-    if systemctl is-active --quiet beszel-agent.service 2>/dev/null; then AGENT_WAS_RUNNING=true; fi
-    if systemctl is-active --quiet beszel-maintenance.socket 2>/dev/null; then SOCKET_WAS_RUNNING=true; fi
-  fi
-  TRANSACTION_ACTIVE=true
-  trap 'rollback_install $?' 0
-  trap 'exit 130' INT
-  trap 'exit 143' TERM
-  trap 'exit 129' HUP
+read_existing_management_flag() {
+  existing_name="$1"
+  existing_value=$(sed -n "s/.*${existing_name}=\(true\|false\).*/\1/p" /etc/systemd/system/beszel-agent.service /etc/systemd/system/beszel-agent.service.d/*.conf 2>/dev/null | tail -n 1)
+  [ -n "$existing_value" ] && echo "$existing_value" || echo "false"
+}
+if [ -z "$OS_UPDATE_MANAGEMENT_FLAG" ]; then
+  if [ "$EXISTING_INSTALLATION" = "true" ]; then OS_UPDATE_MANAGEMENT_FLAG=$(read_existing_management_flag OS_UPDATE_MANAGEMENT); echo "OS update management flag not provided; preserving existing setting: $OS_UPDATE_MANAGEMENT_FLAG."; else OS_UPDATE_MANAGEMENT_FLAG=false; fi
 fi
-if [ "$UNINSTALL" != true ] && [ -f "$BIN_PATH" ]; then
-  echo "Existing installation detected. Stopping service for upgrade..."
-  if is_alpine; then
-    rc-service beszel-agent stop 2>/dev/null || true
-  elif is_openwrt; then
-    /etc/init.d/beszel-agent stop 2>/dev/null || true
-  elif is_freebsd; then
-    service beszel-agent stop 2>/dev/null || true
-  else
-    cleanup_stale_maintenance_validations || exit 1
-    systemctl stop beszel-maintenance.socket 2>/dev/null || true
-    systemctl stop beszel-agent.service 2>/dev/null || true
-  fi
+if [ -z "$POWER_MANAGEMENT_FLAG" ]; then
+  if [ "$EXISTING_INSTALLATION" = "true" ]; then POWER_MANAGEMENT_FLAG=$(read_existing_management_flag POWER_MANAGEMENT); echo "Power management flag not provided; preserving existing setting: $POWER_MANAGEMENT_FLAG."; else POWER_MANAGEMENT_FLAG=false; fi
 fi
 
+diagnose_install() {
+  diagnose_helper_version="not installed"
+  diagnose_helper_protocol="unknown"
+  if [ -x "$MAINTENANCE_HELPER_PATH" ]; then
+    diagnose_output=$($MAINTENANCE_HELPER_PATH --version 2>/dev/null || true)
+    diagnose_helper_version=$(printf '%s\n' "$diagnose_output" | sed -n -e 's/^Beszel Plus Maintenance Helper v//p' -e 's/^beszel-maintenance-helper v//p' | head -n 1)
+    diagnose_helper_protocol=$(printf '%s\n' "$diagnose_output" | sed -n 's/^protocol //p' | head -n 1)
+  fi
+  diagnose_operation=$(json_string_value "$MAINTENANCE_STATUS_PATH" operation 2>/dev/null || true)
+  diagnose_request=$(json_string_value "$MAINTENANCE_STATUS_PATH" request_id 2>/dev/null || true)
+  diagnose_status=$(json_string_value "$MAINTENANCE_STATUS_PATH" status 2>/dev/null || true)
+  if [ "$diagnose_status" != "running" ]; then diagnose_operation=""; diagnose_request=""; fi
+  diagnose_pending="no"; [ -f /var/lib/beszel-maintenance/pending-policy.json ] && diagnose_pending="yes"
+  diagnose_apt="none"; if command -v fuser >/dev/null 2>&1; then diagnose_apt=$(fuser /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock 2>/dev/null | tr '\n' ' '); [ -n "$diagnose_apt" ] || diagnose_apt="none"; fi
+  diagnose_units_file=$(mktemp)
+  systemctl list-units --all --no-legend 'beszel-maintenance@*.service' 2>/dev/null >"$diagnose_units_file" || true
+  diagnose_unit=$(awk '$3 == "active" { print $1; exit }' "$diagnose_units_file")
+  rm -f "$diagnose_units_file"
+  if [ -z "$diagnose_operation" ] && [ -n "$diagnose_unit" ]; then diagnose_operation="unknown"; fi
+  echo "Installed Agent version: $OLD_AGENT_VERSION"
+  echo "Installed Helper version: ${diagnose_helper_version:-legacy}"
+  echo "Maintenance protocol: $diagnose_helper_protocol"
+  echo "Agent service state: $(service_state beszel-agent.service)"
+  echo "Maintenance socket state: $(service_state beszel-maintenance.socket)"
+  echo "Active maintenance operation: ${diagnose_operation:-none}"
+  echo "Active maintenance unit: ${diagnose_unit:-none}"
+  echo "Operation request ID: ${diagnose_request:-none}"
+  echo "APT lock holder PID: $diagnose_apt"
+  echo "Pending policy: $diagnose_pending"
+  echo "OS update management: $OS_UPDATE_MANAGEMENT_FLAG"
+  echo "Power management: $POWER_MANAGEMENT_FLAG"
+  if [ -n "$diagnose_operation" ] || [ "$diagnose_apt" != "none" ]; then echo "Upgrade can proceed: no"; else echo "Upgrade can proceed: yes"; fi
+}
+if [ "$DIAGNOSE" = "true" ]; then diagnose_install; exit 0; fi
+
+acquire_installer_lock || exit $?
+trap 'on_installer_exit $?' 0
+trap 'exit 130' INT
+trap 'exit 143' TERM
+trap 'exit 129' HUP
+PHASE="PHASE_PREFLIGHT"
+available_kb=$(df -Pk /opt 2>/dev/null | awk 'NR==2 {print $4}')
+case "$available_kb" in ''|*[!0-9]*) ;; *)
+  if [ "$available_kb" -lt 65536 ]; then
+    echo "Upgrade not started: at least 64 MiB of free space is required on /opt." >&2
+    echo "No binaries or configuration files were changed." >&2
+    exit 75
+  fi
+  ;;
+esac
 # Uninstall process
 if [ "$UNINSTALL" = true ]; then
   # Clean up SELinux contexts before removing files
@@ -732,6 +1054,11 @@ elif package_installed pkg && is_freebsd; then
   fi
 elif package_installed apt-get; then
   if ! package_installed tar || ! package_installed curl || ! package_installed sha256sum; then
+    if [ "$EXISTING_INSTALLATION" = "true" ]; then
+      echo "Upgrade not started: required download tools are missing." >&2
+      echo "No binaries or configuration files were changed." >&2
+      exit 75
+    fi
     apt-get update
     apt-get install -y tar curl coreutils
   fi
@@ -776,8 +1103,9 @@ fi
 
 # Create a dedicated user for the service if it doesn't exist
 AGENT_USER="beszel"
-echo "Configuring the dedicated user for the Beszel Plus Agent service..."
-if is_alpine; then
+if [ "$EXISTING_INSTALLATION" != "true" ]; then
+  echo "Configuring the dedicated user for the Beszel Plus Agent service..."
+  if is_alpine; then
   if ! id -u beszel >/dev/null 2>&1; then
     addgroup beszel
     adduser -S -D -H -s /sbin/nologin -G beszel beszel
@@ -788,7 +1116,7 @@ if is_alpine; then
     addgroup beszel docker
   fi
   
-elif is_openwrt; then
+  elif is_openwrt; then
   # Create beszel group first if it doesn't exist (check /etc/group directly)
   if ! grep -q "^beszel:" /etc/group >/dev/null 2>&1; then
     echo "beszel:x:999:" >> /etc/group
@@ -816,7 +1144,7 @@ elif is_openwrt; then
     fi
   fi
 
-elif is_freebsd; then
+  elif is_freebsd; then
   if is_opnsense; then
     echo "OPNsense detected: skipping user creation (using daemon user instead)"
     AGENT_USER="daemon"
@@ -831,7 +1159,7 @@ elif is_freebsd; then
     fi
   fi
 
-else
+  else
   if ! id -u beszel >/dev/null 2>&1; then
     useradd --system --home-dir /nonexistent --shell /bin/false beszel
   fi
@@ -854,6 +1182,7 @@ else
         usermod -aG "$log_group" beszel || echo "Warning: could not add beszel to $log_group"
       fi
     done
+  fi
   fi
 fi
 
@@ -946,16 +1275,6 @@ AGENT_INSTALLED=false
 OS_UPDATE_SUPPORTED=false
 if [ "$OS" = "linux" ] && grep -Eq '^ID=("?)(debian|ubuntu|raspbian)\1$' /etc/os-release 2>/dev/null; then OS_UPDATE_SUPPORTED=true; fi
 if { [ "$OS_UPDATE_MANAGEMENT_FLAG" = "true" ] || [ "$POWER_MANAGEMENT_FLAG" = "true" ]; } && [ "$OS_UPDATE_SUPPORTED" = "true" ]; then
-	if [ "$POWER_MANAGEMENT_FLAG" = "true" ] && ! command -v ethtool >/dev/null 2>&1; then
-	  echo "Installing ethtool for one-time WOL capability diagnostics..."
-	  if ! apt-get update || ! DEBIAN_FRONTEND=noninteractive apt-get install -y ethtool; then echo "Failed to install ethtool" >&2; exit 1; fi
-	fi
-	if [ "$OS_UPDATE_MANAGEMENT_FLAG" = "true" ]; then
-  if ! dpkg-query -W -f='${db:Status-Status}' unattended-upgrades 2>/dev/null | grep -qx installed; then
-    echo "Installing unattended-upgrades dependency..."
-    if ! apt-get update || ! DEBIAN_FRONTEND=noninteractive apt-get install -y unattended-upgrades; then echo "Failed to install unattended-upgrades" >&2; exit 1; fi
-  fi
-	fi
   HELPER_FILE_NAME="beszel-maintenance-helper_${OS}_${ARCH}.tar.gz"
   echo "Downloading maintenance helper v${INSTALL_VERSION}..."
   HELPER_CHECKSUM=$(curl -fsSL "$GITHUB_URL/$REPOSITORY/releases/download/v${INSTALL_VERSION}/beszel_${INSTALL_VERSION}_checksums.txt" | grep " $HELPER_FILE_NAME$" | cut -d' ' -f1)
@@ -975,25 +1294,52 @@ if { [ "$OS_UPDATE_MANAGEMENT_FLAG" = "true" ] || [ "$POWER_MANAGEMENT_FLAG" = "
     detect_existing_helper_version "$MAINTENANCE_HELPER_PATH"
     echo "Upgrading maintenance helper from ${OLD_HELPER_VERSION} to v${INSTALL_VERSION}..."
   fi
+  prepare_transaction_quiesce || exit $?
+  begin_install_transaction || exit 1
+  if [ "$POWER_MANAGEMENT_FLAG" = "true" ] && ! command -v ethtool >/dev/null 2>&1; then
+    echo "Installing ethtool for one-time WOL capability diagnostics..."
+    if ! apt-get update || ! DEBIAN_FRONTEND=noninteractive apt-get install -y ethtool; then echo "Failed to install ethtool" >&2; exit 1; fi
+  fi
+  if [ "$OS_UPDATE_MANAGEMENT_FLAG" = "true" ] && ! dpkg-query -W -f='${db:Status-Status}' unattended-upgrades 2>/dev/null | grep -qx installed; then
+    echo "Installing unattended-upgrades dependency..."
+    if ! apt-get update || ! DEBIAN_FRONTEND=noninteractive apt-get install -y unattended-upgrades; then echo "Failed to install unattended-upgrades" >&2; exit 1; fi
+  fi
   if [ -e "$MAINTENANCE_HELPER_PATH" ]; then echo "Backing up existing maintenance helper..."; fi
   echo "Installing maintenance helper v${INSTALL_VERSION}..."
   mkdir -p "$(dirname "$MAINTENANCE_HELPER_PATH")"
   chown root:root "$(dirname "$MAINTENANCE_HELPER_PATH")"
   chmod 0755 "$(dirname "$MAINTENANCE_HELPER_PATH")"
   HELPER_NEW_PATH="${MAINTENANCE_HELPER_PATH}.new.$$"
-  cp beszel-maintenance-helper "$HELPER_NEW_PATH"
-  chown root:root "$HELPER_NEW_PATH"
-  chmod 0755 "$HELPER_NEW_PATH"
-  install_agent_binary || exit 1
-  if ! mv -f "$HELPER_NEW_PATH" "$MAINTENANCE_HELPER_PATH" || ! "$MAINTENANCE_HELPER_PATH" --version >/dev/null 2>&1; then
+  install -m 0755 -o root -g root "$TEMP_DIR/beszel-maintenance-helper" "$HELPER_NEW_PATH"
+  HELPER_REPLACED=true
+  if ! mv -f "$HELPER_NEW_PATH" "$MAINTENANCE_HELPER_PATH"; then
     echo "New maintenance helper smoke test failed." >&2
+    exit 1
+  fi
+  INSTALLED_HELPER_OUTPUT=$("$MAINTENANCE_HELPER_PATH" --version 2>&1) || { echo "New maintenance helper smoke test failed." >&2; exit 1; }
+  if ! printf '%s\n' "$INSTALLED_HELPER_OUTPUT" | grep -qx "Beszel Plus Maintenance Helper v${INSTALL_VERSION}" || ! printf '%s\n' "$INSTALLED_HELPER_OUTPUT" | grep -qx 'protocol 2'; then
+    echo "Installed maintenance helper has an incompatible version or protocol." >&2
     exit 1
   fi
   echo "Maintenance helper protocol compatibility verified."
   chown root:root "$MAINTENANCE_HELPER_PATH"
   chmod 0755 "$MAINTENANCE_HELPER_PATH"
 fi
+if [ "$TRANSACTION_ACTIVE" != "true" ]; then
+  prepare_transaction_quiesce || exit $?
+  begin_install_transaction || exit 1
+fi
 install_agent_binary || exit 1
+INSTALLED_AGENT_OUTPUT=$("$BIN_PATH" --version 2>&1) || { echo "Installed Agent version check failed." >&2; exit 1; }
+if ! printf '%s\n' "$INSTALLED_AGENT_OUTPUT" | grep -qx "Beszel Plus Agent v${INSTALL_VERSION}"; then
+  echo "Installed Agent version does not match v${INSTALL_VERSION}." >&2
+  exit 1
+fi
+echo "Beszel Plus Agent v${INSTALL_VERSION} validated."
+if [ "$HELPER_REPLACED" = "true" ]; then
+  echo "Beszel Plus Maintenance Helper v${INSTALL_VERSION} validated."
+  echo "Maintenance protocol 2 validated."
+fi
 
 # Set SELinux context if needed
 set_selinux_context
@@ -1248,6 +1594,7 @@ else
   # Original systemd service installation code
   if [ ! -f /etc/systemd/system/beszel-agent.service ]; then
     echo "Creating the systemd service for the agent..."
+    AGENT_SERVICE_CHANGED=true
 
     # Detect NVIDIA devices and grant device permissions
     NVIDIA_DEVICES=$(detect_nvidia_devices)
@@ -1307,6 +1654,7 @@ EOF
     fi
     TOKEN_SYSTEMD=$(systemd_escape_environment "$TOKEN")
     HUB_URL_SYSTEMD=$(systemd_escape_environment "$HUB_URL")
+    CONNECTION_DROPIN_CHANGED=true
     cat >/etc/systemd/system/beszel-agent.service.d/10-beszel-connection.conf <<EOF
 [Service]
 Environment="TOKEN=$TOKEN_SYSTEMD"
@@ -1315,6 +1663,7 @@ EOF
     chmod 0600 /etc/systemd/system/beszel-agent.service.d/10-beszel-connection.conf
     echo "Updated Agent connection settings from this install command."
   fi
+  MONITORING_DROPIN_CHANGED=true
   cat >/etc/systemd/system/beszel-agent.service.d/update-monitoring.conf <<EOF
 [Service]
 Environment="UPDATE_MONITORING=true"
@@ -1327,6 +1676,8 @@ Environment="POWER_MANAGEMENT=$POWER_MANAGEMENT_FLAG"
 EOF
 
   if { [ "$OS_UPDATE_MANAGEMENT_FLAG" = "true" ] || [ "$POWER_MANAGEMENT_FLAG" = "true" ]; } && [ "$OS_UPDATE_SUPPORTED" = "true" ]; then
+    SOCKET_CHANGED=true
+    TEMPLATE_CHANGED=true
     cat >/etc/systemd/system/beszel-maintenance.socket <<EOF
 [Unit]
 Description=Beszel Plus maintenance helper socket
@@ -1375,6 +1726,7 @@ EOF
   fi
 
   # Load and start the service
+  PHASE="PHASE_VALIDATE"
   printf "\nLoading and starting the agent service...\n"
   systemctl daemon-reload
   if { [ "$OS_UPDATE_MANAGEMENT_FLAG" = "true" ] || [ "$POWER_MANAGEMENT_FLAG" = "true" ]; } && [ "$OS_UPDATE_SUPPORTED" = "true" ]; then
@@ -1448,6 +1800,7 @@ EOF
     echo "Setting up daily automatic updates for beszel-agent..."
 
     # Create systemd service for the daily update
+    UPDATE_SERVICE_CHANGED=true
     cat >/etc/systemd/system/beszel-agent-update.service <<EOF
 [Unit]
 Description=Update beszel-agent if needed
@@ -1459,6 +1812,7 @@ ExecStart=$BIN_PATH update
 EOF
 
     # Create systemd timer for the daily update
+    UPDATE_TIMER_CHANGED=true
     cat >/etc/systemd/system/beszel-agent-update.timer <<EOF
 [Unit]
 Description=Run beszel-agent update daily
@@ -1497,9 +1851,15 @@ EOF
   fi
 fi
 
+PHASE="PHASE_COMMIT"
 TRANSACTION_ACTIVE=false
+QUIESCE_ACTIVE=false
+clear_upgrade_drain
+rm -f "${DRAIN_PATH}.new.$$"
 trap - 0 INT TERM HUP
 [ -z "$TRANSACTION_DIR" ] || rm -rf "$TRANSACTION_DIR"
+if [ "$LOCK_KIND" = "mkdir" ] && [ -n "$LOCK_DIR" ]; then rm -rf "$LOCK_DIR"; fi
+PHASE="PHASE_COMPLETE"
 if [ "$POLICY_PENDING" = "true" ]; then
   echo "Agent v${INSTALL_VERSION} installed."
   echo "Maintenance helper v${INSTALL_VERSION} installed."

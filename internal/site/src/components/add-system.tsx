@@ -21,7 +21,7 @@ import { SystemStatus } from "@/lib/enums"
 import { $publicKey } from "@/lib/stores"
 import { cn, generateToken, tokenMap, useBrowserStorage } from "@/lib/utils"
 import type { SystemRecord } from "@/types"
-import { copyLinuxCommand, type DropdownItem, InstallDropdown } from "./install-dropdowns"
+import { copyLinuxCommand, type DropdownItem, InstallDropdown, type LinuxInstallOptions } from "./install-dropdowns"
 import { $router, basePath, Link, navigate } from "./router"
 import { DropdownMenu, DropdownMenuTrigger } from "./ui/dropdown-menu"
 import { TuxIcon } from "./ui/icons"
@@ -64,6 +64,12 @@ export const SystemDialog = ({ setOpen, system }: { setOpen: (open: boolean) => 
 	const isUnixSocket = hostValue.startsWith("/")
 	const [, setTab] = useBrowserStorage("as-tab", "binary")
 	const [token, setToken] = useState(system?.token ?? "")
+	const [installOptions, setInstallOptions] = useState<LinuxInstallOptions>({
+		osUpdateManagement: true,
+		osUpdatePolicy: "security",
+		powerManagement: true,
+		agentAutoUpdate: true,
+	})
 
 	useEffect(() => {
 		;(async () => {
@@ -186,6 +192,57 @@ export const SystemDialog = ({ setOpen, system }: { setOpen: (open: boolean) => 
 							<Trans>Token</Trans>
 						</Label>
 						<InputCopy value={token} id="tkn" name="tkn" />
+						<div className="xs:col-span-2 rounded-md border p-3 grid gap-2 text-sm">
+							<strong>
+								<Trans>Agent installation options</Trans>
+							</strong>
+							<label className="flex items-center gap-2">
+								<input
+									type="checkbox"
+									checked={installOptions.osUpdateManagement}
+									onChange={(event) =>
+										setInstallOptions({ ...installOptions, osUpdateManagement: event.target.checked })
+									}
+								/>
+								<Trans>System update management</Trans>
+							</label>
+							<label className="flex items-center gap-2">
+								<span>
+									<Trans>Initial update policy</Trans>
+								</span>
+								<select
+									className="h-8 rounded-md border bg-background px-2"
+									value={installOptions.osUpdatePolicy}
+									disabled={!installOptions.osUpdateManagement}
+									onChange={(event) =>
+										setInstallOptions({
+											...installOptions,
+											osUpdatePolicy: event.target.value as LinuxInstallOptions["osUpdatePolicy"],
+										})
+									}
+								>
+									<option value="monitor">Monitor</option>
+									<option value="security">Security</option>
+									<option value="official-all">Official repositories</option>
+								</select>
+							</label>
+							<label className="flex items-center gap-2">
+								<input
+									type="checkbox"
+									checked={installOptions.powerManagement}
+									onChange={(event) => setInstallOptions({ ...installOptions, powerManagement: event.target.checked })}
+								/>
+								<Trans>Power management</Trans>
+							</label>
+							<label className="flex items-center gap-2">
+								<input
+									type="checkbox"
+									checked={installOptions.agentAutoUpdate}
+									onChange={(event) => setInstallOptions({ ...installOptions, agentAutoUpdate: event.target.checked })}
+								/>
+								<Trans>Automatic Agent updates</Trans>
+							</label>
+						</div>
 					</div>
 					<DialogFooter className="flex justify-end gap-x-2 gap-y-3 flex-col mt-5">
 						{/* Binary */}
@@ -193,7 +250,9 @@ export const SystemDialog = ({ setOpen, system }: { setOpen: (open: boolean) => 
 							<CopyButton
 								text={t`Copy Linux command`}
 								icon={<TuxIcon className="size-4" />}
-								onClick={async () => copyLinuxCommand(isUnixSocket ? hostValue : port.current?.value, publicKey, token)}
+								onClick={async () =>
+									copyLinuxCommand(isUnixSocket ? hostValue : port.current?.value, publicKey, token, installOptions)
+								}
 								dropdownItems={[
 									{
 										text: t`Manual setup instructions`,

@@ -3,7 +3,9 @@ package agent
 import (
 	"context"
 	"encoding/json"
+	"fmt"
 	"net"
+	"os"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -13,6 +15,30 @@ import (
 	"github.com/henrygd/beszel/internal/common"
 	entity "github.com/henrygd/beszel/internal/entities/maintenance"
 )
+
+func TestMaintenanceManagerRefusesRequestsDuringUpgradeDrain(t *testing.T) {
+	originalPath := upgradeDrainPath
+	upgradeDrainPath = filepath.Join(t.TempDir(), "upgrade-in-progress")
+	t.Cleanup(func() { upgradeDrainPath = originalPath })
+	if err := os.WriteFile(upgradeDrainPath, []byte(`{"pid":`+fmt.Sprint(os.Getpid())+`}`), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	m := &maintenanceManager{enabled: true, replays: map[string]entity.Response{}, agent: &Agent{}}
+	for _, operation := range []entity.Operation{entity.GetCapabilities, entity.RunUpdateDryRun, entity.ApplyUpdatePolicy, entity.SchedulePoweroff, entity.CancelPoweroff} {
+		request := entity.Request{Version: entity.ProtocolVersion, RequestID: "drain-test", Operation: operation}
+		if entity.IsLongOperation(operation) {
+			request.IdempotencyKey = "drain-test"
+		}
+		if operation == entity.ApplyUpdatePolicy {
+			policy := entity.DefaultPolicy()
+			request.Policy = &policy
+		}
+		response := m.handle(request)
+		if response.Status != entity.StateFailed || response.ErrorCode != "upgrade_in_progress" || !response.Retryable || response.Stage != "agent_drain" {
+			t.Fatalf("operation %s was not drained: %#v", operation, response)
+		}
+	}
+}
 
 func serveMaintenanceOnce(t *testing.T, socket string, response entity.Response) {
 	t.Helper()
