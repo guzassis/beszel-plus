@@ -10,12 +10,15 @@ import (
 	"os"
 	"path"
 	"strings"
+	"sync"
+	"time"
 
 	"github.com/henrygd/beszel/internal/alerts"
 	"github.com/henrygd/beszel/internal/hub/config"
 	"github.com/henrygd/beszel/internal/hub/heartbeat"
 	"github.com/henrygd/beszel/internal/hub/systems"
 	"github.com/henrygd/beszel/internal/hub/utils"
+	powerexec "github.com/henrygd/beszel/internal/power"
 	"github.com/henrygd/beszel/internal/records"
 	"github.com/henrygd/beszel/internal/users"
 
@@ -28,19 +31,22 @@ import (
 type Hub struct {
 	core.App
 	*alerts.AlertManager
-	um     *users.UserManager
-	rm     *records.RecordManager
-	sm     *systems.SystemManager
-	hb     *heartbeat.Heartbeat
-	hbStop chan struct{}
-	pubKey string
-	signer ssh.Signer
-	appURL string
+	um            *users.UserManager
+	rm            *records.RecordManager
+	sm            *systems.SystemManager
+	hb            *heartbeat.Heartbeat
+	hbStop        chan struct{}
+	pubKey        string
+	signer        ssh.Signer
+	appURL        string
+	powerExecutor powerexec.PowerExecutor
+	powerMu       sync.Mutex
+	powerLast     map[string]time.Time
 }
 
 // NewHub creates a new Hub instance with default configuration
 func NewHub(app core.App) *Hub {
-	hub := &Hub{App: app}
+	hub := &Hub{App: app, powerExecutor: powerexec.LocalHubPowerExecutor{}, powerLast: make(map[string]time.Time)}
 	hub.AlertManager = alerts.NewAlertManager(hub)
 	hub.um = users.NewUserManager(hub)
 	hub.rm = records.NewRecordManager(hub)
@@ -129,6 +135,9 @@ func (h *Hub) initialize(app core.App) error {
 	}
 	if err := app.Save(settings); err != nil {
 		return err
+	}
+	if err := h.syncPowerNetworks(); err != nil {
+		h.Logger().Warn("power network discovery failed", "error", err)
 	}
 	// set auth settings
 	return setCollectionAuthSettings(app)

@@ -13,7 +13,7 @@ import (
 	"strings"
 	"time"
 
-	"github.com/henrygd/beszel"
+	"github.com/henrygd/beszel/internal/buildinfo"
 	"github.com/pocketbase/pocketbase/core"
 )
 
@@ -282,7 +282,7 @@ func (hb *Heartbeat) buildPayload() (*Payload, error) {
 		Systems:   summary,
 		Down:      downSystems,
 		Alerts:    alerts,
-		Version:   beszel.Version,
+		Version:   buildinfo.Version,
 	}, nil
 }
 

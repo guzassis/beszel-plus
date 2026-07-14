@@ -9,8 +9,8 @@ import (
 
 	"github.com/blang/semver"
 	"github.com/google/uuid"
-	"github.com/henrygd/beszel"
 	"github.com/henrygd/beszel/internal/alerts"
+	"github.com/henrygd/beszel/internal/buildinfo"
 	"github.com/henrygd/beszel/internal/ghupdate"
 	"github.com/henrygd/beszel/internal/hub/config"
 	"github.com/henrygd/beszel/internal/hub/systems"
@@ -129,6 +129,8 @@ func (h *Hub) registerApiRoutes(se *core.ServeEvent) error {
 	apiAuth.GET("/systemd/info", h.getSystemdInfo)
 	// privileged OS maintenance uses the existing authenticated Hub-Agent transport.
 	apiAuth.POST("/maintenance", h.handleMaintenance)
+	apiAuth.GET("/power/networks", h.handlePowerNetworks).BindFunc(requireAdminRole)
+	apiAuth.POST("/power", h.handlePower).BindFunc(requireAdminRole)
 	// /containers routes
 	if enabled, _ := utils.GetEnv("CONTAINER_DETAILS"); enabled != "false" {
 		// get container logs
@@ -148,7 +150,7 @@ func (h *Hub) getInfo(e *core.RequestEvent) error {
 	}
 	info := infoResponse{
 		Key:     h.pubKey,
-		Version: beszel.Version,
+		Version: buildinfo.Version,
 	}
 	if optIn, _ := utils.GetEnv("CHECK_UPDATES"); optIn == "true" {
 		info.CheckUpdate = true
@@ -166,7 +168,7 @@ func (info *UpdateInfo) getUpdate(e *core.RequestEvent) error {
 	if err != nil {
 		return err
 	}
-	currentVersion, err := semver.Parse(strings.TrimPrefix(beszel.Version, "v"))
+	currentVersion, err := semver.Parse(strings.TrimPrefix(buildinfo.Version, "v"))
 	if err != nil {
 		return err
 	}

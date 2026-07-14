@@ -4,6 +4,7 @@ import type { AuthMethodsList } from "pocketbase"
 import { useEffect, useMemo, useState } from "react"
 import { UserAuthForm } from "@/components/login/auth-form"
 import { pb } from "@/lib/api"
+import { buildInfo, pageTitle } from "@/lib/build-info"
 import { Logo } from "../logo"
 import { ModeToggle } from "../mode-toggle"
 import { $router } from "../router"
@@ -18,7 +19,7 @@ export default function () {
 	const { theme } = useTheme()
 
 	useEffect(() => {
-		document.title = t`Login` + " / Beszel"
+		document.title = pageTitle(t`Login`)
 
 		pb.send("/api/beszel/first-run", {}).then(({ firstRun }) => {
 			setFirstRun(firstRun)
@@ -62,7 +63,7 @@ export default function () {
 				<div className="text-center">
 					<h1 className="mb-3">
 						<Logo className="h-7 fill-foreground mx-auto" />
-						<span className="sr-only">Beszel</span>
+						<span className="sr-only">{buildInfo.productName}</span>
 					</h1>
 					<p className="text-sm text-muted-foreground">{subtitle}</p>
 				</div>

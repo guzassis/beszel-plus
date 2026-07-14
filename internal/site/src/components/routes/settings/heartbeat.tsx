@@ -85,7 +85,7 @@ export default function HeartbeatSettings() {
 				</h3>
 				<p className="text-sm text-muted-foreground leading-relaxed">
 					<Trans>
-						Send periodic outbound pings to an external monitoring service so you can monitor Beszel without exposing it
+						Send periodic outbound pings to an external monitoring service so you can monitor Beszel Plus without exposing it
 						to the internet.
 					</Trans>
 				</p>
@@ -174,7 +174,7 @@ function NotEnabledState({ isLoading }: { isLoading?: boolean }) {
 		<div className={cn("grid gap-4", isLoading && "animate-pulse")}>
 			<div>
 				<p className="text-sm text-muted-foreground leading-relaxed mb-3">
-					<Trans>Set the following environment variables on your Beszel hub to enable heartbeat monitoring:</Trans>
+					<Trans>Set the following environment variables on your Beszel Plus Hub to enable heartbeat monitoring:</Trans>
 				</p>
 				<div className="grid gap-2.5">
 					<EnvVarItem
@@ -191,7 +191,7 @@ function NotEnabledState({ isLoading }: { isLoading?: boolean }) {
 				</div>
 			</div>
 			<p className="text-sm text-muted-foreground leading-relaxed">
-				<Trans>After setting the environment variables, restart your Beszel hub for changes to take effect.</Trans>
+				<Trans>After setting the environment variables, restart your Beszel Plus Hub for changes to take effect.</Trans>
 			</p>
 		</div>
 	)

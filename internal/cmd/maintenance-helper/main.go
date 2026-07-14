@@ -8,12 +8,13 @@ import (
 	"syscall"
 	"time"
 
+	"github.com/henrygd/beszel/internal/buildinfo"
 	"github.com/henrygd/beszel/internal/maintenance"
 )
 
 func main() {
 	if len(os.Args) == 2 && (os.Args[1] == "--version" || os.Args[1] == "version") {
-		fmt.Printf("beszel-maintenance-helper v%s\nprotocol %d\n", maintenance.HelperVersion(), maintenance.ProtocolVersion())
+		fmt.Printf("%s\nprotocol %d\n", buildinfo.VersionLine("Maintenance Helper"), maintenance.ProtocolVersion())
 		return
 	}
 	if os.Geteuid() != 0 {

@@ -21,6 +21,7 @@ import (
 	"time"
 
 	entity "github.com/henrygd/beszel/internal/entities/maintenance"
+	powerentity "github.com/henrygd/beszel/internal/entities/power"
 	"golang.org/x/sys/unix"
 )
 
@@ -137,6 +138,13 @@ func (h *Helper) Execute(ctx context.Context, req entity.Request) entity.Respons
 	if req.Operation == entity.GetCapabilities {
 		return h.complete(req, &entity.Result{Capabilities: h.capabilities()}, false)
 	}
+	if req.Operation == entity.GetPowerCapabilities {
+		return h.complete(req, &entity.Result{PowerCapabilities: h.powerCapabilities()}, false)
+	}
+	if req.Operation == entity.GetPoweroffStatus {
+		status := h.poweroffStatus(ctx)
+		return h.complete(req, &entity.Result{PoweroffStatus: &status}, false)
+	}
 	if req.Operation == entity.GetOperationStatus {
 		if pending, err := h.readPendingPolicy(); err == nil {
 			return pending
@@ -171,7 +179,11 @@ func (h *Helper) Execute(ctx context.Context, req entity.Request) entity.Respons
 	}
 	if req.Operation == entity.ApplyUpdatePolicy {
 		if response.Status == entity.StateFailed && response.Retryable && response.Result != nil && response.Result.Policy != nil {
-			_ = h.savePendingPolicy(response)
+			if h.savePendingPolicy(response) == nil {
+				if pending, err := h.readPendingPolicyData(); err == nil {
+					response.NextAttemptAt = &pending.NextAttemptAt
+				}
+			}
 		} else {
 			_ = os.Remove(filepath.Join(h.stateDir(), "pending-policy.json"))
 		}
@@ -182,8 +194,30 @@ func (h *Helper) Execute(ctx context.Context, req entity.Request) entity.Respons
 	return response
 }
 
+type pendingPolicy struct {
+	Policy        entity.Policy `json:"policy"`
+	CreatedAt     time.Time     `json:"created_at"`
+	LastAttemptAt time.Time     `json:"last_attempt_at"`
+	AttemptCount  uint32        `json:"attempt_count"`
+	LastErrorCode string        `json:"last_error_code"`
+	NextAttemptAt time.Time     `json:"next_attempt_at"`
+}
+
+var pendingBackoff = []time.Duration{time.Minute, 5 * time.Minute, 15 * time.Minute, 30 * time.Minute, time.Hour}
+
 func (h *Helper) savePendingPolicy(response entity.Response) error {
-	data, err := json.Marshal(response)
+	if response.Result == nil || response.Result.Policy == nil {
+		return errors.New("pending policy is missing")
+	}
+	now := h.Now()
+	pending := pendingPolicy{Policy: *response.Result.Policy, CreatedAt: now, LastAttemptAt: now, AttemptCount: 1, LastErrorCode: response.ErrorCode}
+	if previous, err := h.readPendingPolicyData(); err == nil {
+		pending.CreatedAt = previous.CreatedAt
+		pending.AttemptCount = previous.AttemptCount + 1
+	}
+	index := min(int(pending.AttemptCount)-1, len(pendingBackoff)-1)
+	pending.NextAttemptAt = now.Add(pendingBackoff[index])
+	data, err := json.Marshal(pending)
 	if err != nil {
 		return err
 	}
@@ -191,13 +225,21 @@ func (h *Helper) savePendingPolicy(response entity.Response) error {
 }
 
 func (h *Helper) readPendingPolicy() (entity.Response, error) {
-	data, err := readLimited(filepath.Join(h.stateDir(), "pending-policy.json"), 64*1024)
+	pending, err := h.readPendingPolicyData()
 	if err != nil {
 		return entity.Response{}, err
 	}
-	var response entity.Response
-	err = json.Unmarshal(data, &response)
-	return response, err
+	return entity.Response{Version: entity.ProtocolVersion, RequestID: "pending-policy", Operation: entity.ApplyUpdatePolicy, Status: entity.StateFailed, Error: "policy application is pending", ErrorCode: pending.LastErrorCode, Retryable: true, Result: &entity.Result{Policy: &pending.Policy}, FinishedAt: &pending.LastAttemptAt, NextAttemptAt: &pending.NextAttemptAt}, nil
+}
+
+func (h *Helper) readPendingPolicyData() (pendingPolicy, error) {
+	data, err := readLimited(filepath.Join(h.stateDir(), "pending-policy.json"), 64*1024)
+	if err != nil {
+		return pendingPolicy{}, err
+	}
+	var pending pendingPolicy
+	err = json.Unmarshal(data, &pending)
+	return pending, err
 }
 
 func (h *Helper) run(ctx context.Context, req entity.Request) (*entity.Result, bool, error) {
@@ -226,6 +268,10 @@ func (h *Helper) run(ctx context.Context, req entity.Request) (*entity.Result, b
 		}
 		out, err := h.command(ctx, 2*time.Hour, "unattended-upgrade", "--verbose")
 		return &entity.Result{Output: sanitize(string(out), maxCommandOutputBytes)}, false, err
+	case entity.SchedulePoweroff:
+		return h.schedulePoweroff(ctx, req.DelaySeconds)
+	case entity.CancelPoweroff:
+		return h.cancelPoweroff(ctx)
 	}
 	return nil, false, errors.New("operation not allowed")
 }
@@ -233,7 +279,40 @@ func (h *Helper) run(ctx context.Context, req entity.Request) (*entity.Result, b
 func (h *Helper) capabilities() *entity.Capabilities {
 	platform := platformID(h.path("/etc/os-release"))
 	supported := platform == "debian" || platform == "ubuntu" || platform == "raspbian"
-	return &entity.Capabilities{UpdateMonitoring: true, UpdateManagement: supported, PrivilegedHelper: true, PolicyRead: supported, PolicyWrite: supported, DryRun: supported, RunUpgrade: supported, AutomaticReboot: supported, SupportedPlatform: platform, HelperVersion: HelperVersion(), ProtocolVersion: entity.ProtocolVersion, MinAgentVersion: MinAgentVersion, MaxProtocolVersion: entity.ProtocolVersion, BuildCommit: BuildCommit}
+	return &entity.Capabilities{UpdateMonitoring: true, UpdateManagement: supported, PrivilegedHelper: true, PolicyRead: supported, PolicyWrite: supported, DryRun: supported, RunUpgrade: supported, AutomaticReboot: supported, SupportedPlatform: platform, HelperVersion: HelperVersion(), ProtocolVersion: entity.ProtocolVersion, MinAgentVersion: MinAgentVersion, MaxProtocolVersion: entity.ProtocolVersion, BuildCommit: BuildCommit, Power: h.powerCapabilities()}
+}
+
+func (h *Helper) powerCapabilities() *powerentity.Capabilities {
+	return &powerentity.Capabilities{PowerManagement: true, Shutdown: true, CancelShutdown: true, MaxDelaySeconds: 604800}
+}
+
+func (h *Helper) schedulePoweroff(ctx context.Context, delay uint32) (*entity.Result, bool, error) {
+	if lock := h.aptActivity(); lock != nil {
+		return nil, false, &operationError{code: "apt_lock_busy", stage: "power_guard", retryable: true, message: "APT is currently in use", lock: lock}
+	}
+	if status := h.poweroffStatus(ctx); status.Scheduled {
+		return nil, false, &operationError{code: "power_operation_active", stage: "power_guard", message: "a shutdown is already scheduled"}
+	}
+	if output, err := h.Runner.Run(ctx, "systemd-inhibit", "--list", "--no-pager", "--no-legend"); err == nil && strings.Contains(strings.ToLower(string(output)), "block") {
+		return nil, false, &operationError{code: "shutdown_inhibited", stage: "power_guard", message: "shutdown is blocked by a system inhibitor"}
+	}
+	args := []string{"--unit=beszel-poweroff", "--collect", fmt.Sprintf("--on-active=%ds", max(delay, 3)), "/usr/bin/systemctl", "poweroff"}
+	if _, err := h.command(ctx, 10*time.Second, "systemd-run", args...); err != nil {
+		return nil, false, &operationError{code: "schedule_failed", stage: "power_schedule", message: err.Error()}
+	}
+	now := h.Now().Add(time.Duration(max(delay, 3)) * time.Second)
+	return &entity.Result{Changed: true, PoweroffStatus: &powerentity.ShutdownStatus{Scheduled: true, ScheduledAt: &now, DelaySeconds: delay}}, true, nil
+}
+
+func (h *Helper) cancelPoweroff(ctx context.Context) (*entity.Result, bool, error) {
+	_, _ = h.command(ctx, 10*time.Second, "systemctl", "stop", "beszel-poweroff.timer", "beszel-poweroff.service")
+	_, _ = h.command(ctx, 10*time.Second, "systemctl", "reset-failed", "beszel-poweroff.timer", "beszel-poweroff.service")
+	return &entity.Result{Changed: true, PoweroffStatus: &powerentity.ShutdownStatus{}}, true, nil
+}
+
+func (h *Helper) poweroffStatus(ctx context.Context) powerentity.ShutdownStatus {
+	out, err := h.Runner.Run(ctx, "systemctl", "is-active", "beszel-poweroff.timer")
+	return powerentity.ShutdownStatus{Scheduled: err == nil && strings.TrimSpace(string(out)) == "active"}
 }
 
 func platformID(path string) string {

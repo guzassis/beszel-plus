@@ -1,5 +1,9 @@
 #!/bin/sh
 
+PRODUCT_NAME="Beszel Plus"
+PRODUCT_VERSION="0.2.0"
+REPOSITORY="guzassis/beszel-plus"
+
 is_freebsd() {
   [ "$(uname -s)" = "FreeBSD" ]
 }
@@ -26,13 +30,13 @@ generate_freebsd_rc_service() {
 # BEFORE: LOGIN
 # KEYWORD: shutdown
 
-# Add the following lines to /etc/rc.conf to configure Beszel Hub:
+# Add the following lines to /etc/rc.conf to configure Beszel Plus Hub:
 #
-# beszel_hub_enable (bool):   Set to YES to enable Beszel Hub
+# beszel_hub_enable (bool):   Set to YES to enable Beszel Plus Hub
 #                             Default: YES
 # beszel_hub_port (str):      Port to listen on
 #                             Default: 8090
-# beszel_hub_user (str):      Beszel Hub daemon user
+# beszel_hub_user (str):      Beszel Plus Hub daemon user
 #                             Default: beszel
 # beszel_hub_bin (str):       Path to the beszel binary
 #                             Default: /usr/local/sbin/beszel
@@ -158,6 +162,8 @@ fi
 PORT=8090
 GITHUB_URL="https://github.com"
 AUTO_UPDATE_FLAG="false"
+POWER_MANAGEMENT_FLAG="true"
+POWER_INTERFACE=""
 UNINSTALL=false
 
 # Parse command line arguments
@@ -168,13 +174,15 @@ while [ $# -gt 0 ]; do
       shift
       ;;
     -h|--help)
-      printf "Beszel Hub installation script\n\n"
+      printf "Beszel Plus Hub installation script\n\n"
       printf "Usage: ./install-hub.sh [options]\n\n"
       printf "Options: \n"
-      printf "  -u           : Uninstall the Beszel Hub\n"
+      printf "  -u           : Uninstall the Beszel Plus Hub\n"
       printf "  -p <port>    : Specify a port number (default: 8090)\n"
       printf "  -c, --mirror [URL] : Use a GitHub mirror/proxy URL (default: https://gh.beszel.dev)\n"
       printf "  --auto-update : Enable automatic daily updates (disabled by default)\n"
+      printf "  --power-management=true|false : Enable Hub-local power management (default: true)\n"
+      printf "  --power-interface <name> : Prefer a local interface for power networks\n"
       printf "  -h, --help   : Display this help message\n"
       exit 0
       ;;
@@ -196,12 +204,28 @@ while [ $# -gt 0 ]; do
       AUTO_UPDATE_FLAG="true"
       shift
       ;;
+    --power-management=*)
+      POWER_MANAGEMENT_FLAG=${1#*=}
+      case "$POWER_MANAGEMENT_FLAG" in true|false) ;; *) echo "Invalid --power-management value" >&2; exit 1 ;; esac
+      shift
+      ;;
+    --power-interface)
+      POWER_INTERFACE="$2"
+      shift 2
+      ;;
     *)
       echo "Invalid option: $1" >&2
       exit 1
       ;;
   esac
 done
+
+if [ "$(uname -s)" != "Linux" ] || ! grep -Eq '^ID=("?)(debian|ubuntu|raspbian)\1$' /etc/os-release 2>/dev/null; then
+  echo "$PRODUCT_NAME v$PRODUCT_VERSION supports only Debian, Ubuntu, or Raspbian Linux in this release." >&2
+  exit 1
+fi
+SUPPORTED_ARCH=$(detect_architecture)
+case "$SUPPORTED_ARCH" in amd64|arm64) ;; *) echo "$PRODUCT_NAME v$PRODUCT_VERSION supports only amd64 and arm64 (detected: $SUPPORTED_ARCH)." >&2; exit 1 ;; esac
 
 # Set paths based on operating system
 if is_freebsd; then
@@ -215,7 +239,7 @@ fi
 # Uninstall process
 if [ "$UNINSTALL" = true ]; then
   if is_freebsd; then
-    echo "Stopping and disabling the Beszel Hub service..."
+    echo "Stopping and disabling the Beszel Plus Hub service..."
     service beszel-hub stop 2>/dev/null
     sysrc beszel_hub_enable="NO" 2>/dev/null
 
@@ -228,18 +252,18 @@ if [ "$UNINSTALL" = true ]; then
     echo "Removing log files..."
     rm -f /var/log/beszel_hub.log
 
-    echo "Removing the Beszel Hub binary and data..."
+    echo "Removing the Beszel Plus Hub binary and data..."
     rm -f "$BIN_PATH"
     rm -rf "$HUB_DIR"
 
     echo "Removing the dedicated user..."
     pw user del beszel 2>/dev/null
 
-    echo "The Beszel Hub has been uninstalled successfully!"
+    echo "The Beszel Plus Hub has been uninstalled successfully!"
     exit 0
   else
-    # Stop and disable the Beszel Hub service
-    echo "Stopping and disabling the Beszel Hub service..."
+    # Stop and disable the Beszel Plus Hub service
+    echo "Stopping and disabling the Beszel Plus Hub service..."
     systemctl stop beszel-hub.service
     systemctl disable beszel-hub.service
 
@@ -258,15 +282,15 @@ if [ "$UNINSTALL" = true ]; then
     echo "Reloading the systemd daemon..."
     systemctl daemon-reload
 
-    # Remove the Beszel Hub binary and data
-    echo "Removing the Beszel Hub binary and data..."
+    # Remove the Beszel Plus Hub binary and data
+    echo "Removing the Beszel Plus Hub binary and data..."
     rm -rf "$HUB_DIR"
 
     # Remove the dedicated user
     echo "Removing the dedicated user..."
     userdel beszel 2>/dev/null
 
-    echo "The Beszel Hub has been uninstalled successfully!"
+    echo "The Beszel Plus Hub has been uninstalled successfully!"
     exit 0
   fi
 fi
@@ -300,7 +324,7 @@ else
 fi
 
 # Create a dedicated user for the service if it doesn't exist
-echo "Creating a dedicated user for the Beszel Hub service..."
+echo "Creating a dedicated user for the Beszel Plus Hub service..."
 if is_freebsd; then
   if ! id -u beszel >/dev/null 2>&1; then
     pw user add beszel -d /nonexistent -s /usr/sbin/nologin -c "beszel user"
@@ -311,14 +335,14 @@ else
   fi
 fi
 
-# Create the directory for the Beszel Hub
-echo "Creating the directory for the Beszel Hub..."
+# Create the directory for the Beszel Plus Hub
+echo "Creating the directory for the Beszel Plus Hub..."
 mkdir -p "$HUB_DIR/beszel_data"
 chown -R beszel:beszel "$HUB_DIR"
 chmod 755 "$HUB_DIR"
 
-# Download and install the Beszel Hub
-echo "Downloading and installing the Beszel Hub..."
+# Download and install the Beszel Plus Hub
+echo "Downloading and installing the Beszel Plus Hub..."
 
 OS=$(uname -s | tr '[:upper:]' '[:lower:]')
 ARCH=$(detect_architecture)
@@ -326,10 +350,10 @@ FILE_NAME="beszel_${OS}_${ARCH}.tar.gz"
 
 TEMP_DIR=$(mktemp -d)
 ARCHIVE_PATH="$TEMP_DIR/$FILE_NAME"
-DOWNLOAD_URL="$GITHUB_URL/guzassis/beszel-plus/releases/latest/download/$FILE_NAME"
+DOWNLOAD_URL="$GITHUB_URL/$REPOSITORY/releases/latest/download/$FILE_NAME"
 
 if ! curl -fL# --retry 3 --retry-delay 2 --connect-timeout 10 "$DOWNLOAD_URL" -o "$ARCHIVE_PATH"; then
-  echo "Failed to download the Beszel Hub from:"
+  echo "Failed to download the Beszel Plus Hub from:"
   echo "$DOWNLOAD_URL"
   echo "Try again with --mirror (or --mirror <url>) if GitHub is not reachable."
   rm -rf "$TEMP_DIR"
@@ -373,14 +397,14 @@ if is_freebsd; then
   sysrc beszel_hub_port="$PORT"
 
   # Enable and start the service
-  echo "Enabling and starting the Beszel Hub service..."
+  echo "Enabling and starting the Beszel Plus Hub service..."
   sysrc beszel_hub_enable="YES"
   service beszel-hub restart
 
   # Check if service started successfully
   sleep 2
   if ! service beszel-hub status | grep -q "is running"; then
-    echo "Error: The Beszel Hub service failed to start. Checking logs..."
+    echo "Error: The Beszel Plus Hub service failed to start. Checking logs..."
     tail -n 20 /var/log/beszel_hub.log
     exit 1
   fi
@@ -391,7 +415,7 @@ if is_freebsd; then
 
     # Create cron job in /etc/cron.d
     cat >/etc/cron.d/beszel-hub <<EOF
-# Beszel Hub daily update job
+# Beszel Plus Hub daily update job
 12 8 * * * root $BIN_PATH update >/dev/null 2>&1
 EOF
     chmod 644 /etc/cron.d/beszel-hub
@@ -400,20 +424,22 @@ EOF
 
   # Check service status
   if ! service beszel-hub status >/dev/null 2>&1; then
-    echo "Error: The Beszel Hub service is not running."
+    echo "Error: The Beszel Plus Hub service is not running."
     service beszel-hub status
     exit 1
   fi
 
 else
   # Original systemd service installation code
-  printf "Creating the systemd service for the Beszel Hub...\n"
+  printf "Creating the systemd service for the Beszel Plus Hub...\n"
   cat >/etc/systemd/system/beszel-hub.service <<EOF
 [Unit]
-Description=Beszel Hub Service
+Description=Beszel Plus Hub Service
 After=network.target
 
 [Service]
+Environment="POWER_MANAGEMENT=$POWER_MANAGEMENT_FLAG"
+Environment="POWER_INTERFACE=$POWER_INTERFACE"
 ExecStart=$BIN_PATH serve --http "0.0.0.0:$PORT"
 WorkingDirectory=$HUB_DIR
 User=beszel
@@ -425,7 +451,7 @@ WantedBy=multi-user.target
 EOF
 
   # Load and start the service
-  printf "Loading and starting the Beszel Hub service...\n"
+  printf "Loading and starting the Beszel Plus Hub service...\n"
   systemctl daemon-reload
   systemctl enable --quiet beszel-hub.service
   systemctl start --quiet beszel-hub.service
@@ -435,8 +461,8 @@ EOF
 
   # Check if the service is running
   if [ "$(systemctl is-active beszel-hub.service)" != "active" ]; then
-    echo "Error: The Beszel Hub service is not running."
-    echo "$(systemctl status beszel-hub.service)"
+    echo "Error: The Beszel Plus Hub service is not running."
+    systemctl status beszel-hub.service
     exit 1
   fi
 
@@ -476,4 +502,4 @@ EOF
   fi
 fi
 
-printf "\n\033[32mBeszel Hub has been installed successfully! It is now accessible on port $PORT.\033[0m\n"
+printf "\n\033[32m%s Hub has been installed successfully! It is now accessible on port %s.\033[0m\n" "$PRODUCT_NAME" "$PORT"

@@ -9,10 +9,10 @@ import (
 	"runtime"
 	"strings"
 
-	"github.com/henrygd/beszel"
 	"github.com/henrygd/beszel/agent/battery"
 	"github.com/henrygd/beszel/agent/utils"
 	"github.com/henrygd/beszel/agent/zfs"
+	"github.com/henrygd/beszel/internal/buildinfo"
 	"github.com/henrygd/beszel/internal/entities/container"
 	"github.com/henrygd/beszel/internal/entities/system"
 
@@ -24,7 +24,7 @@ import (
 
 // Sets initial / non-changing values about the host system
 func (a *Agent) refreshSystemDetails() {
-	a.systemInfo.AgentVersion = beszel.Version
+	a.systemInfo.AgentVersion = buildinfo.Version
 
 	// get host info from Docker if available
 	var hostInfo container.HostInfo

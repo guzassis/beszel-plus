@@ -165,8 +165,12 @@ msgid "After"
 msgstr "Sonra"
 
 #: src/components/routes/settings/heartbeat.tsx
-msgid "After setting the environment variables, restart your Beszel hub for changes to take effect."
-msgstr "Ortam değişkenlerini ayarladıktan sonra, değişikliklerin etkili olması için Beszel Hub'ınızı yeniden başlatın."
+#~ msgid "After setting the environment variables, restart your Beszel hub for changes to take effect."
+#~ msgstr "Ortam değişkenlerini ayarladıktan sonra, değişikliklerin etkili olması için Beszel Hub'ınızı yeniden başlatın."
+
+#: src/components/routes/settings/heartbeat.tsx
+msgid "After setting the environment variables, restart your Beszel Plus Hub for changes to take effect."
+msgstr ""
 
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Agent"
@@ -360,12 +364,20 @@ msgid "Below {0}{1} in last {2, plural, one {# minute} other {# minutes}}"
 msgstr "Son {2, plural, one {# dakika} other {# dakika}} içinde {0}{1} altında"
 
 #: src/components/login/auth-form.tsx
-msgid "Beszel supports OpenID Connect and many OAuth2 authentication providers."
-msgstr "Beszel, OpenID Connect ve birçok OAuth2 kimlik doğrulama sağlayıcısını destekler."
+msgid "Beszel Plus supports OpenID Connect and many OAuth2 authentication providers."
+msgstr ""
 
 #: src/components/routes/settings/notifications.tsx
-msgid "Beszel uses <0>Shoutrrr</0> to integrate with popular notification services."
-msgstr "Beszel, popüler bildirim hizmetleriyle entegre olmak için <0>Shoutrrr</0> kullanır."
+msgid "Beszel Plus uses <0>Shoutrrr</0> to integrate with popular notification services."
+msgstr ""
+
+#: src/components/login/auth-form.tsx
+#~ msgid "Beszel supports OpenID Connect and many OAuth2 authentication providers."
+#~ msgstr "Beszel, OpenID Connect ve birçok OAuth2 kimlik doğrulama sağlayıcısını destekler."
+
+#: src/components/routes/settings/notifications.tsx
+#~ msgid "Beszel uses <0>Shoutrrr</0> to integrate with popular notification services."
+#~ msgstr "Beszel, popüler bildirim hizmetleriyle entegre olmak için <0>Shoutrrr</0> kullanır."
 
 #: src/components/add-system.tsx
 msgid "Binary"
@@ -379,6 +391,14 @@ msgstr "Bit (Kbps, Mbps, Gbps)"
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Boot state"
 msgstr "Önyükleme durumu"
+
+#: src/components/routes/system/power-management.tsx
+msgid "Broadcast address"
+msgstr ""
+
+#: src/components/routes/system/power-management.tsx
+msgid "Broadcast override"
+msgstr ""
 
 #: src/components/routes/settings/general.tsx
 #: src/components/routes/settings/general.tsx
@@ -406,6 +426,10 @@ msgstr "Durdurulabilir"
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Cancel"
 msgstr "İptal"
+
+#: src/components/routes/system/power-management.tsx
+msgid "Cancel shutdown"
+msgstr ""
 
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Capabilities"
@@ -455,6 +479,10 @@ msgstr "Sıfırlama bağlantısı için {email} kontrol edin."
 #: src/components/routes/settings/layout.tsx
 msgid "Check logs for more details."
 msgstr "Daha fazla ayrıntı için günlükleri kontrol edin."
+
+#: src/components/routes/system/power-management.tsx
+msgid "Check system logs for details."
+msgstr ""
 
 #: src/components/routes/settings/heartbeat.tsx
 msgid "Check your monitoring service"
@@ -508,6 +536,7 @@ msgid "Configuration"
 msgstr "Configuration"
 
 #: src/components/routes/system/automatic-updates.tsx
+#: src/components/routes/system/power-management.tsx
 msgid "Configure"
 msgstr "Configure"
 
@@ -523,6 +552,10 @@ msgstr "Uyarı bildirimlerini nasıl alacağınızı yapılandırın."
 #: src/components/login/auth-form.tsx
 msgid "Confirm password"
 msgstr "Şifreyi onayla"
+
+#: src/components/routes/system/power-management.tsx
+msgid "Confirm shutdown of this system?"
+msgstr ""
 
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Conflicts"
@@ -547,15 +580,15 @@ msgstr "Panoya kopyalandı"
 
 #: src/components/add-system.tsx
 #: src/components/routes/settings/tokens-fingerprints.tsx
-msgctxt "Button to copy docker compose file content"
-msgid "Copy docker compose"
-msgstr "Docker compose kopyala"
+#~ msgctxt "Button to copy docker compose file content"
+#~ msgid "Copy docker compose"
+#~ msgstr "Docker compose kopyala"
 
 #: src/components/add-system.tsx
 #: src/components/routes/settings/tokens-fingerprints.tsx
-msgctxt "Button to copy docker run command"
-msgid "Copy docker run"
-msgstr "Docker run kopyala"
+#~ msgctxt "Button to copy docker run command"
+#~ msgid "Copy docker run"
+#~ msgstr "Docker run kopyala"
 
 #: src/components/routes/settings/tokens-fingerprints.tsx
 msgctxt "Environment variables"
@@ -589,8 +622,8 @@ msgid "Copy the installation command for the agent below, or register agents aut
 msgstr "Aşağıdaki agent için kurulum komutunu kopyalayın veya <0>evrensel token</0> ile agentları otomatik olarak kaydedin."
 
 #: src/components/add-system.tsx
-msgid "Copy the<0>docker-compose.yml</0> content for the agent below, or register agents automatically with a <1>universal token</1>."
-msgstr "Aşağıdaki agent için <0>docker-compose.yml</0> içeriğini kopyalayın veya <1>evrensel token</1> ile agentları otomatik olarak kaydedin."
+#~ msgid "Copy the<0>docker-compose.yml</0> content for the agent below, or register agents automatically with a <1>universal token</1>."
+#~ msgstr "Aşağıdaki agent için <0>docker-compose.yml</0> içeriğini kopyalayın veya <1>evrensel token</1> ile agentları otomatik olarak kaydedin."
 
 #: src/components/routes/settings/tokens-fingerprints.tsx
 msgid "Copy YAML"
@@ -663,6 +696,10 @@ msgstr "Mevcut durum"
 #: src/components/routes/system/automatic-updates.tsx
 msgid "Custom repositories"
 msgstr "Custom repositories"
+
+#: src/components/routes/system/power-management.tsx
+msgid "Custom shutdown delay in minutes"
+msgstr ""
 
 #. Power Cycles
 #: src/components/routes/system/smart-table.tsx
@@ -992,9 +1029,9 @@ msgstr "Şifrenizi mi unuttunuz?"
 
 #: src/components/add-system.tsx
 #: src/components/routes/settings/tokens-fingerprints.tsx
-msgctxt "Button to copy install command"
-msgid "FreeBSD command"
-msgstr "FreeBSD komutu"
+#~ msgctxt "Button to copy install command"
+#~ msgid "FreeBSD command"
+#~ msgstr "FreeBSD komutu"
 
 #. Context: Battery state
 #: src/components/routes/system/info-bar.tsx
@@ -1051,9 +1088,9 @@ msgstr "Heartbeat başarıyla gönderildi"
 
 #: src/components/add-system.tsx
 #: src/components/routes/settings/tokens-fingerprints.tsx
-msgctxt "Button to copy install command"
-msgid "Homebrew command"
-msgstr "Homebrew komutu"
+#~ msgctxt "Button to copy install command"
+#~ msgid "Homebrew command"
+#~ msgstr "Homebrew komutu"
 
 #: src/components/add-system.tsx
 msgid "Host / IP"
@@ -1432,6 +1469,7 @@ msgstr "Operation in progress: {0}%"
 
 #: src/components/routes/system/automatic-updates.tsx
 #: src/components/routes/system/automatic-updates.tsx
+#: src/components/routes/system/power-management.tsx
 msgid "Operation queued"
 msgstr "Operation queued"
 
@@ -1579,10 +1617,30 @@ msgctxt "Container ports"
 msgid "Ports"
 msgstr "Portlar"
 
+#: src/components/routes/system/power-management.tsx
+msgid "Power management"
+msgstr ""
+
+#: src/components/routes/system/power-management.tsx
+msgid "Power network"
+msgstr ""
+
 #. Power On Time
 #: src/components/routes/system/smart-table.tsx
 msgid "Power On"
 msgstr "Güç Açık"
+
+#: src/components/routes/system/power-management.tsx
+msgid "Power operation"
+msgstr ""
+
+#: src/components/routes/system/power-management.tsx
+msgid "Power operation failed"
+msgstr ""
+
+#: src/components/routes/system/power-management.tsx
+msgid "Power settings saved"
+msgstr ""
 
 #: src/components/routes/system/charts/gpu-charts.tsx
 #: src/components/routes/system/charts/memory-charts.tsx
@@ -1634,6 +1692,10 @@ msgstr "Read operation status"
 #: src/components/alerts-history-columns.tsx
 msgid "Read update policy"
 msgstr "Read update policy"
+
+#: src/components/routes/system/power-management.tsx
+msgid "Readiness"
+msgstr ""
 
 #: src/components/alerts-history-columns.tsx
 #: src/components/routes/system/automatic-updates.tsx
@@ -1769,6 +1831,10 @@ msgstr "Adresleri enter tuşu veya virgül ile kaydedin. E-posta bildirimlerini 
 msgid "Save and apply"
 msgstr "Save and apply"
 
+#: src/components/routes/system/power-management.tsx
+msgid "Save configuration"
+msgstr ""
+
 #: src/components/routes/settings/general.tsx
 #: src/components/routes/settings/notifications.tsx
 msgid "Save Settings"
@@ -1781,6 +1847,10 @@ msgstr "Veritabanında kaydedilir ve siz devre dışı bırakana kadar süresi d
 #: src/components/routes/settings/quiet-hours.tsx
 msgid "Schedule"
 msgstr "Zamanla"
+
+#: src/components/routes/system/power-management.tsx
+msgid "Schedule custom shutdown"
+msgstr ""
 
 #: src/components/routes/settings/quiet-hours.tsx
 msgid "Schedule quiet hours where notifications will not be sent, such as during maintenance periods."
@@ -1828,8 +1898,12 @@ msgid "Send a single heartbeat ping to verify your endpoint is working."
 msgstr "Uç noktanızın çalıştığını doğrulamak için tek bir heartbeat ping'i gönderin."
 
 #: src/components/routes/settings/heartbeat.tsx
-msgid "Send periodic outbound pings to an external monitoring service so you can monitor Beszel without exposing it to the internet."
-msgstr "Beszel'i internete maruz bırakmadan izleyebilmeniz için harici bir izleme servisine periyodik giden pingler gönderin."
+msgid "Send periodic outbound pings to an external monitoring service so you can monitor Beszel Plus without exposing it to the internet."
+msgstr ""
+
+#: src/components/routes/settings/heartbeat.tsx
+#~ msgid "Send periodic outbound pings to an external monitoring service so you can monitor Beszel without exposing it to the internet."
+#~ msgstr "Beszel'i internete maruz bırakmadan izleyebilmeniz için harici bir izleme servisine periyodik giden pingler gönderin."
 
 #: src/components/routes/settings/heartbeat.tsx
 msgid "Send test heartbeat"
@@ -1861,8 +1935,12 @@ msgid "Set percentage thresholds for meter colors."
 msgstr "Sayaç renkleri için yüzde eşiklerini ayarlayın."
 
 #: src/components/routes/settings/heartbeat.tsx
-msgid "Set the following environment variables on your Beszel hub to enable heartbeat monitoring:"
-msgstr "Heartbeat izlemeyi etkinleştirmek için Beszel hub'ınızda aşağıdaki ortam değişkenlerini ayarlayın:"
+#~ msgid "Set the following environment variables on your Beszel hub to enable heartbeat monitoring:"
+#~ msgstr "Heartbeat izlemeyi etkinleştirmek için Beszel hub'ınızda aşağıdaki ortam değişkenlerini ayarlayın:"
+
+#: src/components/routes/settings/heartbeat.tsx
+msgid "Set the following environment variables on your Beszel Plus Hub to enable heartbeat monitoring:"
+msgstr ""
 
 #: src/components/command-palette.tsx
 #: src/components/command-palette.tsx
@@ -1882,6 +1960,18 @@ msgstr "Ayarlar kaydedildi"
 msgid "Showing the last successful eligibility result."
 msgstr ""
 
+#: src/components/routes/system/power-management.tsx
+msgid "Shut down in {minutes} minutes"
+msgstr ""
+
+#: src/components/routes/system/power-management.tsx
+msgid "Shut down in 15 minutes"
+msgstr ""
+
+#: src/components/routes/system/power-management.tsx
+msgid "Shut down now"
+msgstr ""
+
 #: src/components/login/auth-form.tsx
 msgid "Sign in"
 msgstr "Giriş yap"
@@ -1893,6 +1983,10 @@ msgstr "SMTP ayarları"
 #: src/components/systems-table/systems-table.tsx
 msgid "Sort By"
 msgstr "Sıralama Ölçütü"
+
+#: src/components/routes/system/power-management.tsx
+msgid "stale"
+msgstr ""
 
 #: src/components/routes/system/automatic-updates.tsx
 msgid "Stale data"
@@ -2019,6 +2113,10 @@ msgstr "Test bildirimi gönderildi"
 msgid "The Agent remains unprivileged. A restricted local helper applies validated APT policies."
 msgstr "The Agent remains unprivileged. A restricted local helper applies validated APT policies."
 
+#: src/components/routes/system/power-management.tsx
+msgid "The Hub cannot wake itself. Use another Hub on the same power network."
+msgstr ""
+
 #: src/components/routes/settings/heartbeat.tsx
 msgid "The overall status is <0>ok</0> when all systems are up, <1>warn</1> when alerts are triggered, and <2>error</2> when any system is down."
 msgstr "Tüm sistemler çalışırken genel durum <0>ok</0>, uyarılar tetiklendiğinde <1>uyarı</1> ve herhangi bir sistem çöktüğünde <2>hata</2> şeklindedir."
@@ -2038,6 +2136,14 @@ msgstr "Third-party repository"
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "This action cannot be undone. This will permanently delete all current records for {name} from the database."
 msgstr "Bu işlem geri alınamaz. Bu, veritabanından {name} için tüm mevcut kayıtları kalıcı olarak silecektir."
+
+#: src/components/routes/system/power-management.tsx
+msgid "This Agent is older than v0.2.0 or does not expose power diagnostics."
+msgstr ""
+
+#: src/components/routes/system/power-management.tsx
+msgid "This system hosts Beszel Plus. Shutting it down will make the dashboard unavailable, and this Hub cannot wake itself. Continue?"
+msgstr ""
 
 #: src/components/routes/settings/alerts-history-data-table.tsx
 msgid "This will permanently delete all selected records from the database."
@@ -2199,6 +2305,10 @@ msgstr "Tür"
 #: src/components/routes/system/automatic-updates.tsx
 msgid "Unable to load update policy"
 msgstr "Unable to load update policy"
+
+#: src/components/routes/system/power-management.tsx
+msgid "Unable to save power settings"
+msgstr ""
 
 #: src/lib/alerts.ts
 msgid "Unattended upgrades package missing"
@@ -2400,6 +2510,14 @@ msgstr "Görünür Alanlar"
 msgid "Waiting for enough records to display"
 msgstr "Görüntülemek için yeterli kayıt bekleniyor"
 
+#: src/components/routes/system/power-management.tsx
+msgid "Wake system"
+msgstr ""
+
+#: src/components/routes/system/power-management.tsx
+msgid "Wake-on-LAN MAC address"
+msgstr ""
+
 #: src/components/routes/settings/general.tsx
 msgid "Want to help improve our translations? Check <0>Crowdin</0> for details."
 msgstr "Çevirilerimizi daha iyi hale getirmemize yardımcı olmak ister misiniz? Daha fazla bilgi için <0>Crowdin</0> inceleyin."
@@ -2430,9 +2548,9 @@ msgstr "POST kullanırken, her heartbeat sistem durumu özeti, çöken sistemler
 
 #: src/components/add-system.tsx
 #: src/components/routes/settings/tokens-fingerprints.tsx
-msgctxt "Button to copy install command"
-msgid "Windows command"
-msgstr "Windows komutu"
+#~ msgctxt "Button to copy install command"
+#~ msgid "Windows command"
+#~ msgstr "Windows komutu"
 
 #. Disk write
 #: src/components/routes/system/charts/disk-charts.tsx

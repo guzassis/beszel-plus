@@ -1,5 +1,5 @@
 [Unit]
-Description=Beszel maintenance helper socket
+Description=Beszel Plus maintenance helper socket
 
 [Socket]
 ListenStream=/run/beszel-maintenance.sock

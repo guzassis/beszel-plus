@@ -165,8 +165,12 @@ msgid "After"
 msgstr "之後"
 
 #: src/components/routes/settings/heartbeat.tsx
-msgid "After setting the environment variables, restart your Beszel hub for changes to take effect."
-msgstr "設定環境變數後，請重新啟動 Beszel Hub 以使變更生效。"
+#~ msgid "After setting the environment variables, restart your Beszel hub for changes to take effect."
+#~ msgstr "設定環境變數後，請重新啟動 Beszel Hub 以使變更生效。"
+
+#: src/components/routes/settings/heartbeat.tsx
+msgid "After setting the environment variables, restart your Beszel Plus Hub for changes to take effect."
+msgstr ""
 
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Agent"
@@ -360,12 +364,20 @@ msgid "Below {0}{1} in last {2, plural, one {# minute} other {# minutes}}"
 msgstr "在過去的{2, plural, one {# 分鐘} other {# 分鐘}}中低於{0}{1}"
 
 #: src/components/login/auth-form.tsx
-msgid "Beszel supports OpenID Connect and many OAuth2 authentication providers."
-msgstr "Beszel 支援 OpenID Connect 和許多 OAuth2 認證提供者。"
+msgid "Beszel Plus supports OpenID Connect and many OAuth2 authentication providers."
+msgstr ""
 
 #: src/components/routes/settings/notifications.tsx
-msgid "Beszel uses <0>Shoutrrr</0> to integrate with popular notification services."
-msgstr "Beszel 以 <0>Shoutrrr</0> 整合常用的通知服務。"
+msgid "Beszel Plus uses <0>Shoutrrr</0> to integrate with popular notification services."
+msgstr ""
+
+#: src/components/login/auth-form.tsx
+#~ msgid "Beszel supports OpenID Connect and many OAuth2 authentication providers."
+#~ msgstr "Beszel 支援 OpenID Connect 和許多 OAuth2 認證提供者。"
+
+#: src/components/routes/settings/notifications.tsx
+#~ msgid "Beszel uses <0>Shoutrrr</0> to integrate with popular notification services."
+#~ msgstr "Beszel 以 <0>Shoutrrr</0> 整合常用的通知服務。"
 
 #: src/components/add-system.tsx
 msgid "Binary"
@@ -379,6 +391,14 @@ msgstr "位元 (Kbps, Mbps, Gbps)"
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Boot state"
 msgstr "啟動狀態"
+
+#: src/components/routes/system/power-management.tsx
+msgid "Broadcast address"
+msgstr ""
+
+#: src/components/routes/system/power-management.tsx
+msgid "Broadcast override"
+msgstr ""
 
 #: src/components/routes/settings/general.tsx
 #: src/components/routes/settings/general.tsx
@@ -406,6 +426,10 @@ msgstr "可停止"
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Cancel"
 msgstr "取消"
+
+#: src/components/routes/system/power-management.tsx
+msgid "Cancel shutdown"
+msgstr ""
 
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Capabilities"
@@ -455,6 +479,10 @@ msgstr "檢查 {email} 以取得重設連結。"
 #: src/components/routes/settings/layout.tsx
 msgid "Check logs for more details."
 msgstr "檢查系統記錄以取得更多資訊。"
+
+#: src/components/routes/system/power-management.tsx
+msgid "Check system logs for details."
+msgstr ""
 
 #: src/components/routes/settings/heartbeat.tsx
 msgid "Check your monitoring service"
@@ -508,6 +536,7 @@ msgid "Configuration"
 msgstr "Configuration"
 
 #: src/components/routes/system/automatic-updates.tsx
+#: src/components/routes/system/power-management.tsx
 msgid "Configure"
 msgstr "Configure"
 
@@ -523,6 +552,10 @@ msgstr "設定您要如何接收警報通知"
 #: src/components/login/auth-form.tsx
 msgid "Confirm password"
 msgstr "確認密碼"
+
+#: src/components/routes/system/power-management.tsx
+msgid "Confirm shutdown of this system?"
+msgstr ""
 
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Conflicts"
@@ -547,15 +580,15 @@ msgstr "已複製到剪貼簿"
 
 #: src/components/add-system.tsx
 #: src/components/routes/settings/tokens-fingerprints.tsx
-msgctxt "Button to copy docker compose file content"
-msgid "Copy docker compose"
-msgstr "複製 docker compose"
+#~ msgctxt "Button to copy docker compose file content"
+#~ msgid "Copy docker compose"
+#~ msgstr "複製 docker compose"
 
 #: src/components/add-system.tsx
 #: src/components/routes/settings/tokens-fingerprints.tsx
-msgctxt "Button to copy docker run command"
-msgid "Copy docker run"
-msgstr "複製 docker run"
+#~ msgctxt "Button to copy docker run command"
+#~ msgid "Copy docker run"
+#~ msgstr "複製 docker run"
 
 #: src/components/routes/settings/tokens-fingerprints.tsx
 msgctxt "Environment variables"
@@ -589,8 +622,8 @@ msgid "Copy the installation command for the agent below, or register agents aut
 msgstr "以下方指令安裝 Agent ，或使用<0>通用 Token</0>進行自動註冊。"
 
 #: src/components/add-system.tsx
-msgid "Copy the<0>docker-compose.yml</0> content for the agent below, or register agents automatically with a <1>universal token</1>."
-msgstr "以下方<0>docker-compose.yml</0>執行 Agent，或使用<1>通用 Token</1>進行自動註冊。"
+#~ msgid "Copy the<0>docker-compose.yml</0> content for the agent below, or register agents automatically with a <1>universal token</1>."
+#~ msgstr "以下方<0>docker-compose.yml</0>執行 Agent，或使用<1>通用 Token</1>進行自動註冊。"
 
 #: src/components/routes/settings/tokens-fingerprints.tsx
 msgid "Copy YAML"
@@ -663,6 +696,10 @@ msgstr "目前狀態"
 #: src/components/routes/system/automatic-updates.tsx
 msgid "Custom repositories"
 msgstr "Custom repositories"
+
+#: src/components/routes/system/power-management.tsx
+msgid "Custom shutdown delay in minutes"
+msgstr ""
 
 #. Power Cycles
 #: src/components/routes/system/smart-table.tsx
@@ -992,9 +1029,9 @@ msgstr "忘記密碼？"
 
 #: src/components/add-system.tsx
 #: src/components/routes/settings/tokens-fingerprints.tsx
-msgctxt "Button to copy install command"
-msgid "FreeBSD command"
-msgstr "FreeBSD 指令"
+#~ msgctxt "Button to copy install command"
+#~ msgid "FreeBSD command"
+#~ msgstr "FreeBSD 指令"
 
 #. Context: Battery state
 #: src/components/routes/system/info-bar.tsx
@@ -1051,9 +1088,9 @@ msgstr "Heartbeat 發送成功"
 
 #: src/components/add-system.tsx
 #: src/components/routes/settings/tokens-fingerprints.tsx
-msgctxt "Button to copy install command"
-msgid "Homebrew command"
-msgstr "Homebrew 指令"
+#~ msgctxt "Button to copy install command"
+#~ msgid "Homebrew command"
+#~ msgstr "Homebrew 指令"
 
 #: src/components/add-system.tsx
 msgid "Host / IP"
@@ -1432,6 +1469,7 @@ msgstr "Operation in progress: {0}%"
 
 #: src/components/routes/system/automatic-updates.tsx
 #: src/components/routes/system/automatic-updates.tsx
+#: src/components/routes/system/power-management.tsx
 msgid "Operation queued"
 msgstr "Operation queued"
 
@@ -1579,10 +1617,30 @@ msgctxt "Container ports"
 msgid "Ports"
 msgstr "Port 映射"
 
+#: src/components/routes/system/power-management.tsx
+msgid "Power management"
+msgstr ""
+
+#: src/components/routes/system/power-management.tsx
+msgid "Power network"
+msgstr ""
+
 #. Power On Time
 #: src/components/routes/system/smart-table.tsx
 msgid "Power On"
 msgstr "電源開啟"
+
+#: src/components/routes/system/power-management.tsx
+msgid "Power operation"
+msgstr ""
+
+#: src/components/routes/system/power-management.tsx
+msgid "Power operation failed"
+msgstr ""
+
+#: src/components/routes/system/power-management.tsx
+msgid "Power settings saved"
+msgstr ""
 
 #: src/components/routes/system/charts/gpu-charts.tsx
 #: src/components/routes/system/charts/memory-charts.tsx
@@ -1634,6 +1692,10 @@ msgstr "Read operation status"
 #: src/components/alerts-history-columns.tsx
 msgid "Read update policy"
 msgstr "Read update policy"
+
+#: src/components/routes/system/power-management.tsx
+msgid "Readiness"
+msgstr ""
 
 #: src/components/alerts-history-columns.tsx
 #: src/components/routes/system/automatic-updates.tsx
@@ -1769,6 +1831,10 @@ msgstr "使用 Enter 鍵或逗號儲存地址。留空以停用電子郵件通�
 msgid "Save and apply"
 msgstr "Save and apply"
 
+#: src/components/routes/system/power-management.tsx
+msgid "Save configuration"
+msgstr ""
+
 #: src/components/routes/settings/general.tsx
 #: src/components/routes/settings/notifications.tsx
 msgid "Save Settings"
@@ -1781,6 +1847,10 @@ msgstr "儲存在資料庫中，在您停用之前不會過期。"
 #: src/components/routes/settings/quiet-hours.tsx
 msgid "Schedule"
 msgstr "排程"
+
+#: src/components/routes/system/power-management.tsx
+msgid "Schedule custom shutdown"
+msgstr ""
 
 #: src/components/routes/settings/quiet-hours.tsx
 msgid "Schedule quiet hours where notifications will not be sent, such as during maintenance periods."
@@ -1828,8 +1898,12 @@ msgid "Send a single heartbeat ping to verify your endpoint is working."
 msgstr "發送單次 Heartbeat Ping 以驗證您的 Endpoint 是否運作正常。"
 
 #: src/components/routes/settings/heartbeat.tsx
-msgid "Send periodic outbound pings to an external monitoring service so you can monitor Beszel without exposing it to the internet."
-msgstr "定期發送 Outbound Ping 至外部監控服務，讓您無需將 Beszel 暴露於網際網路即可進行監控。"
+msgid "Send periodic outbound pings to an external monitoring service so you can monitor Beszel Plus without exposing it to the internet."
+msgstr ""
+
+#: src/components/routes/settings/heartbeat.tsx
+#~ msgid "Send periodic outbound pings to an external monitoring service so you can monitor Beszel without exposing it to the internet."
+#~ msgstr "定期發送 Outbound Ping 至外部監控服務，讓您無需將 Beszel 暴露於網際網路即可進行監控。"
 
 #: src/components/routes/settings/heartbeat.tsx
 msgid "Send test heartbeat"
@@ -1861,8 +1935,12 @@ msgid "Set percentage thresholds for meter colors."
 msgstr "設定儀表顏色的百分比閾值。"
 
 #: src/components/routes/settings/heartbeat.tsx
-msgid "Set the following environment variables on your Beszel hub to enable heartbeat monitoring:"
-msgstr "設定以下環境變數至 Beszel Hub 以啟用 Heartbeat 監控："
+#~ msgid "Set the following environment variables on your Beszel hub to enable heartbeat monitoring:"
+#~ msgstr "設定以下環境變數至 Beszel Hub 以啟用 Heartbeat 監控："
+
+#: src/components/routes/settings/heartbeat.tsx
+msgid "Set the following environment variables on your Beszel Plus Hub to enable heartbeat monitoring:"
+msgstr ""
 
 #: src/components/command-palette.tsx
 #: src/components/command-palette.tsx
@@ -1882,6 +1960,18 @@ msgstr "已儲存設定"
 msgid "Showing the last successful eligibility result."
 msgstr ""
 
+#: src/components/routes/system/power-management.tsx
+msgid "Shut down in {minutes} minutes"
+msgstr ""
+
+#: src/components/routes/system/power-management.tsx
+msgid "Shut down in 15 minutes"
+msgstr ""
+
+#: src/components/routes/system/power-management.tsx
+msgid "Shut down now"
+msgstr ""
+
 #: src/components/login/auth-form.tsx
 msgid "Sign in"
 msgstr "登入"
@@ -1893,6 +1983,10 @@ msgstr "SMTP 設定"
 #: src/components/systems-table/systems-table.tsx
 msgid "Sort By"
 msgstr "排序"
+
+#: src/components/routes/system/power-management.tsx
+msgid "stale"
+msgstr ""
 
 #: src/components/routes/system/automatic-updates.tsx
 msgid "Stale data"
@@ -2019,6 +2113,10 @@ msgstr "已發送測試通知"
 msgid "The Agent remains unprivileged. A restricted local helper applies validated APT policies."
 msgstr "The Agent remains unprivileged. A restricted local helper applies validated APT policies."
 
+#: src/components/routes/system/power-management.tsx
+msgid "The Hub cannot wake itself. Use another Hub on the same power network."
+msgstr ""
+
 #: src/components/routes/settings/heartbeat.tsx
 msgid "The overall status is <0>ok</0> when all systems are up, <1>warn</1> when alerts are triggered, and <2>error</2> when any system is down."
 msgstr "當所有系統都正常運行時，整體狀態為 <0>正常</0>；當觸發警報時為 <1>警告</1>；當任何系統故障時為 <2>錯誤</2>。"
@@ -2038,6 +2136,14 @@ msgstr "Third-party repository"
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "This action cannot be undone. This will permanently delete all current records for {name} from the database."
 msgstr "此操作無法復原。這將永久刪除資料庫中{name}的所有當前記錄。"
+
+#: src/components/routes/system/power-management.tsx
+msgid "This Agent is older than v0.2.0 or does not expose power diagnostics."
+msgstr ""
+
+#: src/components/routes/system/power-management.tsx
+msgid "This system hosts Beszel Plus. Shutting it down will make the dashboard unavailable, and this Hub cannot wake itself. Continue?"
+msgstr ""
 
 #: src/components/routes/settings/alerts-history-data-table.tsx
 msgid "This will permanently delete all selected records from the database."
@@ -2199,6 +2305,10 @@ msgstr "類型"
 #: src/components/routes/system/automatic-updates.tsx
 msgid "Unable to load update policy"
 msgstr "Unable to load update policy"
+
+#: src/components/routes/system/power-management.tsx
+msgid "Unable to save power settings"
+msgstr ""
 
 #: src/lib/alerts.ts
 msgid "Unattended upgrades package missing"
@@ -2400,6 +2510,14 @@ msgstr "顯示欄位"
 msgid "Waiting for enough records to display"
 msgstr "等待足夠的記錄以顯示"
 
+#: src/components/routes/system/power-management.tsx
+msgid "Wake system"
+msgstr ""
+
+#: src/components/routes/system/power-management.tsx
+msgid "Wake-on-LAN MAC address"
+msgstr ""
+
 #: src/components/routes/settings/general.tsx
 msgid "Want to help improve our translations? Check <0>Crowdin</0> for details."
 msgstr "想幫助我們改善翻譯嗎？查看<0>Crowdin</0>以取得更多詳細資訊。"
@@ -2430,9 +2548,9 @@ msgstr "使用 POST 時，每個 Heartbeat 都會包含一個 JSON Payload，內
 
 #: src/components/add-system.tsx
 #: src/components/routes/settings/tokens-fingerprints.tsx
-msgctxt "Button to copy install command"
-msgid "Windows command"
-msgstr "Windows 指令"
+#~ msgctxt "Button to copy install command"
+#~ msgid "Windows command"
+#~ msgstr "Windows 指令"
 
 #. Disk write
 #: src/components/routes/system/charts/disk-charts.tsx

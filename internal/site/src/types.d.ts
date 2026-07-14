@@ -7,6 +7,9 @@ declare global {
 		BASE_PATH: string
 		HUB_VERSION: string
 		HUB_URL: string
+		PRODUCT_NAME: string
+		REPOSITORY_URL: string
+		DOCUMENTATION_URL: string
 		OAUTH_DISABLE_POPUP: boolean
 	}
 }
@@ -31,6 +34,13 @@ export interface SystemRecord extends RecordModel {
 	info: SystemInfo
 	v: string
 	updated: string
+	power_network_id?: string
+	wol_interface?: string
+	wol_mac?: string
+	wol_broadcast?: string
+	wol_port?: number
+	wol_enabled?: boolean
+	power_management_enabled?: boolean
 }
 
 export interface SystemInfo {
@@ -80,6 +90,33 @@ export interface SystemInfo {
 	sv?: [number, number]
 	/** current unattended-upgrades monitoring snapshot */
 	upd?: UpdateStatus
+	/** latest Agent power readiness diagnostics */
+	power?: PowerDiagnostics
+}
+
+export interface PowerInterfaceDiagnostic {
+	interface: string
+	type: string
+	mac?: string
+	ip?: string
+	prefix?: number
+	broadcast?: string
+	driver?: string
+	operstate?: string
+	carrier: boolean
+	speed?: string
+	duplex?: string
+	physical: boolean
+	wol_supported: boolean
+	wol_enabled: boolean
+}
+
+export interface PowerDiagnostics {
+	enabled: boolean
+	state: string
+	reason?: string
+	interfaces?: PowerInterfaceDiagnostic[]
+	collected_at: string
 }
 
 export type UpdateOverallState =

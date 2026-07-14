@@ -165,8 +165,12 @@ msgid "After"
 msgstr "이후"
 
 #: src/components/routes/settings/heartbeat.tsx
-msgid "After setting the environment variables, restart your Beszel hub for changes to take effect."
-msgstr "환경 변수를 설정한 후, 변경 사항을 적용하려면 Beszel 허브를 재시작하세요."
+#~ msgid "After setting the environment variables, restart your Beszel hub for changes to take effect."
+#~ msgstr "환경 변수를 설정한 후, 변경 사항을 적용하려면 Beszel 허브를 재시작하세요."
+
+#: src/components/routes/settings/heartbeat.tsx
+msgid "After setting the environment variables, restart your Beszel Plus Hub for changes to take effect."
+msgstr ""
 
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Agent"
@@ -360,12 +364,20 @@ msgid "Below {0}{1} in last {2, plural, one {# minute} other {# minutes}}"
 msgstr "마지막 {2, plural, one {# 분} other {# 분}} 동안 {0}{1} 미만"
 
 #: src/components/login/auth-form.tsx
-msgid "Beszel supports OpenID Connect and many OAuth2 authentication providers."
-msgstr "Beszel은 OpenID Connect 및 많은 OAuth2 인증 제공자를 지원합니다."
+msgid "Beszel Plus supports OpenID Connect and many OAuth2 authentication providers."
+msgstr ""
 
 #: src/components/routes/settings/notifications.tsx
-msgid "Beszel uses <0>Shoutrrr</0> to integrate with popular notification services."
-msgstr "Beszel은 여러 인기 있는 알림 서비스와 연동하기 위해 <0>Shoutrrr</0>을 이용합니다."
+msgid "Beszel Plus uses <0>Shoutrrr</0> to integrate with popular notification services."
+msgstr ""
+
+#: src/components/login/auth-form.tsx
+#~ msgid "Beszel supports OpenID Connect and many OAuth2 authentication providers."
+#~ msgstr "Beszel은 OpenID Connect 및 많은 OAuth2 인증 제공자를 지원합니다."
+
+#: src/components/routes/settings/notifications.tsx
+#~ msgid "Beszel uses <0>Shoutrrr</0> to integrate with popular notification services."
+#~ msgstr "Beszel은 여러 인기 있는 알림 서비스와 연동하기 위해 <0>Shoutrrr</0>을 이용합니다."
 
 #: src/components/add-system.tsx
 msgid "Binary"
@@ -379,6 +391,14 @@ msgstr "비트 (Kbps, Mbps, Gbps)"
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Boot state"
 msgstr "부팅 상태"
+
+#: src/components/routes/system/power-management.tsx
+msgid "Broadcast address"
+msgstr ""
+
+#: src/components/routes/system/power-management.tsx
+msgid "Broadcast override"
+msgstr ""
 
 #: src/components/routes/settings/general.tsx
 #: src/components/routes/settings/general.tsx
@@ -406,6 +426,10 @@ msgstr "중지 가능"
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Cancel"
 msgstr "취소"
+
+#: src/components/routes/system/power-management.tsx
+msgid "Cancel shutdown"
+msgstr ""
 
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Capabilities"
@@ -455,6 +479,10 @@ msgstr "{email}에서 재설정 링크를 확인하세요."
 #: src/components/routes/settings/layout.tsx
 msgid "Check logs for more details."
 msgstr "자세한 내용은 로그를 확인하세요."
+
+#: src/components/routes/system/power-management.tsx
+msgid "Check system logs for details."
+msgstr ""
 
 #: src/components/routes/settings/heartbeat.tsx
 msgid "Check your monitoring service"
@@ -508,6 +536,7 @@ msgid "Configuration"
 msgstr "Configuration"
 
 #: src/components/routes/system/automatic-updates.tsx
+#: src/components/routes/system/power-management.tsx
 msgid "Configure"
 msgstr "Configure"
 
@@ -523,6 +552,10 @@ msgstr "알림을 수신할 방법을 설정하세요."
 #: src/components/login/auth-form.tsx
 msgid "Confirm password"
 msgstr "비밀번호 확인"
+
+#: src/components/routes/system/power-management.tsx
+msgid "Confirm shutdown of this system?"
+msgstr ""
 
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Conflicts"
@@ -547,15 +580,15 @@ msgstr "클립보드에 복사됨"
 
 #: src/components/add-system.tsx
 #: src/components/routes/settings/tokens-fingerprints.tsx
-msgctxt "Button to copy docker compose file content"
-msgid "Copy docker compose"
-msgstr "docker compose 내용 복사"
+#~ msgctxt "Button to copy docker compose file content"
+#~ msgid "Copy docker compose"
+#~ msgstr "docker compose 내용 복사"
 
 #: src/components/add-system.tsx
 #: src/components/routes/settings/tokens-fingerprints.tsx
-msgctxt "Button to copy docker run command"
-msgid "Copy docker run"
-msgstr "docker run 명령어 복사"
+#~ msgctxt "Button to copy docker run command"
+#~ msgid "Copy docker run"
+#~ msgstr "docker run 명령어 복사"
 
 #: src/components/routes/settings/tokens-fingerprints.tsx
 msgctxt "Environment variables"
@@ -589,8 +622,8 @@ msgid "Copy the installation command for the agent below, or register agents aut
 msgstr "아래 에이전트의 설치 명령을 복사하거나 <0>범용 토큰</0>으로 에이전트를 자동으로 등록하세요."
 
 #: src/components/add-system.tsx
-msgid "Copy the<0>docker-compose.yml</0> content for the agent below, or register agents automatically with a <1>universal token</1>."
-msgstr "아래 에이전트의 <0>docker-compose.yml</0> 내용을 복사하거나 <1>범용 토큰</1>으로 에이전트를 자동으로 등록하세요."
+#~ msgid "Copy the<0>docker-compose.yml</0> content for the agent below, or register agents automatically with a <1>universal token</1>."
+#~ msgstr "아래 에이전트의 <0>docker-compose.yml</0> 내용을 복사하거나 <1>범용 토큰</1>으로 에이전트를 자동으로 등록하세요."
 
 #: src/components/routes/settings/tokens-fingerprints.tsx
 msgid "Copy YAML"
@@ -663,6 +696,10 @@ msgstr "현재 상태"
 #: src/components/routes/system/automatic-updates.tsx
 msgid "Custom repositories"
 msgstr "Custom repositories"
+
+#: src/components/routes/system/power-management.tsx
+msgid "Custom shutdown delay in minutes"
+msgstr ""
 
 #. Power Cycles
 #: src/components/routes/system/smart-table.tsx
@@ -992,9 +1029,9 @@ msgstr "비밀번호를 잊으셨나요?"
 
 #: src/components/add-system.tsx
 #: src/components/routes/settings/tokens-fingerprints.tsx
-msgctxt "Button to copy install command"
-msgid "FreeBSD command"
-msgstr "FreeBSD 명령어"
+#~ msgctxt "Button to copy install command"
+#~ msgid "FreeBSD command"
+#~ msgstr "FreeBSD 명령어"
 
 #. Context: Battery state
 #: src/components/routes/system/info-bar.tsx
@@ -1051,9 +1088,9 @@ msgstr "하트비트 전송 성공"
 
 #: src/components/add-system.tsx
 #: src/components/routes/settings/tokens-fingerprints.tsx
-msgctxt "Button to copy install command"
-msgid "Homebrew command"
-msgstr "Homebrew 명령어"
+#~ msgctxt "Button to copy install command"
+#~ msgid "Homebrew command"
+#~ msgstr "Homebrew 명령어"
 
 #: src/components/add-system.tsx
 msgid "Host / IP"
@@ -1432,6 +1469,7 @@ msgstr "Operation in progress: {0}%"
 
 #: src/components/routes/system/automatic-updates.tsx
 #: src/components/routes/system/automatic-updates.tsx
+#: src/components/routes/system/power-management.tsx
 msgid "Operation queued"
 msgstr "Operation queued"
 
@@ -1579,10 +1617,30 @@ msgctxt "Container ports"
 msgid "Ports"
 msgstr "포트"
 
+#: src/components/routes/system/power-management.tsx
+msgid "Power management"
+msgstr ""
+
+#: src/components/routes/system/power-management.tsx
+msgid "Power network"
+msgstr ""
+
 #. Power On Time
 #: src/components/routes/system/smart-table.tsx
 msgid "Power On"
 msgstr "전원 켜기"
+
+#: src/components/routes/system/power-management.tsx
+msgid "Power operation"
+msgstr ""
+
+#: src/components/routes/system/power-management.tsx
+msgid "Power operation failed"
+msgstr ""
+
+#: src/components/routes/system/power-management.tsx
+msgid "Power settings saved"
+msgstr ""
 
 #: src/components/routes/system/charts/gpu-charts.tsx
 #: src/components/routes/system/charts/memory-charts.tsx
@@ -1634,6 +1692,10 @@ msgstr "Read operation status"
 #: src/components/alerts-history-columns.tsx
 msgid "Read update policy"
 msgstr "Read update policy"
+
+#: src/components/routes/system/power-management.tsx
+msgid "Readiness"
+msgstr ""
 
 #: src/components/alerts-history-columns.tsx
 #: src/components/routes/system/automatic-updates.tsx
@@ -1769,6 +1831,10 @@ msgstr "Enter 키 또는 쉼표를 사용하여 주소를 저장하세요. 이�
 msgid "Save and apply"
 msgstr "Save and apply"
 
+#: src/components/routes/system/power-management.tsx
+msgid "Save configuration"
+msgstr ""
+
 #: src/components/routes/settings/general.tsx
 #: src/components/routes/settings/notifications.tsx
 msgid "Save Settings"
@@ -1781,6 +1847,10 @@ msgstr "데이터베이스에 저장되며 비활성화할 때까지 만료되�
 #: src/components/routes/settings/quiet-hours.tsx
 msgid "Schedule"
 msgstr "일정"
+
+#: src/components/routes/system/power-management.tsx
+msgid "Schedule custom shutdown"
+msgstr ""
 
 #: src/components/routes/settings/quiet-hours.tsx
 msgid "Schedule quiet hours where notifications will not be sent, such as during maintenance periods."
@@ -1828,8 +1898,12 @@ msgid "Send a single heartbeat ping to verify your endpoint is working."
 msgstr "엔드포인트가 작동하는지 확인하기 위해 단일 하트비트 핑을 보냅니다."
 
 #: src/components/routes/settings/heartbeat.tsx
-msgid "Send periodic outbound pings to an external monitoring service so you can monitor Beszel without exposing it to the internet."
-msgstr "외부 모니터링 서비스에 주기적으로 아웃바운드 핑을 보내 인터넷에 노출하지 않고도 Beszel을 모니터링할 수 있습니다."
+msgid "Send periodic outbound pings to an external monitoring service so you can monitor Beszel Plus without exposing it to the internet."
+msgstr ""
+
+#: src/components/routes/settings/heartbeat.tsx
+#~ msgid "Send periodic outbound pings to an external monitoring service so you can monitor Beszel without exposing it to the internet."
+#~ msgstr "외부 모니터링 서비스에 주기적으로 아웃바운드 핑을 보내 인터넷에 노출하지 않고도 Beszel을 모니터링할 수 있습니다."
 
 #: src/components/routes/settings/heartbeat.tsx
 msgid "Send test heartbeat"
@@ -1861,8 +1935,12 @@ msgid "Set percentage thresholds for meter colors."
 msgstr "그래프 미터 색상의 백분율 임계값을 설정합니다."
 
 #: src/components/routes/settings/heartbeat.tsx
-msgid "Set the following environment variables on your Beszel hub to enable heartbeat monitoring:"
-msgstr "하트비트 모니터링을 활성화하려면 Beszel 허브에 다음 환경 변수를 설정하세요:"
+#~ msgid "Set the following environment variables on your Beszel hub to enable heartbeat monitoring:"
+#~ msgstr "하트비트 모니터링을 활성화하려면 Beszel 허브에 다음 환경 변수를 설정하세요:"
+
+#: src/components/routes/settings/heartbeat.tsx
+msgid "Set the following environment variables on your Beszel Plus Hub to enable heartbeat monitoring:"
+msgstr ""
 
 #: src/components/command-palette.tsx
 #: src/components/command-palette.tsx
@@ -1882,6 +1960,18 @@ msgstr "설정이 저장되었습니다."
 msgid "Showing the last successful eligibility result."
 msgstr ""
 
+#: src/components/routes/system/power-management.tsx
+msgid "Shut down in {minutes} minutes"
+msgstr ""
+
+#: src/components/routes/system/power-management.tsx
+msgid "Shut down in 15 minutes"
+msgstr ""
+
+#: src/components/routes/system/power-management.tsx
+msgid "Shut down now"
+msgstr ""
+
 #: src/components/login/auth-form.tsx
 msgid "Sign in"
 msgstr "로그인"
@@ -1893,6 +1983,10 @@ msgstr "SMTP 설정"
 #: src/components/systems-table/systems-table.tsx
 msgid "Sort By"
 msgstr "정렬 기준"
+
+#: src/components/routes/system/power-management.tsx
+msgid "stale"
+msgstr ""
 
 #: src/components/routes/system/automatic-updates.tsx
 msgid "Stale data"
@@ -2019,6 +2113,10 @@ msgstr "테스트 알림이 전송되었습니다."
 msgid "The Agent remains unprivileged. A restricted local helper applies validated APT policies."
 msgstr "The Agent remains unprivileged. A restricted local helper applies validated APT policies."
 
+#: src/components/routes/system/power-management.tsx
+msgid "The Hub cannot wake itself. Use another Hub on the same power network."
+msgstr ""
+
 #: src/components/routes/settings/heartbeat.tsx
 msgid "The overall status is <0>ok</0> when all systems are up, <1>warn</1> when alerts are triggered, and <2>error</2> when any system is down."
 msgstr "모든 시스템이 정상이면 <0>ok</0>, 알림이 트리거되면 <1>경고</1>, 시스템이 다운되면 <2>오류</2> 상태가 됩니다."
@@ -2038,6 +2136,14 @@ msgstr "Third-party repository"
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "This action cannot be undone. This will permanently delete all current records for {name} from the database."
 msgstr "이 작업은 되돌릴 수 없습니다. 데이터베이스에서 {name}에 대한 모든 현재 기록이 영구적으로 삭제됩니다."
+
+#: src/components/routes/system/power-management.tsx
+msgid "This Agent is older than v0.2.0 or does not expose power diagnostics."
+msgstr ""
+
+#: src/components/routes/system/power-management.tsx
+msgid "This system hosts Beszel Plus. Shutting it down will make the dashboard unavailable, and this Hub cannot wake itself. Continue?"
+msgstr ""
 
 #: src/components/routes/settings/alerts-history-data-table.tsx
 msgid "This will permanently delete all selected records from the database."
@@ -2199,6 +2305,10 @@ msgstr "유형"
 #: src/components/routes/system/automatic-updates.tsx
 msgid "Unable to load update policy"
 msgstr "Unable to load update policy"
+
+#: src/components/routes/system/power-management.tsx
+msgid "Unable to save power settings"
+msgstr ""
 
 #: src/lib/alerts.ts
 msgid "Unattended upgrades package missing"
@@ -2400,6 +2510,14 @@ msgstr "표시할 열"
 msgid "Waiting for enough records to display"
 msgstr "표시할 충분한 기록을 기다리는 중"
 
+#: src/components/routes/system/power-management.tsx
+msgid "Wake system"
+msgstr ""
+
+#: src/components/routes/system/power-management.tsx
+msgid "Wake-on-LAN MAC address"
+msgstr ""
+
 #: src/components/routes/settings/general.tsx
 msgid "Want to help improve our translations? Check <0>Crowdin</0> for details."
 msgstr "번역을 개선하는데 도움을 주시겠습니까? 자세한 내용은 <0>Crowdin</0>을 확인해 주세요."
@@ -2430,9 +2548,9 @@ msgstr "POST를 사용할 때 각 하트비트에는 시스템 상태 요약, �
 
 #: src/components/add-system.tsx
 #: src/components/routes/settings/tokens-fingerprints.tsx
-msgctxt "Button to copy install command"
-msgid "Windows command"
-msgstr "Windows 명령어"
+#~ msgctxt "Button to copy install command"
+#~ msgid "Windows command"
+#~ msgstr "Windows 명령어"
 
 #. Disk write
 #: src/components/routes/system/charts/disk-charts.tsx

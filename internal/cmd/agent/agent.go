@@ -8,10 +8,10 @@ import (
 	"strings"
 	"time"
 
-	"github.com/henrygd/beszel"
 	"github.com/henrygd/beszel/agent"
 	"github.com/henrygd/beszel/agent/health"
 	"github.com/henrygd/beszel/agent/utils"
+	"github.com/henrygd/beszel/internal/buildinfo"
 	maintenanceentity "github.com/henrygd/beszel/internal/entities/maintenance"
 	"github.com/spf13/pflag"
 	"golang.org/x/crypto/ssh"
@@ -61,6 +61,7 @@ func (opts *cmdOptions) parse() bool {
 	pflag.StringVarP(&opts.hubURL, "url", "u", "", "URL of the Beszel hub")
 	pflag.StringVarP(&opts.token, "token", "t", "", "Token to use for authentication")
 	chinaMirrors := pflag.BoolP("china-mirrors", "c", false, "Use mirror for update (gh.beszel.dev) instead of GitHub")
+	powerManagement := pflag.Bool("power-management", false, "Enable power readiness diagnostics")
 	version := pflag.BoolP("version", "v", false, "Show version information")
 	help := pflag.BoolP("help", "h", false, "Show this help message")
 
@@ -96,11 +97,14 @@ func (opts *cmdOptions) parse() bool {
 
 	// Parse all arguments with pflag
 	pflag.Parse()
+	if *powerManagement {
+		_ = os.Setenv("POWER_MANAGEMENT", "true")
+	}
 
 	// Must run after pflag.Parse()
 	switch {
 	case *version:
-		fmt.Printf("%s-agent %s\nBeszel Plus v%s\nmaintenance protocol %d\n", beszel.AppName, beszel.Version, beszel.PlusVersion, maintenanceentity.ProtocolVersion)
+		fmt.Printf("%s\nmaintenance protocol %d\n", buildinfo.VersionLine("Agent"), maintenanceentity.ProtocolVersion)
 		return true
 	case *help || subcommand == "help":
 		pflag.Usage()

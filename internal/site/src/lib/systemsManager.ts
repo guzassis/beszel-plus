@@ -14,7 +14,8 @@ import type { SystemRecord } from "@/types"
 import { SystemStatus } from "./enums"
 
 const COLLECTION = pb.collection<SystemRecord>("systems")
-const FIELDS_DEFAULT = "id,name,host,port,info,status"
+const FIELDS_DEFAULT =
+	"id,name,host,port,info,status,power_network_id,wol_interface,wol_mac,wol_broadcast,wol_port,wol_enabled,power_management_enabled"
 
 /** Maximum system name length for display purposes */
 const MAX_SYSTEM_NAME_LENGTH = 22

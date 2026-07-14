@@ -129,7 +129,7 @@ const SettingsNotificationsPage = ({ userSettings }: { userSettings: UserSetting
 							</h3>
 							<p className="text-sm text-muted-foreground leading-relaxed">
 								<Trans>
-									Beszel uses{" "}
+									Beszel Plus uses{" "}
 									<a href="https://beszel.dev/guide/notifications" target="_blank" className="link" rel="noopener">
 										Shoutrrr
 									</a>{" "}

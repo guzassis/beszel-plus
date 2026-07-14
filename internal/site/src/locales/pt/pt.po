@@ -165,8 +165,12 @@ msgid "After"
 msgstr "Depois"
 
 #: src/components/routes/settings/heartbeat.tsx
-msgid "After setting the environment variables, restart your Beszel hub for changes to take effect."
-msgstr "Após configurar as variáveis de ambiente, reinicie o hub do Beszel para que as alterações entrem em vigor."
+#~ msgid "After setting the environment variables, restart your Beszel hub for changes to take effect."
+#~ msgstr "Após configurar as variáveis de ambiente, reinicie o hub do Beszel para que as alterações entrem em vigor."
+
+#: src/components/routes/settings/heartbeat.tsx
+msgid "After setting the environment variables, restart your Beszel Plus Hub for changes to take effect."
+msgstr ""
 
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Agent"
@@ -360,12 +364,20 @@ msgid "Below {0}{1} in last {2, plural, one {# minute} other {# minutes}}"
 msgstr "Abaixo de {0}{1} no último {2, plural, one {# minuto} other {# minutos}}"
 
 #: src/components/login/auth-form.tsx
-msgid "Beszel supports OpenID Connect and many OAuth2 authentication providers."
-msgstr "Beszel suporta OpenID Connect e muitos provedores de autenticação OAuth2."
+msgid "Beszel Plus supports OpenID Connect and many OAuth2 authentication providers."
+msgstr ""
 
 #: src/components/routes/settings/notifications.tsx
-msgid "Beszel uses <0>Shoutrrr</0> to integrate with popular notification services."
-msgstr "Beszel usa <0>Shoutrrr</0> para integrar com serviços de notificação populares."
+msgid "Beszel Plus uses <0>Shoutrrr</0> to integrate with popular notification services."
+msgstr ""
+
+#: src/components/login/auth-form.tsx
+#~ msgid "Beszel supports OpenID Connect and many OAuth2 authentication providers."
+#~ msgstr "Beszel suporta OpenID Connect e muitos provedores de autenticação OAuth2."
+
+#: src/components/routes/settings/notifications.tsx
+#~ msgid "Beszel uses <0>Shoutrrr</0> to integrate with popular notification services."
+#~ msgstr "Beszel usa <0>Shoutrrr</0> para integrar com serviços de notificação populares."
 
 #: src/components/add-system.tsx
 msgid "Binary"
@@ -379,6 +391,14 @@ msgstr ""
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Boot state"
 msgstr "Estado de inicialização"
+
+#: src/components/routes/system/power-management.tsx
+msgid "Broadcast address"
+msgstr ""
+
+#: src/components/routes/system/power-management.tsx
+msgid "Broadcast override"
+msgstr ""
 
 #: src/components/routes/settings/general.tsx
 #: src/components/routes/settings/general.tsx
@@ -406,6 +426,10 @@ msgstr "Pode parar"
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Cancel"
 msgstr "Cancelar"
+
+#: src/components/routes/system/power-management.tsx
+msgid "Cancel shutdown"
+msgstr ""
 
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Capabilities"
@@ -455,6 +479,10 @@ msgstr "Verifique {email} para um link de redefinição."
 #: src/components/routes/settings/layout.tsx
 msgid "Check logs for more details."
 msgstr "Verifique os logs para mais detalhes."
+
+#: src/components/routes/system/power-management.tsx
+msgid "Check system logs for details."
+msgstr ""
 
 #: src/components/routes/settings/heartbeat.tsx
 msgid "Check your monitoring service"
@@ -508,6 +536,7 @@ msgid "Configuration"
 msgstr "Configuração"
 
 #: src/components/routes/system/automatic-updates.tsx
+#: src/components/routes/system/power-management.tsx
 msgid "Configure"
 msgstr "Configurar"
 
@@ -523,6 +552,10 @@ msgstr "Configure como você recebe notificações de alerta."
 #: src/components/login/auth-form.tsx
 msgid "Confirm password"
 msgstr "Confirmar senha"
+
+#: src/components/routes/system/power-management.tsx
+msgid "Confirm shutdown of this system?"
+msgstr ""
 
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Conflicts"
@@ -547,15 +580,15 @@ msgstr "Copiado para a área de transferência"
 
 #: src/components/add-system.tsx
 #: src/components/routes/settings/tokens-fingerprints.tsx
-msgctxt "Button to copy docker compose file content"
-msgid "Copy docker compose"
-msgstr "Copiar docker compose"
+#~ msgctxt "Button to copy docker compose file content"
+#~ msgid "Copy docker compose"
+#~ msgstr "Copiar docker compose"
 
 #: src/components/add-system.tsx
 #: src/components/routes/settings/tokens-fingerprints.tsx
-msgctxt "Button to copy docker run command"
-msgid "Copy docker run"
-msgstr "Copiar docker run"
+#~ msgctxt "Button to copy docker run command"
+#~ msgid "Copy docker run"
+#~ msgstr "Copiar docker run"
 
 #: src/components/routes/settings/tokens-fingerprints.tsx
 msgctxt "Environment variables"
@@ -589,8 +622,8 @@ msgid "Copy the installation command for the agent below, or register agents aut
 msgstr "Copie o comando de instalação do agente abaixo, ou registre agentes automaticamente com um <0>token universal</0>."
 
 #: src/components/add-system.tsx
-msgid "Copy the<0>docker-compose.yml</0> content for the agent below, or register agents automatically with a <1>universal token</1>."
-msgstr "Copie o conteúdo do <0>docker-compose.yml</0> do agente abaixo, ou registre agentes automaticamente com um <1>token universal</1>."
+#~ msgid "Copy the<0>docker-compose.yml</0> content for the agent below, or register agents automatically with a <1>universal token</1>."
+#~ msgstr "Copie o conteúdo do <0>docker-compose.yml</0> do agente abaixo, ou registre agentes automaticamente com um <1>token universal</1>."
 
 #: src/components/routes/settings/tokens-fingerprints.tsx
 msgid "Copy YAML"
@@ -663,6 +696,10 @@ msgstr "Estado atual"
 #: src/components/routes/system/automatic-updates.tsx
 msgid "Custom repositories"
 msgstr "Repositórios personalizados"
+
+#: src/components/routes/system/power-management.tsx
+msgid "Custom shutdown delay in minutes"
+msgstr ""
 
 #. Power Cycles
 #: src/components/routes/system/smart-table.tsx
@@ -992,9 +1029,9 @@ msgstr "Esqueceu a senha?"
 
 #: src/components/add-system.tsx
 #: src/components/routes/settings/tokens-fingerprints.tsx
-msgctxt "Button to copy install command"
-msgid "FreeBSD command"
-msgstr "Comando FreeBSD"
+#~ msgctxt "Button to copy install command"
+#~ msgid "FreeBSD command"
+#~ msgstr "Comando FreeBSD"
 
 #. Context: Battery state
 #: src/components/routes/system/info-bar.tsx
@@ -1051,9 +1088,9 @@ msgstr "Heartbeat enviado com sucesso"
 
 #: src/components/add-system.tsx
 #: src/components/routes/settings/tokens-fingerprints.tsx
-msgctxt "Button to copy install command"
-msgid "Homebrew command"
-msgstr "Comando Homebrew"
+#~ msgctxt "Button to copy install command"
+#~ msgid "Homebrew command"
+#~ msgstr "Comando Homebrew"
 
 #: src/components/add-system.tsx
 msgid "Host / IP"
@@ -1432,6 +1469,7 @@ msgstr "Operação em andamento: {0}%"
 
 #: src/components/routes/system/automatic-updates.tsx
 #: src/components/routes/system/automatic-updates.tsx
+#: src/components/routes/system/power-management.tsx
 msgid "Operation queued"
 msgstr "Operação enfileirada"
 
@@ -1579,10 +1617,30 @@ msgctxt "Container ports"
 msgid "Ports"
 msgstr "Portas"
 
+#: src/components/routes/system/power-management.tsx
+msgid "Power management"
+msgstr ""
+
+#: src/components/routes/system/power-management.tsx
+msgid "Power network"
+msgstr ""
+
 #. Power On Time
 #: src/components/routes/system/smart-table.tsx
 msgid "Power On"
 msgstr "Ligado"
+
+#: src/components/routes/system/power-management.tsx
+msgid "Power operation"
+msgstr ""
+
+#: src/components/routes/system/power-management.tsx
+msgid "Power operation failed"
+msgstr ""
+
+#: src/components/routes/system/power-management.tsx
+msgid "Power settings saved"
+msgstr ""
 
 #: src/components/routes/system/charts/gpu-charts.tsx
 #: src/components/routes/system/charts/memory-charts.tsx
@@ -1634,6 +1692,10 @@ msgstr "Ler status da operação"
 #: src/components/alerts-history-columns.tsx
 msgid "Read update policy"
 msgstr "Ler política de atualizações"
+
+#: src/components/routes/system/power-management.tsx
+msgid "Readiness"
+msgstr ""
 
 #: src/components/alerts-history-columns.tsx
 #: src/components/routes/system/automatic-updates.tsx
@@ -1769,6 +1831,10 @@ msgstr "Salve o endereço usando a tecla enter ou vírgula. Deixe em branco para
 msgid "Save and apply"
 msgstr "Salvar e aplicar"
 
+#: src/components/routes/system/power-management.tsx
+msgid "Save configuration"
+msgstr ""
+
 #: src/components/routes/settings/general.tsx
 #: src/components/routes/settings/notifications.tsx
 msgid "Save Settings"
@@ -1781,6 +1847,10 @@ msgstr "Salvo no banco de dados e não expira até você desativá-lo."
 #: src/components/routes/settings/quiet-hours.tsx
 msgid "Schedule"
 msgstr "Agendar"
+
+#: src/components/routes/system/power-management.tsx
+msgid "Schedule custom shutdown"
+msgstr ""
 
 #: src/components/routes/settings/quiet-hours.tsx
 msgid "Schedule quiet hours where notifications will not be sent, such as during maintenance periods."
@@ -1828,8 +1898,12 @@ msgid "Send a single heartbeat ping to verify your endpoint is working."
 msgstr "Envie um único ping de heartbeat para verificar se o seu endpoint está a funcionar."
 
 #: src/components/routes/settings/heartbeat.tsx
-msgid "Send periodic outbound pings to an external monitoring service so you can monitor Beszel without exposing it to the internet."
-msgstr "Envie pings de saída periódicos para um serviço de monitorização externo para que possa monitorizar o Beszel sem o expor à internet."
+msgid "Send periodic outbound pings to an external monitoring service so you can monitor Beszel Plus without exposing it to the internet."
+msgstr ""
+
+#: src/components/routes/settings/heartbeat.tsx
+#~ msgid "Send periodic outbound pings to an external monitoring service so you can monitor Beszel without exposing it to the internet."
+#~ msgstr "Envie pings de saída periódicos para um serviço de monitorização externo para que possa monitorizar o Beszel sem o expor à internet."
 
 #: src/components/routes/settings/heartbeat.tsx
 msgid "Send test heartbeat"
@@ -1861,8 +1935,12 @@ msgid "Set percentage thresholds for meter colors."
 msgstr "Defina os limiares de porcentagem para as cores do medidor."
 
 #: src/components/routes/settings/heartbeat.tsx
-msgid "Set the following environment variables on your Beszel hub to enable heartbeat monitoring:"
-msgstr "Defina as seguintes variáveis de ambiente no seu hub do Beszel para ativar a monitorização de heartbeat:"
+#~ msgid "Set the following environment variables on your Beszel hub to enable heartbeat monitoring:"
+#~ msgstr "Defina as seguintes variáveis de ambiente no seu hub do Beszel para ativar a monitorização de heartbeat:"
+
+#: src/components/routes/settings/heartbeat.tsx
+msgid "Set the following environment variables on your Beszel Plus Hub to enable heartbeat monitoring:"
+msgstr ""
 
 #: src/components/command-palette.tsx
 #: src/components/command-palette.tsx
@@ -1882,6 +1960,18 @@ msgstr "Definições guardadas"
 msgid "Showing the last successful eligibility result."
 msgstr "A mostrar o último resultado de elegibilidade bem-sucedido."
 
+#: src/components/routes/system/power-management.tsx
+msgid "Shut down in {minutes} minutes"
+msgstr ""
+
+#: src/components/routes/system/power-management.tsx
+msgid "Shut down in 15 minutes"
+msgstr ""
+
+#: src/components/routes/system/power-management.tsx
+msgid "Shut down now"
+msgstr ""
+
 #: src/components/login/auth-form.tsx
 msgid "Sign in"
 msgstr "Entrar"
@@ -1893,6 +1983,10 @@ msgstr "Configurações SMTP"
 #: src/components/systems-table/systems-table.tsx
 msgid "Sort By"
 msgstr "Ordenar Por"
+
+#: src/components/routes/system/power-management.tsx
+msgid "stale"
+msgstr ""
 
 #: src/components/routes/system/automatic-updates.tsx
 msgid "Stale data"
@@ -2019,6 +2113,10 @@ msgstr "Notificação de teste enviada"
 msgid "The Agent remains unprivileged. A restricted local helper applies validated APT policies."
 msgstr "O Agent continua sem privilégios. Um helper local restrito aplica políticas do APT previamente validadas."
 
+#: src/components/routes/system/power-management.tsx
+msgid "The Hub cannot wake itself. Use another Hub on the same power network."
+msgstr ""
+
 #: src/components/routes/settings/heartbeat.tsx
 msgid "The overall status is <0>ok</0> when all systems are up, <1>warn</1> when alerts are triggered, and <2>error</2> when any system is down."
 msgstr "O estado geral é <0>ok</0> quando todos os sistemas estão ativos, <1>aviso</1> quando os alertas são acionados e <2>erro</2> quando qualquer sistema está inativo."
@@ -2038,6 +2136,14 @@ msgstr "Repositório de terceiros"
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "This action cannot be undone. This will permanently delete all current records for {name} from the database."
 msgstr "Esta ação não pode ser desfeita. Isso excluirá permanentemente todos os registros atuais de {name} do banco de dados."
+
+#: src/components/routes/system/power-management.tsx
+msgid "This Agent is older than v0.2.0 or does not expose power diagnostics."
+msgstr ""
+
+#: src/components/routes/system/power-management.tsx
+msgid "This system hosts Beszel Plus. Shutting it down will make the dashboard unavailable, and this Hub cannot wake itself. Continue?"
+msgstr ""
 
 #: src/components/routes/settings/alerts-history-data-table.tsx
 msgid "This will permanently delete all selected records from the database."
@@ -2199,6 +2305,10 @@ msgstr "Tipo"
 #: src/components/routes/system/automatic-updates.tsx
 msgid "Unable to load update policy"
 msgstr "Não foi possível carregar a política de atualizações"
+
+#: src/components/routes/system/power-management.tsx
+msgid "Unable to save power settings"
+msgstr ""
 
 #: src/lib/alerts.ts
 msgid "Unattended upgrades package missing"
@@ -2400,6 +2510,14 @@ msgstr "Campos Visíveis"
 msgid "Waiting for enough records to display"
 msgstr "Aguardando registros suficientes para exibir"
 
+#: src/components/routes/system/power-management.tsx
+msgid "Wake system"
+msgstr ""
+
+#: src/components/routes/system/power-management.tsx
+msgid "Wake-on-LAN MAC address"
+msgstr ""
+
 #: src/components/routes/settings/general.tsx
 msgid "Want to help improve our translations? Check <0>Crowdin</0> for details."
 msgstr "Quer nos ajudar a melhorar ainda mais nossas traduções? Confira <0>Crowdin</0> para mais detalhes."
@@ -2430,9 +2548,9 @@ msgstr "Ao usar POST, cada heartbeat inclui um payload JSON com o resumo do esta
 
 #: src/components/add-system.tsx
 #: src/components/routes/settings/tokens-fingerprints.tsx
-msgctxt "Button to copy install command"
-msgid "Windows command"
-msgstr "Comando Windows"
+#~ msgctxt "Button to copy install command"
+#~ msgid "Windows command"
+#~ msgstr "Comando Windows"
 
 #. Disk write
 #: src/components/routes/system/charts/disk-charts.tsx

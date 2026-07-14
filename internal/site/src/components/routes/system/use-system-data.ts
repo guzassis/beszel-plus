@@ -4,6 +4,7 @@ import { subscribeKeys } from "nanostores"
 import { useEffect, useMemo, useRef, useState } from "react"
 import { useContainerChartConfigs } from "@/components/charts/hooks"
 import { pb } from "@/lib/api"
+import { pageTitle } from "@/lib/build-info"
 import { SystemStatus } from "@/lib/enums"
 import {
 	$allSystemsById,
@@ -77,7 +78,7 @@ export function useSystemData(id: string) {
 			const sys = newSystems[id]
 			if (sys) {
 				setSystem(sys)
-				document.title = `${sys?.name} / Beszel`
+				document.title = pageTitle(sys?.name || "System")
 			}
 		})
 	}, [id, systems.length])

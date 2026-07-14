@@ -5,7 +5,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/henrygd/beszel"
+	"github.com/henrygd/beszel/internal/buildinfo"
 	"github.com/henrygd/beszel/internal/hub/utils"
 )
 
@@ -14,6 +14,9 @@ type PublicAppInfo struct {
 	BASE_PATH           string
 	HUB_VERSION         string
 	HUB_URL             string
+	PRODUCT_NAME        string
+	REPOSITORY_URL      string
+	DOCUMENTATION_URL   string
 	OAUTH_DISABLE_POPUP bool `json:"OAUTH_DISABLE_POPUP,omitempty"`
 }
 
@@ -31,9 +34,12 @@ func modifyIndexHTML(hub *Hub, html []byte) string {
 func getPublicAppInfo(hub *Hub) PublicAppInfo {
 	parsedURL, _ := url.Parse(hub.appURL)
 	info := PublicAppInfo{
-		BASE_PATH:   strings.TrimSuffix(parsedURL.Path, "/") + "/",
-		HUB_VERSION: beszel.Version,
-		HUB_URL:     hub.appURL,
+		BASE_PATH:         strings.TrimSuffix(parsedURL.Path, "/") + "/",
+		HUB_VERSION:       buildinfo.Version,
+		HUB_URL:           hub.appURL,
+		PRODUCT_NAME:      buildinfo.ProductName,
+		REPOSITORY_URL:    buildinfo.RepositoryURL,
+		DOCUMENTATION_URL: buildinfo.DocumentationURL,
 	}
 	if val, _ := utils.GetEnv("OAUTH_DISABLE_POPUP"); val == "true" {
 		info.OAUTH_DISABLE_POPUP = true

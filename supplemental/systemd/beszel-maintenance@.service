@@ -1,5 +1,5 @@
 [Unit]
-Description=Beszel privileged maintenance helper instance
+Description=Beszel Plus privileged maintenance helper instance
 Documentation=https://github.com/guzassis/beszel-plus
 
 [Service]

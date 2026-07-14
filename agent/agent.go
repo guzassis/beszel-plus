@@ -6,6 +6,7 @@ package agent
 
 import (
 	"log/slog"
+	"os"
 	"strings"
 	"sync"
 	"time"
@@ -176,6 +177,7 @@ func (a *Agent) gatherStats(options common.DataRequestOptions) *system.CombinedD
 			data.Updates.Capabilities = a.maintenanceManager.capabilities()
 		}
 	}
+	data.Info.Power = collectPowerDiagnostics(strings.EqualFold(os.Getenv("POWER_MANAGEMENT"), "true"))
 
 	// slog.Info("System data", "data", data, "cacheTimeMs", cacheTimeMs)
 

@@ -105,6 +105,55 @@ func TestAPTLockMessagesAreNarrowlyClassified(t *testing.T) {
 	}
 }
 
+func TestSchedulePoweroffUsesSystemdTransientTimer(t *testing.T) {
+	h := testHelper(t)
+	runner := h.Runner.(*fakeRunner)
+	result, changed, err := h.schedulePoweroff(context.Background(), 900)
+	if err != nil || !changed || result.PoweroffStatus == nil || !result.PoweroffStatus.Scheduled {
+		t.Fatalf("result=%#v changed=%v err=%v", result, changed, err)
+	}
+	var flattened []string
+	for _, call := range runner.calls {
+		flattened = append(flattened, strings.Join(call, " "))
+	}
+	joined := strings.Join(flattened, "\n")
+	if !strings.Contains(joined, "systemd-run --unit=beszel-poweroff --collect --on-active=900s /usr/bin/systemctl poweroff") {
+		t.Fatalf("unsafe poweroff invocation: %s", joined)
+	}
+}
+
+func TestPoweroffDelayIsBounded(t *testing.T) {
+	req := entity.Request{Version: entity.ProtocolVersion, RequestID: "power-request", Operation: entity.SchedulePoweroff, IdempotencyKey: "power-request", DelaySeconds: 604801}
+	if err := entity.ValidateRequest(req); err == nil {
+		t.Fatal("expected excessive delay to be rejected")
+	}
+}
+
+func TestPendingPolicyUsesBoundedMetadataSchema(t *testing.T) {
+	h := testHelper(t)
+	policy := entity.DefaultPolicy()
+	response := entity.Response{ErrorCode: "apt_lock_busy", Result: &entity.Result{Policy: &policy}}
+	if err := h.savePendingPolicy(response); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(filepath.Join(h.stateDir(), "pending-policy.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, field := range []string{"policy", "created_at", "last_attempt_at", "attempt_count", "last_error_code", "next_attempt_at"} {
+		if !strings.Contains(string(data), `"`+field+`"`) {
+			t.Errorf("missing %s in %s", field, data)
+		}
+	}
+	pending, err := h.readPendingPolicyData()
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pending.AttemptCount != 1 || pending.NextAttemptAt.Sub(pending.LastAttemptAt) != time.Minute {
+		t.Fatalf("unexpected pending metadata: %#v", pending)
+	}
+}
+
 func TestDryRunFailuresAreStructured(t *testing.T) {
 	for _, test := range []struct {
 		output string

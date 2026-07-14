@@ -1,12 +1,11 @@
 name: Make docker images
 
 on:
-  push:
-    tags:
-      - "v*"
+  workflow_dispatch:
 
 jobs:
   build:
+    if: ${{ false }} # Docker publishing is intentionally excluded from Beszel Plus v0.2.0.
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false

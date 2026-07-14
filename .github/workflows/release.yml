@@ -32,16 +32,6 @@ jobs:
           go-version: 1.26.5
           check-latest: true
 
-      - name: Set up .NET
-        uses: actions/setup-dotnet@v4
-        with:
-          dotnet-version: "9.0.x"
-
-      - name: Build .NET LHM executable for Windows sensors
-        run: |
-          dotnet build -c Release ./agent/lhm/beszel_lhm.csproj
-        shell: bash
-
       - name: GoReleaser beszel
         uses: goreleaser/goreleaser-action@v6
         with:
@@ -51,8 +41,6 @@ jobs:
           args: release --clean
         env:
           GITHUB_TOKEN: ${{ secrets.TOKEN || secrets.GITHUB_TOKEN }}
-          WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
-          IS_FORK: ${{ github.repository_owner != 'henrygd' }}
 
       - name: Verify paired Agent and maintenance helper assets
         run: |
@@ -62,7 +50,6 @@ jobs:
           printf '%s\n' "$assets" | grep -qx "$checksum"
           printf '%s\n' "$assets" | while IFS= read -r asset; do
             case "$asset" in
-              beszel-agent_linux_*_glibc.tar.gz) continue ;;
               beszel-agent_linux_*.tar.gz)
                 suffix=${asset#beszel-agent_}
                 helper="beszel-maintenance-helper_${suffix}"

@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/henrygd/beszel"
+	"github.com/henrygd/beszel/internal/buildinfo"
 	"github.com/henrygd/beszel/internal/hub"
 	_ "github.com/henrygd/beszel/internal/migrations"
 
@@ -17,6 +18,10 @@ import (
 )
 
 func main() {
+	if len(os.Args) == 2 && (os.Args[1] == "--version" || os.Args[1] == "version") {
+		fmt.Println(buildinfo.VersionLine("Hub"))
+		return
+	}
 	// handle health check first to prevent unneeded execution
 	if len(os.Args) > 3 && os.Args[1] == "health" {
 		url := os.Args[3]
@@ -42,7 +47,7 @@ func getBaseApp() *pocketbase.PocketBase {
 		DefaultDataDir: beszel.AppName + "_data",
 		DefaultDev:     isDev,
 	})
-	baseApp.RootCmd.Version = beszel.Version
+	baseApp.RootCmd.Version = buildinfo.VersionLine("Hub")
 	baseApp.RootCmd.Use = beszel.AppName
 	baseApp.RootCmd.Short = ""
 	// add update command

@@ -46,7 +46,8 @@ type maintenanceManager struct {
 
 func newMaintenanceManager(agent *Agent) *maintenanceManager {
 	raw, _ := utils.GetEnv("OS_UPDATE_MANAGEMENT")
-	m := &maintenanceManager{agent: agent, socket: maintenanceSocket, enabled: strings.EqualFold(raw, "true"), replays: make(map[string]entity.Response)}
+	powerRaw, _ := utils.GetEnv("POWER_MANAGEMENT")
+	m := &maintenanceManager{agent: agent, socket: maintenanceSocket, enabled: strings.EqualFold(raw, "true") || strings.EqualFold(powerRaw, "true"), replays: make(map[string]entity.Response)}
 	m.caps = &entity.Capabilities{UpdateMonitoring: agent.updateManager != nil}
 	if agent.updateManager != nil {
 		agent.updateManager.setEligibilityCheck(func(ctx context.Context) eligibilityCheckResult {
@@ -130,6 +131,11 @@ func (m *maintenanceManager) retryPersistedPolicy() {
 	if err != nil || response.Status != entity.StateFailed || !response.Retryable || response.Result == nil || response.Result.Policy == nil {
 		return
 	}
+	if response.NextAttemptAt != nil && time.Now().Before(*response.NextAttemptAt) {
+		return
+	}
+	// The helper persists the bounded retry schedule. Capability refreshes must
+	// not create an independent retry loop or log spam.
 	now := time.Now().UTC().Format("20060102T150405.000000000")
 	retry := entity.Request{Version: entity.ProtocolVersion, RequestID: "policy-retry-" + now, Operation: entity.ApplyUpdatePolicy, IdempotencyKey: "policy-retry-" + now, Policy: response.Result.Policy}
 	m.handle(retry)
@@ -247,7 +253,14 @@ func (m *maintenanceManager) run(req entity.Request) {
 	}
 	go m.refreshCapabilities()
 	if req.Operation == entity.ApplyUpdatePolicy && response.Status == entity.StateFailed && response.Retryable {
-		time.AfterFunc(5*time.Minute, func() {
+		delay := 5 * time.Minute
+		if response.NextAttemptAt != nil {
+			delay = time.Until(*response.NextAttemptAt)
+			if delay < 0 {
+				delay = 0
+			}
+		}
+		time.AfterFunc(delay, func() {
 			retry := req
 			suffix := time.Now().UTC().Format("20060102T150405.000000000")
 			retry.RequestID = "policy-retry-" + suffix
@@ -297,7 +310,7 @@ func helperCompatible(caps *entity.Capabilities) bool {
 
 func maintenanceWriteOperation(operation entity.Operation) bool {
 	switch operation {
-	case entity.ApplyUpdatePolicy, entity.InstallUpdateDependencies, entity.RunUnattendedUpgrades:
+	case entity.ApplyUpdatePolicy, entity.InstallUpdateDependencies, entity.RunUnattendedUpgrades, entity.SchedulePoweroff, entity.CancelPoweroff:
 		return true
 	default:
 		return false

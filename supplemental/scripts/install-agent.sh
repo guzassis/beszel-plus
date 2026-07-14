@@ -1,5 +1,9 @@
 #!/bin/sh
 
+PRODUCT_NAME="Beszel Plus"
+PRODUCT_VERSION="0.2.0"
+REPOSITORY="guzassis/beszel-plus"
+
 is_alpine() {
   [ -f /etc/alpine-release ]
 }
@@ -103,13 +107,13 @@ generate_freebsd_rc_service() {
 # BEFORE: LOGIN
 # KEYWORD: shutdown
 
-# Add the following lines to /etc/rc.conf to configure Beszel Agent:
+# Add the following lines to /etc/rc.conf to configure Beszel Plus Agent:
 #
-# beszel_agent_enable (bool):   Set to YES to enable Beszel Agent
+# beszel_agent_enable (bool):   Set to YES to enable Beszel Plus Agent
 #                               Default: YES
-# beszel_agent_env_file (str):  Beszel Agent env configuration file
+# beszel_agent_env_file (str):  Beszel Plus Agent env configuration file
 #                               Default: /usr/local/etc/beszel-agent/env
-# beszel_agent_user (str):      Beszel Agent daemon user
+# beszel_agent_user (str):      Beszel Plus Agent daemon user
 #                               Default: beszel
 # beszel_agent_bin (str):       Path to the beszel-agent binary
 #                               Default: /usr/local/sbin/beszel-agent
@@ -239,6 +243,7 @@ TOKEN=""
 HUB_URL=""
 AUTO_UPDATE_FLAG="" # empty string means prompt, "true" means auto-enable, "false" means skip
 OS_UPDATE_MANAGEMENT_FLAG="false"
+POWER_MANAGEMENT_FLAG="false"
 OS_UPDATE_POLICY="security"
 VERSION="latest"
 WEBSOCKET_AUTH_WARNING=false
@@ -247,7 +252,7 @@ POLICY_PENDING=false
 # Check for help flag
 case "$1" in
 -h | --help)
-  printf "Beszel Agent installation script\n\n"
+  printf "Beszel Plus Agent installation script\n\n"
   printf "Usage: ./install-agent.sh [options]\n\n"
   printf "Options: \n"
   printf "  -k                    : SSH key (required, or interactive if not provided)\n"
@@ -255,10 +260,11 @@ case "$1" in
   printf "  -t                    : Token (optional for backwards compatibility)\n"
   printf "  -url                  : Hub URL (optional for backwards compatibility)\n"
   printf "  -v, --version         : Version to install (default: latest)\n"
-  printf "  -u                    : Uninstall Beszel Agent\n"
+  printf "  -u                    : Uninstall Beszel Plus Agent\n"
 	printf "  --agent-auto-update=true|false : Control automatic updates of the Agent binary\n"
 	printf "  --auto-update [VALUE] : Deprecated alias for --agent-auto-update\n"
 	printf "  --os-update-management=true|false : Install OS update management components\n"
+	printf "  --power-management=true|false : Enable WOL diagnostics and secure shutdown\n"
 	printf "  --os-update-policy=monitor|security|official-all : Initial policy for new installations\n"
   printf "                          VALUE can be true (enable) or false (disable). If not specified, will prompt.\n"
   printf "  --mirror [URL]        : Use GitHub proxy to resolve network timeout issues in mainland China\n"
@@ -312,7 +318,7 @@ detect_existing_helper_version() {
   else
     OLD_HELPER_VERSION_OUTPUT=$(run_with_portable_timeout 3 "$helper_path" --version 2>/dev/null || true)
   fi
-  DETECTED_HELPER_VERSION=$(printf '%s\n' "$OLD_HELPER_VERSION_OUTPUT" | sed -n 's/^beszel-maintenance-helper v//p' | head -n 1)
+  DETECTED_HELPER_VERSION=$(printf '%s\n' "$OLD_HELPER_VERSION_OUTPUT" | sed -n -e 's/^Beszel Plus Maintenance Helper v//p' -e 's/^beszel-maintenance-helper v//p' | head -n 1)
   if [ -n "$DETECTED_HELPER_VERSION" ]; then
     OLD_HELPER_VERSION="$DETECTED_HELPER_VERSION"
   else
@@ -394,6 +400,10 @@ while [ $# -gt 0 ]; do
 		if echo "$1" | grep -q "="; then OS_UPDATE_POLICY=$(echo "$1" | cut -d'=' -f2); else OS_UPDATE_POLICY="$2"; shift; fi
 		case "$OS_UPDATE_POLICY" in monitor|security|official-all) ;; *) echo "Invalid --os-update-policy value" >&2; exit 1 ;; esac
 		;;
+	--power-management*)
+		if echo "$1" | grep -q "="; then POWER_VALUE=$(echo "$1" | cut -d'=' -f2); else POWER_VALUE="$2"; shift; fi
+		if [ "$POWER_VALUE" = "true" ] || [ "$POWER_VALUE" = "false" ]; then POWER_MANAGEMENT_FLAG="$POWER_VALUE"; else echo "Invalid --power-management value" >&2; exit 1; fi
+		;;
   --auto-update*)
 		echo "Warning: --auto-update is deprecated; use --agent-auto-update." >&2
     # Check if there's a value after the = sign
@@ -424,6 +434,13 @@ while [ $# -gt 0 ]; do
   shift
 done
 
+if [ "$(uname -s)" != "Linux" ] || ! grep -Eq '^ID=("?)(debian|ubuntu|raspbian)\1$' /etc/os-release 2>/dev/null; then
+  echo "$PRODUCT_NAME v$PRODUCT_VERSION supports only Debian, Ubuntu, or Raspbian Linux in this release." >&2
+  exit 1
+fi
+SUPPORTED_ARCH=$(detect_architecture)
+case "$SUPPORTED_ARCH" in amd64|arm64) ;; *) echo "$PRODUCT_NAME v$PRODUCT_VERSION supports only amd64 and arm64 (detected: $SUPPORTED_ARCH)." >&2; exit 1 ;; esac
+
 # Set paths based on operating system
 if is_freebsd; then
   AGENT_DIR="/usr/local/etc/beszel-agent"
@@ -449,6 +466,31 @@ backup_transaction_file() {
   else
     : >"$TRANSACTION_DIR/$transaction_name.missing"
   fi
+}
+
+cleanup_stale_maintenance_validations() {
+  command -v systemctl >/dev/null 2>&1 || return 0
+  systemctl list-units --all --no-legend 'beszel-maintenance@*.service' 2>/dev/null |
+  while IFS=' ' read -r unit _rest; do
+    case "$unit" in beszel-maintenance@*.service) ;; *) continue ;; esac
+    pid=$(systemctl show "$unit" -p MainPID --value 2>/dev/null || true)
+    case "$pid" in ''|0|*[!0-9]*) continue ;; esac
+    exe=$(readlink "/proc/$pid/exe" 2>/dev/null || true)
+    cmdline=$(tr '\000' ' ' <"/proc/$pid/cmdline" 2>/dev/null || true)
+    cgroup=$(cat "/proc/$pid/cgroup" 2>/dev/null || true)
+    journal=$(journalctl -u "$unit" -n 30 --no-pager 2>/dev/null || true)
+    owned=false
+    validation=false
+    if [ "$exe" = "$MAINTENANCE_HELPER_PATH" ] && printf '%s' "$cgroup" | grep -Fq "$unit"; then owned=true; fi
+    if printf '%s' "$cmdline" | grep -Eq 'run-update-dry-run|dry-run' || printf '%s' "$journal" | grep -Fq 'operation=run-update-dry-run'; then validation=true; fi
+    if [ "$owned" = "true" ] && [ "$validation" = "true" ]; then
+      echo "Stopping stale Beszel Plus validation unit $unit (PID $pid)..."
+      systemctl stop "$unit" || { echo "Could not stop $unit safely; upgrade aborted." >&2; return 1; }
+    elif [ "$owned" = "true" ]; then
+      echo "A non-validation Beszel Plus maintenance operation is active in $unit; upgrade aborted without killing it." >&2
+      return 1
+    fi
+  done
 }
 
 restore_transaction_file() {
@@ -558,6 +600,8 @@ if [ "$UNINSTALL" != true ] && [ -f "$BIN_PATH" ]; then
   elif is_freebsd; then
     service beszel-agent stop 2>/dev/null || true
   else
+    cleanup_stale_maintenance_validations || exit 1
+    systemctl stop beszel-maintenance.socket 2>/dev/null || true
     systemctl stop beszel-agent.service 2>/dev/null || true
   fi
 fi
@@ -648,7 +692,7 @@ if [ "$UNINSTALL" = true ]; then
     systemctl daemon-reload
   fi
 
-  echo "Removing the Beszel Agent directory..."
+  echo "Removing the Beszel Plus Agent directory..."
   rm -rf "$AGENT_DIR"
 
   echo "Removing the dedicated user for the agent service..."
@@ -661,7 +705,7 @@ if [ "$UNINSTALL" = true ]; then
     userdel beszel 2>/dev/null
   fi
 
-  echo "Beszel Agent has been uninstalled successfully!"
+  echo "Beszel Plus Agent has been uninstalled successfully!"
   exit 0
 fi
 
@@ -732,7 +776,7 @@ fi
 
 # Create a dedicated user for the service if it doesn't exist
 AGENT_USER="beszel"
-echo "Configuring the dedicated user for the Beszel Agent service..."
+echo "Configuring the dedicated user for the Beszel Plus Agent service..."
 if is_alpine; then
   if ! id -u beszel >/dev/null 2>&1; then
     addgroup beszel
@@ -813,10 +857,10 @@ else
   fi
 fi
 
-# Create the directory for the Beszel Agent
+# Create the directory for the Beszel Plus Agent
 
 if [ ! -d "$AGENT_DIR" ]; then
-  echo "Creating the directory for the Beszel Agent..."
+  echo "Creating the directory for the Beszel Plus Agent..."
   mkdir -p "$AGENT_DIR"
   chown "${AGENT_USER}:${AGENT_USER}" "$AGENT_DIR"
   chmod 755 "$AGENT_DIR"
@@ -826,18 +870,15 @@ if [ ! -d "$BIN_DIR" ]; then
   mkdir -p "$BIN_DIR"
 fi
 
-# Download and install the Beszel Agent
+# Download and install the Beszel Plus Agent
 
 OS=$(uname -s | sed -e 'y/ABCDEFGHIJKLMNOPQRSTUVWXYZ/abcdefghijklmnopqrstuvwxyz/')
 ARCH=$(detect_architecture)
 FILE_NAME="beszel-agent_${OS}_${ARCH}.tar.gz"
-if [ "$OS" = "linux" ] && [ "$ARCH" = "amd64" ] && is_glibc; then
-  FILE_NAME="beszel-agent_${OS}_${ARCH}_glibc.tar.gz"
-fi
 
 # Determine version to install
 if [ "$VERSION" = "latest" ]; then
-  API_RELEASE_URL="https://api.github.com/repos/guzassis/beszel-plus/releases/latest"
+  API_RELEASE_URL="https://api.github.com/repos/$REPOSITORY/releases/latest"
   INSTALL_VERSION=$(curl -s "$API_RELEASE_URL" | grep -o '"tag_name": "v[^"]*"' | cut -d'"' -f4 | tr -d 'v')
   if [ -z "$INSTALL_VERSION" ]; then
     echo "Failed to get latest version"
@@ -854,7 +895,7 @@ echo "Downloading beszel-agent v${INSTALL_VERSION}..."
 # Download checksums file
 TEMP_DIR=$(mktemp -d)
 cd "$TEMP_DIR" || exit 1
-CHECKSUM=$(curl -fsSL "$GITHUB_URL/guzassis/beszel-plus/releases/download/v${INSTALL_VERSION}/beszel_${INSTALL_VERSION}_checksums.txt" | grep "$FILE_NAME" | cut -d' ' -f1)
+CHECKSUM=$(curl -fsSL "$GITHUB_URL/$REPOSITORY/releases/download/v${INSTALL_VERSION}/beszel_${INSTALL_VERSION}_checksums.txt" | grep "$FILE_NAME" | cut -d' ' -f1)
 if [ -z "$CHECKSUM" ] || ! echo "$CHECKSUM" | grep -qE "^[a-fA-F0-9]{64}$"; then
   echo "Failed to get checksum or invalid checksum format"
   echo "Try again with --mirror (or --mirror <url>) if GitHub is not reachable."
@@ -862,8 +903,8 @@ if [ -z "$CHECKSUM" ] || ! echo "$CHECKSUM" | grep -qE "^[a-fA-F0-9]{64}$"; then
   exit 1
 fi
 
-if ! curl -fL# --retry 3 --retry-delay 2 --connect-timeout 10 "$GITHUB_URL/guzassis/beszel-plus/releases/download/v${INSTALL_VERSION}/$FILE_NAME" -o "$FILE_NAME"; then
-  echo "Failed to download the agent from $GITHUB_URL/guzassis/beszel-plus/releases/download/v${INSTALL_VERSION}/$FILE_NAME"
+if ! curl -fL# --retry 3 --retry-delay 2 --connect-timeout 10 "$GITHUB_URL/$REPOSITORY/releases/download/v${INSTALL_VERSION}/$FILE_NAME" -o "$FILE_NAME"; then
+  echo "Failed to download the agent from $GITHUB_URL/$REPOSITORY/releases/download/v${INSTALL_VERSION}/$FILE_NAME"
   echo "Try again with --mirror (or --mirror <url>) if GitHub is not reachable."
   rm -rf "$TEMP_DIR"
   exit 1
@@ -894,7 +935,7 @@ if [ ! -s "$TEMP_DIR/beszel-agent" ]; then
   exit 1
 fi
 AGENT_VERSION_OUTPUT=$(./beszel-agent --version 2>&1) || { echo "Downloaded Agent version check failed" >&2; exit 1; }
-if ! printf '%s\n' "$AGENT_VERSION_OUTPUT" | grep -qx "Beszel Plus v${INSTALL_VERSION}"; then
+if ! printf '%s\n' "$AGENT_VERSION_OUTPUT" | grep -qx "Beszel Plus Agent v${INSTALL_VERSION}"; then
   echo "Downloaded Agent does not report Beszel Plus v${INSTALL_VERSION}." >&2
   exit 1
 fi
@@ -904,21 +945,27 @@ AGENT_INSTALLED=false
 # Install the privileged one-shot helper only on supported Linux systems when requested.
 OS_UPDATE_SUPPORTED=false
 if [ "$OS" = "linux" ] && grep -Eq '^ID=("?)(debian|ubuntu|raspbian)\1$' /etc/os-release 2>/dev/null; then OS_UPDATE_SUPPORTED=true; fi
-if [ "$OS_UPDATE_MANAGEMENT_FLAG" = "true" ] && [ "$OS_UPDATE_SUPPORTED" = "true" ]; then
+if { [ "$OS_UPDATE_MANAGEMENT_FLAG" = "true" ] || [ "$POWER_MANAGEMENT_FLAG" = "true" ]; } && [ "$OS_UPDATE_SUPPORTED" = "true" ]; then
+	if [ "$POWER_MANAGEMENT_FLAG" = "true" ] && ! command -v ethtool >/dev/null 2>&1; then
+	  echo "Installing ethtool for one-time WOL capability diagnostics..."
+	  if ! apt-get update || ! DEBIAN_FRONTEND=noninteractive apt-get install -y ethtool; then echo "Failed to install ethtool" >&2; exit 1; fi
+	fi
+	if [ "$OS_UPDATE_MANAGEMENT_FLAG" = "true" ]; then
   if ! dpkg-query -W -f='${db:Status-Status}' unattended-upgrades 2>/dev/null | grep -qx installed; then
     echo "Installing unattended-upgrades dependency..."
     if ! apt-get update || ! DEBIAN_FRONTEND=noninteractive apt-get install -y unattended-upgrades; then echo "Failed to install unattended-upgrades" >&2; exit 1; fi
   fi
+	fi
   HELPER_FILE_NAME="beszel-maintenance-helper_${OS}_${ARCH}.tar.gz"
   echo "Downloading maintenance helper v${INSTALL_VERSION}..."
-  HELPER_CHECKSUM=$(curl -fsSL "$GITHUB_URL/guzassis/beszel-plus/releases/download/v${INSTALL_VERSION}/beszel_${INSTALL_VERSION}_checksums.txt" | grep " $HELPER_FILE_NAME$" | cut -d' ' -f1)
+  HELPER_CHECKSUM=$(curl -fsSL "$GITHUB_URL/$REPOSITORY/releases/download/v${INSTALL_VERSION}/beszel_${INSTALL_VERSION}_checksums.txt" | grep " $HELPER_FILE_NAME$" | cut -d' ' -f1)
   if [ -z "$HELPER_CHECKSUM" ] || ! echo "$HELPER_CHECKSUM" | grep -qE '^[a-fA-F0-9]{64}$'; then echo "Invalid maintenance helper checksum" >&2; exit 1; fi
-  curl -fL# --retry 3 --retry-delay 2 --connect-timeout 10 "$GITHUB_URL/guzassis/beszel-plus/releases/download/v${INSTALL_VERSION}/$HELPER_FILE_NAME" -o "$HELPER_FILE_NAME"
+  curl -fL# --retry 3 --retry-delay 2 --connect-timeout 10 "$GITHUB_URL/$REPOSITORY/releases/download/v${INSTALL_VERSION}/$HELPER_FILE_NAME" -o "$HELPER_FILE_NAME"
   if [ "$($CHECK_CMD "$HELPER_FILE_NAME" | cut -d' ' -f1)" != "$HELPER_CHECKSUM" ]; then echo "Maintenance helper checksum verification failed" >&2; exit 1; fi
   if ! tar -xzf "$HELPER_FILE_NAME" beszel-maintenance-helper; then echo "Failed to extract maintenance helper" >&2; exit 1; fi
   chmod 0755 beszel-maintenance-helper
   HELPER_VERSION_OUTPUT=$(./beszel-maintenance-helper --version 2>&1) || { echo "New maintenance helper version check failed" >&2; exit 1; }
-  if ! printf '%s\n' "$HELPER_VERSION_OUTPUT" | grep -qx "beszel-maintenance-helper v${INSTALL_VERSION}" || ! printf '%s\n' "$HELPER_VERSION_OUTPUT" | grep -qx 'protocol 1'; then
+  if ! printf '%s\n' "$HELPER_VERSION_OUTPUT" | grep -qx "Beszel Plus Maintenance Helper v${INSTALL_VERSION}" || ! printf '%s\n' "$HELPER_VERSION_OUTPUT" | grep -qx 'protocol 2'; then
     echo "Maintenance helper version or protocol does not match Agent v${INSTALL_VERSION}." >&2
     exit 1
   fi
@@ -978,7 +1025,7 @@ if is_alpine; then
 #!/sbin/openrc-run
 
 name="beszel-agent"
-description="Beszel Agent Service"
+description="Beszel Plus Agent Service"
 command="$BIN_PATH"
 command_user="beszel"
 command_background="yes"
@@ -1016,7 +1063,7 @@ EOF
   # Check if service started successfully
   sleep 2
   if ! rc-service beszel-agent status | grep -q "started"; then
-    echo "Error: The Beszel Agent service failed to start. Checking logs..."
+    echo "Error: The Beszel Plus Agent service failed to start. Checking logs..."
     tail -n 20 /var/log/beszel-agent.err
     exit 1
   fi
@@ -1045,7 +1092,7 @@ EOF
 
   # Check service status
   if ! rc-service beszel-agent status >/dev/null 2>&1; then
-    echo "Error: The Beszel Agent service is not running."
+    echo "Error: The Beszel Plus Agent service is not running."
     rc-service beszel-agent status
     exit 1
   fi
@@ -1118,7 +1165,7 @@ EOF
 
   # Check service status
   if ! /etc/init.d/beszel-agent running >/dev/null 2>&1; then
-    echo "Error: The Beszel Agent service is not running."
+    echo "Error: The Beszel Plus Agent service is not running."
     /etc/init.d/beszel-agent status
     exit 1
   fi
@@ -1162,7 +1209,7 @@ EOF
   # Check if service started successfully
   sleep 2
   if ! service beszel-agent status | grep -q "is running"; then
-    echo "Error: The Beszel Agent service failed to start. Checking logs..."
+    echo "Error: The Beszel Plus Agent service failed to start. Checking logs..."
     tail -n 20 /var/log/beszel_agent.log
     exit 1
   fi
@@ -1182,7 +1229,7 @@ EOF
 
     # Create cron job in /etc/cron.d 
     cat >/etc/cron.d/beszel-agent <<EOF
-# Beszel Agent daily update job
+# Beszel Plus Agent daily update job
 12 0 * * * root $BIN_PATH update >/dev/null 2>&1
 EOF
     chmod 644 /etc/cron.d/beszel-agent
@@ -1192,7 +1239,7 @@ EOF
 
   # Check service status
   if ! service beszel-agent status >/dev/null 2>&1; then
-    echo "Error: The Beszel Agent service is not running."
+    echo "Error: The Beszel Plus Agent service is not running."
     service beszel-agent status
     exit 1
   fi
@@ -1207,7 +1254,7 @@ else
 
     cat >/etc/systemd/system/beszel-agent.service <<EOF
 [Unit]
-Description=Beszel Agent Service
+Description=Beszel Plus Agent Service
 Wants=network-online.target
 After=network-online.target
 
@@ -1222,6 +1269,7 @@ Environment="UPDATE_CHECK_TIMEOUT=30s"
 Environment="UPDATE_MAX_PACKAGE_LIST=50"
 Environment="UPDATE_APT_TIMEOUT=2m"
 Environment="OS_UPDATE_MANAGEMENT=$OS_UPDATE_MANAGEMENT_FLAG"
+Environment="POWER_MANAGEMENT=$POWER_MANAGEMENT_FLAG"
 # Environment="EXTRA_FILESYSTEMS=sdb"
 ExecStart=$BIN_PATH
 User=beszel
@@ -1275,12 +1323,13 @@ Environment="UPDATE_CHECK_TIMEOUT=30s"
 Environment="UPDATE_MAX_PACKAGE_LIST=50"
 Environment="UPDATE_APT_TIMEOUT=2m"
 Environment="OS_UPDATE_MANAGEMENT=$OS_UPDATE_MANAGEMENT_FLAG"
+Environment="POWER_MANAGEMENT=$POWER_MANAGEMENT_FLAG"
 EOF
 
-  if [ "$OS_UPDATE_MANAGEMENT_FLAG" = "true" ] && [ "$OS_UPDATE_SUPPORTED" = "true" ]; then
+  if { [ "$OS_UPDATE_MANAGEMENT_FLAG" = "true" ] || [ "$POWER_MANAGEMENT_FLAG" = "true" ]; } && [ "$OS_UPDATE_SUPPORTED" = "true" ]; then
     cat >/etc/systemd/system/beszel-maintenance.socket <<EOF
 [Unit]
-Description=Beszel maintenance helper socket
+Description=Beszel Plus maintenance helper socket
 [Socket]
 ListenStream=/run/beszel-maintenance.sock
 SocketUser=root
@@ -1293,7 +1342,7 @@ WantedBy=sockets.target
 EOF
     cat >/etc/systemd/system/beszel-maintenance@.service <<EOF
 [Unit]
-Description=Beszel privileged maintenance helper
+Description=Beszel Plus privileged maintenance helper
 [Service]
 Type=oneshot
 TimeoutStartSec=3h
@@ -1328,7 +1377,7 @@ EOF
   # Load and start the service
   printf "\nLoading and starting the agent service...\n"
   systemctl daemon-reload
-  if [ "$OS_UPDATE_MANAGEMENT_FLAG" = "true" ] && [ "$OS_UPDATE_SUPPORTED" = "true" ]; then
+  if { [ "$OS_UPDATE_MANAGEMENT_FLAG" = "true" ] || [ "$POWER_MANAGEMENT_FLAG" = "true" ]; } && [ "$OS_UPDATE_SUPPORTED" = "true" ]; then
     echo "Starting maintenance socket..."
     if ! systemctl enable beszel-maintenance.socket >/dev/null 2>&1 || ! systemctl restart beszel-maintenance.socket; then
       echo "Error: Failed to enable or restart beszel-maintenance.socket." >&2
@@ -1357,7 +1406,7 @@ EOF
     echo "Applying initial update policy..."
     case "$OS_UPDATE_POLICY" in monitor) POLICY_MODE="monitor_only" ;; official-all) POLICY_MODE="official_all" ;; *) POLICY_MODE="security" ;; esac
     INSTALLER_REQUEST_ID="installer-$(date +%s)-$$"
-    if ! POLICY_RESPONSE=$(printf '{"version":1,"request_id":"%s","operation":"apply-update-policy","idempotency_key":"%s","policy":{"enabled":true,"mode":"%s","update_package_lists_days":1,"unattended_upgrade_days":1,"automatic_reboot":false,"automatic_reboot_time":"04:00","remove_unused_dependencies":false}}\n' "$INSTALLER_REQUEST_ID" "$INSTALLER_REQUEST_ID" "$POLICY_MODE" | "$MAINTENANCE_HELPER_PATH"); then
+    if ! POLICY_RESPONSE=$(printf '{"version":2,"request_id":"%s","operation":"apply-update-policy","idempotency_key":"%s","policy":{"enabled":true,"mode":"%s","update_package_lists_days":1,"unattended_upgrade_days":1,"automatic_reboot":false,"automatic_reboot_time":"04:00","remove_unused_dependencies":false}}\n' "$INSTALLER_REQUEST_ID" "$INSTALLER_REQUEST_ID" "$POLICY_MODE" | "$MAINTENANCE_HELPER_PATH"); then
       echo "Error: Initial OS update policy validation failed; maintenance setup is incomplete." >&2
       exit 1
     fi
@@ -1377,7 +1426,7 @@ EOF
       fi
     fi
   fi
-  echo "Starting Beszel Agent..."
+  echo "Starting Beszel Plus Agent..."
   systemctl enable beszel-agent.service >/dev/null 2>&1
   systemctl restart beszel-agent.service
 
@@ -1432,7 +1481,7 @@ EOF
 
   # Wait for the service to start or fail
   if [ "$(systemctl is-active beszel-agent.service)" != "active" ]; then
-    echo "Error: The Beszel Agent service is not running."
+    echo "Error: The Beszel Plus Agent service is not running."
     systemctl status beszel-agent.service
     exit 1
   fi
@@ -1461,7 +1510,7 @@ if [ "$POLICY_PENDING" = "true" ]; then
 fi
 echo "Installation completed."
 
-printf "\n\033[32mBeszel Agent has been installed successfully! It is now running on %s.\033[0m\n" "$PORT"
+printf "\n\033[32mBeszel Plus Agent has been installed successfully! It is now running on %s.\033[0m\n" "$PORT"
 if [ "$WEBSOCKET_AUTH_WARNING" = "true" ]; then
   printf "\033[33mInstallation completed with a WebSocket authentication warning (401); review TOKEN and HUB_URL.\033[0m\n"
 fi

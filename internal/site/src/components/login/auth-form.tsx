@@ -382,7 +382,7 @@ export function UserAuthForm({
 						</DialogHeader>
 						<div className="text-primary/70 text-[0.95em] contents">
 							<p>
-								<Trans>Beszel supports OpenID Connect and many OAuth2 authentication providers.</Trans>
+								<Trans>Beszel Plus supports OpenID Connect and many OAuth2 authentication providers.</Trans>
 							</p>
 							<p>
 								<Trans>

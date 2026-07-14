@@ -21,7 +21,7 @@ func TestInstallerContainsSafeMaintenanceUpgradeFlow(t *testing.T) {
 			t.Fatalf("installer missing %q", required)
 		}
 	}
-	for _, required := range []string{"10-beszel-connection.conf", "maintenance-smoke", "TRANSACTION_DIR", "rollback_install", "Maintenance helper protocol compatibility verified", `"retryable":true`} {
+	for _, required := range []string{"10-beszel-connection.conf", "maintenance-smoke", "TRANSACTION_DIR", "rollback_install", "Maintenance helper protocol compatibility verified", `"retryable":true`, "cleanup_stale_maintenance_validations", "operation=run-update-dry-run", "non-validation Beszel Plus maintenance operation is active"} {
 		if !strings.Contains(script, required) {
 			t.Fatalf("installer missing upgrade safeguard %q", required)
 		}
@@ -44,7 +44,7 @@ func TestInstallerContainsSafeMaintenanceUpgradeFlow(t *testing.T) {
 		t.Fatal("installer does not arm rollback for exit and interruption")
 	}
 	policy := strings.Index(script, `"operation":"apply-update-policy"`)
-	startLog := strings.Index(script, `echo "Starting Beszel Agent..."`)
+	startLog := strings.Index(script, `echo "Starting Beszel Plus Agent..."`)
 	agentStart := -1
 	if startLog >= 0 {
 		agentStart = startLog + strings.Index(script[startLog:], `systemctl restart beszel-agent.service`)
@@ -64,7 +64,7 @@ func TestInstallerContainsSafeMaintenanceUpgradeFlow(t *testing.T) {
 		t.Fatal("installer enables APT timers before policy validation")
 	}
 	socketCheck := strings.Index(script, `systemctl is-active --quiet beszel-maintenance.socket`)
-	success := strings.LastIndex(script, "Beszel Agent has been installed successfully")
+	success := strings.LastIndex(script, "Beszel Plus Agent has been installed successfully")
 	if socketCheck < 0 || success < 0 || socketCheck >= success || !strings.Contains(script[socketCheck:success], "exit 1") {
 		t.Fatal("installer can report success without failing an inactive maintenance socket")
 	}

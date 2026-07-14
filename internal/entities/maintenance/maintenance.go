@@ -3,12 +3,13 @@ package maintenance
 
 import (
 	"errors"
+	powerentity "github.com/henrygd/beszel/internal/entities/power"
 	"regexp"
 	"strings"
 	"time"
 )
 
-const ProtocolVersion uint8 = 1
+const ProtocolVersion uint8 = 2
 
 type Operation string
 type OperationState string
@@ -24,6 +25,10 @@ const (
 	RunUpdateDryRun           Operation = "run-update-dry-run"
 	RunUnattendedUpgrades     Operation = "run-unattended-upgrades"
 	GetOperationStatus        Operation = "get-operation-status"
+	GetPowerCapabilities      Operation = "get-power-capabilities"
+	SchedulePoweroff          Operation = "schedule-poweroff"
+	CancelPoweroff            Operation = "cancel-poweroff"
+	GetPoweroffStatus         Operation = "get-poweroff-status"
 
 	StateQueued    OperationState = "queued"
 	StateRunning   OperationState = "running"
@@ -39,20 +44,21 @@ const (
 var safeRepositoryValue = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._+:/-]{0,127}$`)
 
 type Capabilities struct {
-	UpdateMonitoring   bool   `json:"update_monitoring" cbor:"0,keyasint"`
-	UpdateManagement   bool   `json:"update_management" cbor:"1,keyasint"`
-	PrivilegedHelper   bool   `json:"privileged_helper" cbor:"2,keyasint"`
-	PolicyRead         bool   `json:"policy_read" cbor:"3,keyasint"`
-	PolicyWrite        bool   `json:"policy_write" cbor:"4,keyasint"`
-	DryRun             bool   `json:"dry_run" cbor:"5,keyasint"`
-	RunUpgrade         bool   `json:"run_upgrade" cbor:"6,keyasint"`
-	AutomaticReboot    bool   `json:"automatic_reboot" cbor:"7,keyasint"`
-	SupportedPlatform  string `json:"supported_platform,omitempty" cbor:"8,keyasint,omitempty"`
-	HelperVersion      string `json:"helper_version,omitempty" cbor:"9,keyasint,omitempty"`
-	ProtocolVersion    uint8  `json:"protocol_version,omitempty" cbor:"10,keyasint,omitempty"`
-	MinAgentVersion    string `json:"min_agent_version,omitempty" cbor:"11,keyasint,omitempty"`
-	MaxProtocolVersion uint8  `json:"max_protocol_version,omitempty" cbor:"12,keyasint,omitempty"`
-	BuildCommit        string `json:"build_commit,omitempty" cbor:"13,keyasint,omitempty"`
+	UpdateMonitoring   bool                      `json:"update_monitoring" cbor:"0,keyasint"`
+	UpdateManagement   bool                      `json:"update_management" cbor:"1,keyasint"`
+	PrivilegedHelper   bool                      `json:"privileged_helper" cbor:"2,keyasint"`
+	PolicyRead         bool                      `json:"policy_read" cbor:"3,keyasint"`
+	PolicyWrite        bool                      `json:"policy_write" cbor:"4,keyasint"`
+	DryRun             bool                      `json:"dry_run" cbor:"5,keyasint"`
+	RunUpgrade         bool                      `json:"run_upgrade" cbor:"6,keyasint"`
+	AutomaticReboot    bool                      `json:"automatic_reboot" cbor:"7,keyasint"`
+	SupportedPlatform  string                    `json:"supported_platform,omitempty" cbor:"8,keyasint,omitempty"`
+	HelperVersion      string                    `json:"helper_version,omitempty" cbor:"9,keyasint,omitempty"`
+	ProtocolVersion    uint8                     `json:"protocol_version,omitempty" cbor:"10,keyasint,omitempty"`
+	MinAgentVersion    string                    `json:"min_agent_version,omitempty" cbor:"11,keyasint,omitempty"`
+	MaxProtocolVersion uint8                     `json:"max_protocol_version,omitempty" cbor:"12,keyasint,omitempty"`
+	BuildCommit        string                    `json:"build_commit,omitempty" cbor:"13,keyasint,omitempty"`
+	Power              *powerentity.Capabilities `json:"power,omitempty" cbor:"14,keyasint,omitempty"`
 }
 
 type Policy struct {
@@ -90,14 +96,17 @@ type Request struct {
 	Operation      Operation `json:"operation" cbor:"2,keyasint"`
 	IdempotencyKey string    `json:"idempotency_key,omitempty" cbor:"3,keyasint,omitempty"`
 	Policy         *Policy   `json:"policy,omitempty" cbor:"4,keyasint,omitempty"`
+	DelaySeconds   uint32    `json:"delay_seconds,omitempty" cbor:"5,keyasint,omitempty"`
 }
 
 type Result struct {
-	Capabilities *Capabilities `json:"capabilities,omitempty" cbor:"0,keyasint,omitempty"`
-	Policy       *Policy       `json:"policy,omitempty" cbor:"1,keyasint,omitempty"`
-	Repositories []Repository  `json:"repositories,omitempty" cbor:"2,keyasint,omitempty"`
-	Output       string        `json:"output,omitempty" cbor:"3,keyasint,omitempty"`
-	Changed      bool          `json:"changed,omitempty" cbor:"4,keyasint,omitempty"`
+	Capabilities      *Capabilities               `json:"capabilities,omitempty" cbor:"0,keyasint,omitempty"`
+	Policy            *Policy                     `json:"policy,omitempty" cbor:"1,keyasint,omitempty"`
+	Repositories      []Repository                `json:"repositories,omitempty" cbor:"2,keyasint,omitempty"`
+	Output            string                      `json:"output,omitempty" cbor:"3,keyasint,omitempty"`
+	Changed           bool                        `json:"changed,omitempty" cbor:"4,keyasint,omitempty"`
+	PowerCapabilities *powerentity.Capabilities   `json:"power_capabilities,omitempty" cbor:"5,keyasint,omitempty"`
+	PoweroffStatus    *powerentity.ShutdownStatus `json:"poweroff_status,omitempty" cbor:"6,keyasint,omitempty"`
 }
 
 type Response struct {
@@ -120,6 +129,7 @@ type Response struct {
 	HolderPID      int            `json:"holder_pid,omitempty" cbor:"16,keyasint,omitempty"`
 	HolderCommand  string         `json:"holder_command,omitempty" cbor:"17,keyasint,omitempty"`
 	HolderUnit     string         `json:"holder_unit,omitempty" cbor:"18,keyasint,omitempty"`
+	NextAttemptAt  *time.Time     `json:"next_attempt_at,omitempty" cbor:"19,keyasint,omitempty"`
 }
 
 type Rollback struct {
@@ -129,7 +139,7 @@ type Rollback struct {
 
 func IsOperationAllowed(op Operation) bool {
 	switch op {
-	case GetCapabilities, GetUpdatePolicy, DetectRepositories, ValidateUpdatePolicy, ApplyUpdatePolicy, InstallUpdateDependencies, RunUpdateDryRun, RunUnattendedUpgrades, GetOperationStatus:
+	case GetCapabilities, GetUpdatePolicy, DetectRepositories, ValidateUpdatePolicy, ApplyUpdatePolicy, InstallUpdateDependencies, RunUpdateDryRun, RunUnattendedUpgrades, GetOperationStatus, GetPowerCapabilities, SchedulePoweroff, CancelPoweroff, GetPoweroffStatus:
 		return true
 	default:
 		return false
@@ -138,7 +148,7 @@ func IsOperationAllowed(op Operation) bool {
 
 func IsLongOperation(op Operation) bool {
 	switch op {
-	case ApplyUpdatePolicy, InstallUpdateDependencies, RunUpdateDryRun, RunUnattendedUpgrades:
+	case ApplyUpdatePolicy, InstallUpdateDependencies, RunUpdateDryRun, RunUnattendedUpgrades, SchedulePoweroff:
 		return true
 	}
 	return false
@@ -168,6 +178,12 @@ func ValidateRequest(req Request) error {
 	}
 	if req.Policy != nil {
 		return errors.New("policy is not valid for this operation")
+	}
+	if req.Operation == SchedulePoweroff && req.DelaySeconds > 604800 {
+		return errors.New("poweroff delay out of range")
+	}
+	if req.Operation != SchedulePoweroff && req.DelaySeconds != 0 {
+		return errors.New("delay is not valid for this operation")
 	}
 	return nil
 }
