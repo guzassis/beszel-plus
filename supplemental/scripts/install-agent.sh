@@ -1,7 +1,7 @@
 #!/bin/sh
 
 PRODUCT_NAME="Beszel Plus"
-PRODUCT_VERSION="0.2.1"
+PRODUCT_VERSION="0.2.2"
 REPOSITORY="guzassis/beszel-plus"
 
 is_alpine() {
@@ -235,12 +235,16 @@ detect_mips_endianness() {
 
 # Default values
 PORT=45876
+PORT_PROVIDED=false
 UNINSTALL=false
 GITHUB_URL="https://github.com"
 GITHUB_PROXY_URL=""
 KEY=""
+KEY_PROVIDED=false
 TOKEN=""
+TOKEN_PROVIDED=false
 HUB_URL=""
+HUB_URL_PROVIDED=false
 AUTO_UPDATE_FLAG="" # empty string means prompt, "true" means auto-enable, "false" means skip
 OS_UPDATE_MANAGEMENT_FLAG=""
 POWER_MANAGEMENT_FLAG=""
@@ -249,6 +253,7 @@ VERSION="latest"
 WEBSOCKET_AUTH_WARNING=false
 POLICY_PENDING=false
 WAIT_FOR_MAINTENANCE=5
+WAIT_FOR_APT=60
 VERBOSE=false
 DIAGNOSE=false
 
@@ -270,6 +275,7 @@ case "$1" in
 	printf "  --power-management=true|false : Enable WOL diagnostics and secure shutdown\n"
 	printf "  --os-update-policy=monitor|security|official-all : Initial policy for new installations\n"
 	printf "  --wait-for-maintenance=SECONDS : Wait up to 5 seconds by default (maximum 300)\n"
+	printf "  --wait-for-apt=SECONDS : Wait for required APT access (default: 60, maximum: 3600)\n"
 	printf "  --verbose             : Show detailed maintenance preflight diagnostics\n"
 	printf "  --diagnose            : Print install readiness without changing the system\n"
   printf "                          VALUE can be true (enable) or false (disable). If not specified, will prompt.\n"
@@ -279,19 +285,6 @@ case "$1" in
   exit 0
   ;;
 esac
-
-# Build sudo args by properly quoting everything
-build_sudo_args() {
-  QUOTED_ARGS=""
-  while [ $# -gt 0 ]; do
-    if [ -n "$QUOTED_ARGS" ]; then
-      QUOTED_ARGS="$QUOTED_ARGS "
-    fi
-    QUOTED_ARGS="$QUOTED_ARGS'$(echo "$1" | sed "s/'/'\\\\''/g")'"
-    shift
-  done
-  echo "$QUOTED_ARGS"
-}
 
 systemd_escape_environment() {
   # systemd double-quoted Environment= values require backslash and quote escaping.
@@ -335,8 +328,7 @@ detect_existing_helper_version() {
 # Check if running as root and re-execute with sudo if needed
 if [ "$(id -u)" != "0" ]; then
   if command -v sudo >/dev/null 2>&1; then
-    SUDO_ARGS=$(build_sudo_args "$@")
-    eval "exec sudo $0 $SUDO_ARGS"
+    exec sudo -- "$0" "$@"
   else
     echo "This script must be run as root. Please either:"
     echo "1. Run this script as root (su root)"
@@ -349,22 +341,31 @@ fi
 while [ $# -gt 0 ]; do
   case "$1" in
   -k)
+    [ "$#" -ge 2 ] || { echo "Missing value for -k" >&2; exit 64; }
     shift
     KEY="$1"
+    KEY_PROVIDED=true
     ;;
   -p)
+    [ "$#" -ge 2 ] || { echo "Missing value for -p" >&2; exit 64; }
     shift
     PORT="$1"
+    PORT_PROVIDED=true
     ;;
   -t)
+    [ "$#" -ge 2 ] || { echo "Missing value for -t" >&2; exit 64; }
     shift
     TOKEN="$1"
+    TOKEN_PROVIDED=true
     ;;
   -url)
+    [ "$#" -ge 2 ] || { echo "Missing value for -url" >&2; exit 64; }
     shift
     HUB_URL="$1"
+    HUB_URL_PROVIDED=true
     ;;
   -v | --version)
+    [ "$#" -ge 2 ] || { echo "Missing value for $1" >&2; exit 64; }
     shift
     VERSION="$1"
     ;;
@@ -395,25 +396,30 @@ while [ $# -gt 0 ]; do
     fi
     ;;
 	--agent-auto-update*)
-		if echo "$1" | grep -q "="; then AUTO_UPDATE_VALUE=$(echo "$1" | cut -d'=' -f2); else AUTO_UPDATE_VALUE="$2"; shift; fi
+		if echo "$1" | grep -q "="; then AUTO_UPDATE_VALUE=$(echo "$1" | cut -d'=' -f2); else [ "$#" -ge 2 ] || { echo "Missing --agent-auto-update value" >&2; exit 64; }; AUTO_UPDATE_VALUE="$2"; shift; fi
 		if [ "$AUTO_UPDATE_VALUE" = "true" ] || [ "$AUTO_UPDATE_VALUE" = "false" ]; then AUTO_UPDATE_FLAG="$AUTO_UPDATE_VALUE"; else echo "Invalid --agent-auto-update value" >&2; exit 1; fi
 		;;
 	--os-update-management*)
-		if echo "$1" | grep -q "="; then OS_UPDATE_VALUE=$(echo "$1" | cut -d'=' -f2); else OS_UPDATE_VALUE="$2"; shift; fi
+		if echo "$1" | grep -q "="; then OS_UPDATE_VALUE=$(echo "$1" | cut -d'=' -f2); else [ "$#" -ge 2 ] || { echo "Missing --os-update-management value" >&2; exit 64; }; OS_UPDATE_VALUE="$2"; shift; fi
 		if [ "$OS_UPDATE_VALUE" = "true" ] || [ "$OS_UPDATE_VALUE" = "false" ]; then OS_UPDATE_MANAGEMENT_FLAG="$OS_UPDATE_VALUE"; else echo "Invalid --os-update-management value" >&2; exit 1; fi
 		;;
 	--os-update-policy*)
-		if echo "$1" | grep -q "="; then OS_UPDATE_POLICY=$(echo "$1" | cut -d'=' -f2); else OS_UPDATE_POLICY="$2"; shift; fi
+		if echo "$1" | grep -q "="; then OS_UPDATE_POLICY=$(echo "$1" | cut -d'=' -f2); else [ "$#" -ge 2 ] || { echo "Missing --os-update-policy value" >&2; exit 64; }; OS_UPDATE_POLICY="$2"; shift; fi
 		case "$OS_UPDATE_POLICY" in monitor|security|official-all) ;; *) echo "Invalid --os-update-policy value" >&2; exit 1 ;; esac
 		;;
 	--power-management*)
-		if echo "$1" | grep -q "="; then POWER_VALUE=$(echo "$1" | cut -d'=' -f2); else POWER_VALUE="$2"; shift; fi
+		if echo "$1" | grep -q "="; then POWER_VALUE=$(echo "$1" | cut -d'=' -f2); else [ "$#" -ge 2 ] || { echo "Missing --power-management value" >&2; exit 64; }; POWER_VALUE="$2"; shift; fi
 		if [ "$POWER_VALUE" = "true" ] || [ "$POWER_VALUE" = "false" ]; then POWER_MANAGEMENT_FLAG="$POWER_VALUE"; else echo "Invalid --power-management value" >&2; exit 1; fi
 		;;
 	--wait-for-maintenance*)
-		if echo "$1" | grep -q "="; then WAIT_FOR_MAINTENANCE=$(echo "$1" | cut -d'=' -f2); else WAIT_FOR_MAINTENANCE="$2"; shift; fi
+		if echo "$1" | grep -q "="; then WAIT_FOR_MAINTENANCE=$(echo "$1" | cut -d'=' -f2); else [ "$#" -ge 2 ] || { echo "Missing --wait-for-maintenance value" >&2; exit 64; }; WAIT_FOR_MAINTENANCE="$2"; shift; fi
 		case "$WAIT_FOR_MAINTENANCE" in ''|*[!0-9]*) echo "Invalid --wait-for-maintenance value" >&2; exit 1 ;; esac
 		if [ "$WAIT_FOR_MAINTENANCE" -gt 300 ]; then echo "--wait-for-maintenance cannot exceed 300 seconds" >&2; exit 1; fi
+		;;
+	--wait-for-apt*)
+		if echo "$1" | grep -q "="; then WAIT_FOR_APT=$(echo "$1" | cut -d'=' -f2); else [ "$#" -ge 2 ] || { echo "Missing --wait-for-apt value" >&2; exit 64; }; WAIT_FOR_APT="$2"; shift; fi
+		case "$WAIT_FOR_APT" in ''|*[!0-9]*) echo "Invalid --wait-for-apt value" >&2; exit 1 ;; esac
+		if [ "$WAIT_FOR_APT" -gt 3600 ]; then echo "--wait-for-apt cannot exceed 3600 seconds" >&2; exit 1; fi
 		;;
 	--verbose)
 		VERBOSE=true
@@ -469,6 +475,7 @@ else
   BIN_PATH="/opt/beszel-agent/beszel-agent"
 fi
 MAINTENANCE_HELPER_PATH="/usr/local/libexec/beszel/maintenance-helper"
+AGENT_ENV_PATH="/etc/beszel-agent/agent.env"
 MAINTENANCE_POLICY_PATH="/var/lib/beszel-maintenance/policy.json"
 MAINTENANCE_STATUS_PATH="/var/lib/beszel-maintenance/status.json"
 DRAIN_PATH="/run/beszel-agent/upgrade-in-progress"
@@ -484,15 +491,20 @@ LOCK_KIND=""
 LOCK_DIR=""
 AGENT_REPLACED=false
 HELPER_REPLACED=false
+HELPER_REMOVED=false
 AGENT_SERVICE_CHANGED=false
 SOCKET_CHANGED=false
 TEMPLATE_CHANGED=false
 MONITORING_DROPIN_CHANGED=false
 CONNECTION_DROPIN_CHANGED=false
+AGENT_ENV_CHANGED=false
 UPDATE_SERVICE_CHANGED=false
 UPDATE_TIMER_CHANGED=false
 ROLLBACK_FAILED_COMPONENTS=""
 ROLLBACK_RESTORED_COMPONENTS=""
+APT_TIMERS_QUIESCED=false
+APT_DAILY_TIMER_WAS_ACTIVE=false
+APT_UPGRADE_TIMER_WAS_ACTIVE=false
 
 json_string_value() {
   json_file="$1"
@@ -518,6 +530,22 @@ restore_quiesced_services() {
   fi
   QUIESCE_ACTIVE=false
   [ "$restore_services_ok" = "true" ]
+}
+
+pause_apt_timers() {
+  if systemctl is-active --quiet apt-daily.timer 2>/dev/null; then APT_DAILY_TIMER_WAS_ACTIVE=true; fi
+  if systemctl is-active --quiet apt-daily-upgrade.timer 2>/dev/null; then APT_UPGRADE_TIMER_WAS_ACTIVE=true; fi
+  APT_TIMERS_QUIESCED=true
+  systemctl stop apt-daily.timer apt-daily-upgrade.timer >/dev/null 2>&1 || true
+}
+
+restore_apt_timers() {
+  [ "$APT_TIMERS_QUIESCED" = "true" ] || return 0
+  apt_restore_ok=true
+  if [ "$APT_DAILY_TIMER_WAS_ACTIVE" = "true" ]; then systemctl start apt-daily.timer >/dev/null 2>&1 || apt_restore_ok=false; fi
+  if [ "$APT_UPGRADE_TIMER_WAS_ACTIVE" = "true" ]; then systemctl start apt-daily-upgrade.timer >/dev/null 2>&1 || apt_restore_ok=false; fi
+  APT_TIMERS_QUIESCED=false
+  [ "$apt_restore_ok" = "true" ]
 }
 
 clear_upgrade_drain() {
@@ -643,14 +671,6 @@ maintenance_preflight() {
     return 75
   done <"$PREFLIGHT_UNITS_FILE"
   rm -f "$PREFLIGHT_UNITS_FILE"
-  if command -v fuser >/dev/null 2>&1; then
-    external_lock_pids=$(fuser /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock /var/cache/apt/archives/lock 2>/dev/null | tr '\n' ' ' || true)
-    if [ -n "$external_lock_pids" ]; then
-      echo "Upgrade not started: APT/dpkg is active (lock holder PIDs: $external_lock_pids)." >&2
-      echo "No binaries or configuration files were changed." >&2
-      return 75
-    fi
-  fi
   return 0
 }
 
@@ -690,6 +710,7 @@ rollback_install() {
     "/etc/systemd/system/beszel-maintenance-helper@.service|maintenance-legacy-template|$TEMPLATE_CHANGED|Legacy template" \
     "/etc/systemd/system/beszel-agent.service.d/update-monitoring.conf|update-monitoring|$MONITORING_DROPIN_CHANGED|Monitoring drop-in" \
     "/etc/systemd/system/beszel-agent.service.d/10-beszel-connection.conf|connection-settings|$CONNECTION_DROPIN_CHANGED|Connection drop-in" \
+    "$AGENT_ENV_PATH|agent-env|$AGENT_ENV_CHANGED|Agent environment" \
     "/etc/systemd/system/beszel-agent-update.service|agent-update-service|$UPDATE_SERVICE_CHANGED|Update service" \
     "/etc/systemd/system/beszel-agent-update.timer|agent-update-timer|$UPDATE_TIMER_CHANGED|Update timer"
   do
@@ -715,7 +736,9 @@ rollback_install() {
   printf '{"timestamp":"%s","target_version":"%s","previous_version":"%s","restored_components":%s,"failed_components":%s,"final_service_state":{"agent":"%s","socket":"%s"}}\n' \
     "$rollback_timestamp" "${INSTALL_VERSION:-unknown}" "${OLD_AGENT_VERSION:-unknown}" "$rollback_restored_json" "$rollback_failed_json" "$(service_state beszel-agent.service)" "$(service_state beszel-maintenance.socket)" \
     >"$ROLLBACK_REPORT_PATH" 2>/dev/null || append_component failed rollback-report
-  rm -f "${BIN_PATH}.new.$$" "${MAINTENANCE_HELPER_PATH}.new.$$"
+  rm -f "${BIN_PATH}.new.$$" "${MAINTENANCE_HELPER_PATH}.new.$$" "${AGENT_ENV_PATH}.new.$$" \
+    "/etc/systemd/system/beszel-agent.service.new.$$" \
+    "/etc/systemd/system/beszel-agent.service.d/10-beszel-connection.conf.new.$$"
   if [ -n "$ROLLBACK_FAILED_COMPONENTS" ]; then
     echo "CRITICAL: Rollback was incomplete. Manual recovery is required." >&2
     return 70
@@ -735,8 +758,11 @@ on_installer_exit() {
   elif [ "$QUIESCE_ACTIVE" = "true" ]; then
     restore_quiesced_services || exit_status=70
   fi
+  restore_apt_timers || exit_status=70
   clear_upgrade_drain
   rm -f "${DRAIN_PATH}.new.$$"
+  rm -f "${AGENT_ENV_PATH}.new.$$" "/etc/systemd/system/beszel-agent.service.new.$$" \
+    "/etc/systemd/system/beszel-agent.service.d/10-beszel-connection.conf.new.$$"
   [ -z "${TEMP_DIR:-}" ] || rm -rf "$TEMP_DIR"
   [ -z "${PREFLIGHT_UNITS_FILE:-}" ] || rm -f "$PREFLIGHT_UNITS_FILE"
   [ -z "$TRANSACTION_DIR" ] || rm -rf "$TRANSACTION_DIR"
@@ -818,6 +844,7 @@ begin_install_transaction() {
   backup_transaction_file /etc/systemd/system/beszel-maintenance-helper@.service maintenance-legacy-template || return 1
   backup_transaction_file /etc/systemd/system/beszel-agent.service.d/update-monitoring.conf update-monitoring || return 1
   backup_transaction_file /etc/systemd/system/beszel-agent.service.d/10-beszel-connection.conf connection-settings || return 1
+  backup_transaction_file "$AGENT_ENV_PATH" agent-env || return 1
   backup_transaction_file /etc/systemd/system/beszel-agent-update.service agent-update-service || return 1
   backup_transaction_file /etc/systemd/system/beszel-agent-update.timer agent-update-timer || return 1
   PHASE="PHASE_TRANSACTION"
@@ -871,6 +898,24 @@ read_existing_management_flag() {
   existing_value=$(sed -n "s/.*${existing_name}=\(true\|false\).*/\1/p" /etc/systemd/system/beszel-agent.service /etc/systemd/system/beszel-agent.service.d/*.conf 2>/dev/null | tail -n 1)
   [ -n "$existing_value" ] && echo "$existing_value" || echo "false"
 }
+
+read_existing_connection_value() {
+  connection_name="$1"
+  connection_value=$(sed -n "s/^${connection_name}=\"\(.*\)\"$/\1/p; s/^${connection_name}=\(.*\)$/\1/p; s/^Environment=\"${connection_name}=\(.*\)\"$/\1/p" \
+    "$AGENT_ENV_PATH" /etc/systemd/system/beszel-agent.service /etc/systemd/system/beszel-agent.service.d/*.conf 2>/dev/null | tail -n 1)
+  printf '%s' "$connection_value" | sed 's/\\"/"/g; s/\\\\/\\/g'
+}
+
+if [ "$EXISTING_INSTALLATION" = "true" ]; then
+  if [ "$PORT_PROVIDED" = "false" ]; then PORT=$(read_existing_connection_value PORT); [ -n "$PORT" ] || PORT=45876; fi
+  if [ "$KEY_PROVIDED" = "false" ]; then KEY=$(read_existing_connection_value KEY); fi
+  if [ "$TOKEN_PROVIDED" = "false" ]; then TOKEN=$(read_existing_connection_value TOKEN); fi
+  if [ "$HUB_URL_PROVIDED" = "false" ]; then HUB_URL=$(read_existing_connection_value HUB_URL); fi
+fi
+if [ -z "$AUTO_UPDATE_FLAG" ] && [ "$EXISTING_INSTALLATION" = "true" ]; then
+  if systemctl is-enabled --quiet beszel-agent-update.timer 2>/dev/null; then AUTO_UPDATE_FLAG=true; else AUTO_UPDATE_FLAG=false; fi
+  echo "Agent auto-update flag not provided; preserving existing setting: $AUTO_UPDATE_FLAG."
+fi
 if [ -z "$OS_UPDATE_MANAGEMENT_FLAG" ]; then
   if [ "$EXISTING_INSTALLATION" = "true" ]; then OS_UPDATE_MANAGEMENT_FLAG=$(read_existing_management_flag OS_UPDATE_MANAGEMENT); echo "OS update management flag not provided; preserving existing setting: $OS_UPDATE_MANAGEMENT_FLAG."; else OS_UPDATE_MANAGEMENT_FLAG=false; fi
 fi
@@ -891,7 +936,10 @@ diagnose_install() {
   diagnose_status=$(json_string_value "$MAINTENANCE_STATUS_PATH" status 2>/dev/null || true)
   if [ "$diagnose_status" != "running" ]; then diagnose_operation=""; diagnose_request=""; fi
   diagnose_pending="no"; [ -f /var/lib/beszel-maintenance/pending-policy.json ] && diagnose_pending="yes"
-  diagnose_apt="none"; if command -v fuser >/dev/null 2>&1; then diagnose_apt=$(fuser /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock 2>/dev/null | tr '\n' ' '); [ -n "$diagnose_apt" ] || diagnose_apt="none"; fi
+  diagnose_apt_required=false
+  if [ "$POWER_MANAGEMENT_FLAG" = "true" ] && ! command -v ethtool >/dev/null 2>&1; then diagnose_apt_required=true; fi
+  if [ "$OS_UPDATE_MANAGEMENT_FLAG" = "true" ] && ! dpkg-query -W -f='${db:Status-Status}' unattended-upgrades 2>/dev/null | grep -qx installed; then diagnose_apt_required=true; fi
+  diagnose_apt="none"; if command -v fuser >/dev/null 2>&1; then diagnose_apt=$(fuser /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock /var/lib/apt/lists/lock /var/cache/apt/archives/lock /run/unattended-upgrades.lock 2>/dev/null | tr ' ' '\n' | sed '/^$/d' | sort -u | tr '\n' ' '); [ -n "$diagnose_apt" ] || diagnose_apt="none"; fi
   diagnose_units_file=$(mktemp)
   systemctl list-units --all --no-legend 'beszel-maintenance@*.service' 2>/dev/null >"$diagnose_units_file" || true
   diagnose_unit=$(awk '$3 == "active" { print $1; exit }' "$diagnose_units_file")
@@ -906,10 +954,11 @@ diagnose_install() {
   echo "Active maintenance unit: ${diagnose_unit:-none}"
   echo "Operation request ID: ${diagnose_request:-none}"
   echo "APT lock holder PID: $diagnose_apt"
+  echo "APT package changes required: $diagnose_apt_required"
   echo "Pending policy: $diagnose_pending"
   echo "OS update management: $OS_UPDATE_MANAGEMENT_FLAG"
   echo "Power management: $POWER_MANAGEMENT_FLAG"
-  if [ -n "$diagnose_operation" ] || [ "$diagnose_apt" != "none" ]; then echo "Upgrade can proceed: no"; else echo "Upgrade can proceed: yes"; fi
+  if [ -n "$diagnose_operation" ] || { [ "$diagnose_apt_required" = "true" ] && [ "$diagnose_apt" != "none" ]; }; then echo "Upgrade can proceed: no"; else echo "Upgrade can proceed: yes"; fi
 }
 if [ "$DIAGNOSE" = "true" ]; then diagnose_install; exit 0; fi
 
@@ -1036,56 +1085,37 @@ package_installed() {
   command -v "$1" >/dev/null 2>&1
 }
 
-# Check for package manager and install necessary packages if not installed
-if package_installed apk; then
-  if ! package_installed tar || ! package_installed curl || ! package_installed sha256sum; then
-    apk update
-    apk add tar curl coreutils shadow
+# Bootstrap tools are preflight requirements. Installing them here would make
+# release/download failures mutate the host before the Beszel transaction.
+for required_tool in tar curl sha256sum; do
+  if ! package_installed "$required_tool"; then
+    echo "Upgrade not started: required tool '$required_tool' is missing." >&2
+    echo "Install it with the operating-system package manager and run this command again." >&2
+    exit 75
   fi
-elif package_installed opkg; then
-  if ! package_installed tar || ! package_installed curl || ! package_installed sha256sum; then
-    opkg update
-    opkg install tar curl coreutils
-  fi
-elif package_installed pkg && is_freebsd; then
-  if ! package_installed tar || ! package_installed curl || ! package_installed sha256sum; then
-    pkg update
-    pkg install -y gtar curl coreutils
-  fi
-elif package_installed apt-get; then
-  if ! package_installed tar || ! package_installed curl || ! package_installed sha256sum; then
-    if [ "$EXISTING_INSTALLATION" = "true" ]; then
-      echo "Upgrade not started: required download tools are missing." >&2
-      echo "No binaries or configuration files were changed." >&2
-      exit 75
-    fi
-    apt-get update
-    apt-get install -y tar curl coreutils
-  fi
-elif package_installed yum; then
-  if ! package_installed tar || ! package_installed curl || ! package_installed sha256sum; then
-    yum install -y tar curl coreutils
-  fi
-elif package_installed pacman; then
-  if ! package_installed tar || ! package_installed curl || ! package_installed sha256sum; then
-    pacman -Sy --noconfirm tar curl coreutils
-  fi
-else
-  echo "Warning: Please ensure 'tar' and 'curl' and 'sha256sum (coreutils)' are installed."
-fi
+done
 
 # If no SSH key is provided, ask for the SSH key interactively (skip if upgrading)
 if [ -z "$KEY" ]; then
-  if [ -f "$BIN_PATH" ]; then
-    echo "Upgrading existing installation. Using existing service configuration."
-  else
+  if [ -t 0 ]; then
     printf "Enter your SSH key: "
     read -r KEY
+  else
+    echo "No SSH key is configured. Provide -k when running non-interactively." >&2
+    exit 64
   fi
 fi
 
 # Remove newlines from KEY
 KEY=$(echo "$KEY" | tr -d '\n')
+
+case "$PORT" in ''|*[!0-9]*) echo "Invalid Agent port: $PORT" >&2; exit 64 ;; esac
+if [ "$PORT" -lt 1 ] || [ "$PORT" -gt 65535 ]; then echo "Agent port must be between 1 and 65535." >&2; exit 64; fi
+if printf '%s%s%s' "$KEY" "$TOKEN" "$HUB_URL" | grep -q '[[:cntrl:]]'; then
+  echo "KEY, TOKEN and HUB_URL cannot contain control characters." >&2
+  exit 64
+fi
+case "$HUB_URL" in ''|http://*|https://*) ;; *) echo "HUB_URL must use http:// or https://." >&2; exit 64 ;; esac
 
 # TOKEN and HUB_URL are optional for backwards compatibility - no interactive prompts
 # They will be set as empty environment variables if not provided
@@ -1208,9 +1238,13 @@ FILE_NAME="beszel-agent_${OS}_${ARCH}.tar.gz"
 # Determine version to install
 if [ "$VERSION" = "latest" ]; then
   API_RELEASE_URL="https://api.github.com/repos/$REPOSITORY/releases/latest"
-  INSTALL_VERSION=$(curl -s "$API_RELEASE_URL" | grep -o '"tag_name": "v[^"]*"' | cut -d'"' -f4 | tr -d 'v')
-  if [ -z "$INSTALL_VERSION" ]; then
+  if ! RELEASE_JSON=$(curl -fsSL "$API_RELEASE_URL"); then
     echo "Failed to get latest version"
+    exit 1
+  fi
+  INSTALL_VERSION=$(printf '%s' "$RELEASE_JSON" | sed -n 's/.*"tag_name":[[:space:]]*"v\([^"]*\)".*/\1/p' | head -n 1)
+  if [ -z "$INSTALL_VERSION" ]; then
+    echo "Latest release metadata does not contain a valid version tag." >&2
     exit 1
   fi
 else
@@ -1218,13 +1252,22 @@ else
   # Remove 'v' prefix if present
   INSTALL_VERSION=$(echo "$INSTALL_VERSION" | sed 's/^v//')
 fi
+if ! printf '%s' "$INSTALL_VERSION" | grep -qE '^[0-9]+\.[0-9]+\.[0-9]+([.-][0-9A-Za-z.-]+)?$'; then
+  echo "Resolved release version is invalid: $INSTALL_VERSION" >&2
+  exit 1
+fi
 
 echo "Downloading beszel-agent v${INSTALL_VERSION}..."
 
 # Download checksums file
 TEMP_DIR=$(mktemp -d)
 cd "$TEMP_DIR" || exit 1
-CHECKSUM=$(curl -fsSL "$GITHUB_URL/$REPOSITORY/releases/download/v${INSTALL_VERSION}/beszel_${INSTALL_VERSION}_checksums.txt" | grep "$FILE_NAME" | cut -d' ' -f1)
+CHECKSUM_MANIFEST="$TEMP_DIR/beszel_${INSTALL_VERSION}_checksums.txt"
+if ! curl -fsSL "$GITHUB_URL/$REPOSITORY/releases/download/v${INSTALL_VERSION}/beszel_${INSTALL_VERSION}_checksums.txt" -o "$CHECKSUM_MANIFEST"; then
+  echo "Failed to download the checksum manifest." >&2
+  exit 1
+fi
+CHECKSUM=$(awk -v file="$FILE_NAME" '$2 == file { print $1 }' "$CHECKSUM_MANIFEST")
 if [ -z "$CHECKSUM" ] || ! echo "$CHECKSUM" | grep -qE "^[a-fA-F0-9]{64}$"; then
   echo "Failed to get checksum or invalid checksum format"
   echo "Try again with --mirror (or --mirror <url>) if GitHub is not reachable."
@@ -1271,13 +1314,25 @@ fi
 
 AGENT_INSTALLED=false
 
+APT_REQUIRED=false
+NEED_ETHTOOL=false
+NEED_UNATTENDED_UPGRADES=false
+if [ "$POWER_MANAGEMENT_FLAG" = "true" ] && ! command -v ethtool >/dev/null 2>&1; then
+  APT_REQUIRED=true
+  NEED_ETHTOOL=true
+fi
+if [ "$OS_UPDATE_MANAGEMENT_FLAG" = "true" ] && ! dpkg-query -W -f='${db:Status-Status}' unattended-upgrades 2>/dev/null | grep -qx installed; then
+  APT_REQUIRED=true
+  NEED_UNATTENDED_UPGRADES=true
+fi
+
 # Install the privileged one-shot helper only on supported Linux systems when requested.
 OS_UPDATE_SUPPORTED=false
 if [ "$OS" = "linux" ] && grep -Eq '^ID=("?)(debian|ubuntu|raspbian)\1$' /etc/os-release 2>/dev/null; then OS_UPDATE_SUPPORTED=true; fi
 if { [ "$OS_UPDATE_MANAGEMENT_FLAG" = "true" ] || [ "$POWER_MANAGEMENT_FLAG" = "true" ]; } && [ "$OS_UPDATE_SUPPORTED" = "true" ]; then
   HELPER_FILE_NAME="beszel-maintenance-helper_${OS}_${ARCH}.tar.gz"
   echo "Downloading maintenance helper v${INSTALL_VERSION}..."
-  HELPER_CHECKSUM=$(curl -fsSL "$GITHUB_URL/$REPOSITORY/releases/download/v${INSTALL_VERSION}/beszel_${INSTALL_VERSION}_checksums.txt" | grep " $HELPER_FILE_NAME$" | cut -d' ' -f1)
+  HELPER_CHECKSUM=$(awk -v file="$HELPER_FILE_NAME" '$2 == file { print $1 }' "$CHECKSUM_MANIFEST")
   if [ -z "$HELPER_CHECKSUM" ] || ! echo "$HELPER_CHECKSUM" | grep -qE '^[a-fA-F0-9]{64}$'; then echo "Invalid maintenance helper checksum" >&2; exit 1; fi
   curl -fL# --retry 3 --retry-delay 2 --connect-timeout 10 "$GITHUB_URL/$REPOSITORY/releases/download/v${INSTALL_VERSION}/$HELPER_FILE_NAME" -o "$HELPER_FILE_NAME"
   if [ "$($CHECK_CMD "$HELPER_FILE_NAME" | cut -d' ' -f1)" != "$HELPER_CHECKSUM" ]; then echo "Maintenance helper checksum verification failed" >&2; exit 1; fi
@@ -1288,6 +1343,38 @@ if { [ "$OS_UPDATE_MANAGEMENT_FLAG" = "true" ] || [ "$POWER_MANAGEMENT_FLAG" = "
     echo "Maintenance helper version or protocol does not match Agent v${INSTALL_VERSION}." >&2
     exit 1
   fi
+  if [ "$APT_REQUIRED" = "true" ]; then
+    echo "Required package dependencies are missing; preparing bounded APT access."
+    pause_apt_timers
+    "$TEMP_DIR/beszel-agent" diagnose-install --apt-required=true --wait-for-apt="$WAIT_FOR_APT"
+    apt_preflight_status=$?
+    if [ "$apt_preflight_status" -ne 0 ]; then
+      restore_apt_timers || true
+      echo "Upgrade not started because APT/dpkg remained busy." >&2
+      echo "No Beszel binaries or configuration files were changed." >&2
+      exit "$apt_preflight_status"
+    fi
+    if ! apt-get -o DPkg::Lock::Timeout="$WAIT_FOR_APT" update; then
+      restore_apt_timers || true
+      echo "Failed to refresh APT metadata before the Beszel transaction started." >&2
+      exit 1
+    fi
+    if [ "$NEED_ETHTOOL" = "true" ] && [ "$NEED_UNATTENDED_UPGRADES" = "true" ]; then
+      DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout="$WAIT_FOR_APT" install -y ethtool unattended-upgrades || apt_dependency_status=$?
+    elif [ "$NEED_ETHTOOL" = "true" ]; then
+      DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout="$WAIT_FOR_APT" install -y ethtool || apt_dependency_status=$?
+    else
+      DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout="$WAIT_FOR_APT" install -y unattended-upgrades || apt_dependency_status=$?
+    fi
+    if [ "${apt_dependency_status:-0}" -ne 0 ]; then
+      restore_apt_timers || true
+      echo "Failed to install required package dependencies before the Beszel transaction started." >&2
+      exit 1
+    fi
+    restore_apt_timers || { echo "Failed to restore APT timer state." >&2; exit 1; }
+  else
+    "$TEMP_DIR/beszel-agent" diagnose-install --apt-required=false --wait-for-apt=0 || true
+  fi
   OLD_HELPER_VERSION="legacy"
   if [ -x "$MAINTENANCE_HELPER_PATH" ]; then
     echo "Checking existing maintenance helper version..."
@@ -1296,14 +1383,6 @@ if { [ "$OS_UPDATE_MANAGEMENT_FLAG" = "true" ] || [ "$POWER_MANAGEMENT_FLAG" = "
   fi
   prepare_transaction_quiesce || exit $?
   begin_install_transaction || exit 1
-  if [ "$POWER_MANAGEMENT_FLAG" = "true" ] && ! command -v ethtool >/dev/null 2>&1; then
-    echo "Installing ethtool for one-time WOL capability diagnostics..."
-    if ! apt-get update || ! DEBIAN_FRONTEND=noninteractive apt-get install -y ethtool; then echo "Failed to install ethtool" >&2; exit 1; fi
-  fi
-  if [ "$OS_UPDATE_MANAGEMENT_FLAG" = "true" ] && ! dpkg-query -W -f='${db:Status-Status}' unattended-upgrades 2>/dev/null | grep -qx installed; then
-    echo "Installing unattended-upgrades dependency..."
-    if ! apt-get update || ! DEBIAN_FRONTEND=noninteractive apt-get install -y unattended-upgrades; then echo "Failed to install unattended-upgrades" >&2; exit 1; fi
-  fi
   if [ -e "$MAINTENANCE_HELPER_PATH" ]; then echo "Backing up existing maintenance helper..."; fi
   echo "Installing maintenance helper v${INSTALL_VERSION}..."
   mkdir -p "$(dirname "$MAINTENANCE_HELPER_PATH")"
@@ -1336,7 +1415,7 @@ if ! printf '%s\n' "$INSTALLED_AGENT_OUTPUT" | grep -qx "Beszel Plus Agent v${IN
   exit 1
 fi
 echo "Beszel Plus Agent v${INSTALL_VERSION} validated."
-if [ "$HELPER_REPLACED" = "true" ]; then
+if [ "$HELPER_REPLACED" = "true" ] && [ "$HELPER_REMOVED" != "true" ]; then
   echo "Beszel Plus Maintenance Helper v${INSTALL_VERSION} validated."
   echo "Maintenance protocol 2 validated."
 fi
@@ -1592,6 +1671,25 @@ EOF
 
 else
   # Original systemd service installation code
+  echo "Writing protected Agent connection settings..."
+  mkdir -p "$(dirname "$AGENT_ENV_PATH")"
+  chmod 0700 "$(dirname "$AGENT_ENV_PATH")"
+  PORT_SYSTEMD=$(systemd_escape_environment "$PORT")
+  KEY_SYSTEMD=$(systemd_escape_environment "$KEY")
+  TOKEN_SYSTEMD=$(systemd_escape_environment "$TOKEN")
+  HUB_URL_SYSTEMD=$(systemd_escape_environment "$HUB_URL")
+  AGENT_ENV_NEW="${AGENT_ENV_PATH}.new.$$"
+  AGENT_ENV_CHANGED=true
+  cat >"$AGENT_ENV_NEW" <<EOF
+PORT="$PORT_SYSTEMD"
+KEY="$KEY_SYSTEMD"
+TOKEN="$TOKEN_SYSTEMD"
+HUB_URL="$HUB_URL_SYSTEMD"
+EOF
+  chown root:root "$AGENT_ENV_NEW"
+  chmod 0600 "$AGENT_ENV_NEW"
+  mv -f "$AGENT_ENV_NEW" "$AGENT_ENV_PATH"
+
   if [ ! -f /etc/systemd/system/beszel-agent.service ]; then
     echo "Creating the systemd service for the agent..."
     AGENT_SERVICE_CHANGED=true
@@ -1606,10 +1704,6 @@ Wants=network-online.target
 After=network-online.target
 
 [Service]
-Environment="PORT=$PORT"
-Environment="KEY=$KEY"
-Environment="TOKEN=$TOKEN"
-Environment="HUB_URL=$HUB_URL"
 Environment="UPDATE_MONITORING=true"
 Environment="UPDATE_CHECK_INTERVAL=6h"
 Environment="UPDATE_CHECK_TIMEOUT=30s"
@@ -1641,28 +1735,33 @@ $(if [ -n "$NVIDIA_DEVICES" ]; then printf "%b" "# NVIDIA device permissions\n${
 WantedBy=multi-user.target
 EOF
   else
-    echo "Systemd service file already exists. Skipping creation."
+    echo "Migrating existing systemd service away from inline connection secrets."
+    AGENT_SERVICE_NEW="/etc/systemd/system/beszel-agent.service.new.$$"
+    if sed '/^[[:space:]]*Environment="\?\(PORT\|KEY\|TOKEN\|HUB_URL\)=/d' /etc/systemd/system/beszel-agent.service >"$AGENT_SERVICE_NEW"; then
+      chmod --reference=/etc/systemd/system/beszel-agent.service "$AGENT_SERVICE_NEW" 2>/dev/null || chmod 0644 "$AGENT_SERVICE_NEW"
+      chown --reference=/etc/systemd/system/beszel-agent.service "$AGENT_SERVICE_NEW" 2>/dev/null || chown root:root "$AGENT_SERVICE_NEW"
+      AGENT_SERVICE_CHANGED=true
+      mv -f "$AGENT_SERVICE_NEW" /etc/systemd/system/beszel-agent.service
+    else
+      rm -f "$AGENT_SERVICE_NEW"
+      echo "Failed to migrate the existing Agent service." >&2
+      exit 1
+    fi
   fi
 
   # Keep monitoring enabled when upgrading an existing installation without
   # rewriting the user's service file.
   mkdir -p /etc/systemd/system/beszel-agent.service.d
-  if [ -n "$TOKEN" ] || [ -n "$HUB_URL" ]; then
-    if printf '%s%s' "$TOKEN" "$HUB_URL" | grep -q '[[:cntrl:]]'; then
-      echo "Error: TOKEN and HUB_URL cannot contain control characters." >&2
-      exit 1
-    fi
-    TOKEN_SYSTEMD=$(systemd_escape_environment "$TOKEN")
-    HUB_URL_SYSTEMD=$(systemd_escape_environment "$HUB_URL")
-    CONNECTION_DROPIN_CHANGED=true
-    cat >/etc/systemd/system/beszel-agent.service.d/10-beszel-connection.conf <<EOF
+  CONNECTION_DROPIN_CHANGED=true
+  CONNECTION_DROPIN_NEW="/etc/systemd/system/beszel-agent.service.d/10-beszel-connection.conf.new.$$"
+  cat >"$CONNECTION_DROPIN_NEW" <<EOF
 [Service]
-Environment="TOKEN=$TOKEN_SYSTEMD"
-Environment="HUB_URL=$HUB_URL_SYSTEMD"
+EnvironmentFile=-$AGENT_ENV_PATH
 EOF
-    chmod 0600 /etc/systemd/system/beszel-agent.service.d/10-beszel-connection.conf
-    echo "Updated Agent connection settings from this install command."
-  fi
+  chown root:root "$CONNECTION_DROPIN_NEW"
+  chmod 0644 "$CONNECTION_DROPIN_NEW"
+  mv -f "$CONNECTION_DROPIN_NEW" /etc/systemd/system/beszel-agent.service.d/10-beszel-connection.conf
+  echo "Updated protected Agent connection settings."
   MONITORING_DROPIN_CHANGED=true
   cat >/etc/systemd/system/beszel-agent.service.d/update-monitoring.conf <<EOF
 [Service]
@@ -1722,6 +1821,19 @@ EOF
       /etc/systemd/system/beszel-maintenance@.service; then
       echo "Error: Maintenance systemd units failed validation." >&2
       exit 1
+    fi
+  else
+    echo "OS update and power management are disabled; removing the privileged maintenance surface."
+    systemctl disable --now beszel-maintenance.socket >/dev/null 2>&1 || true
+    SOCKET_CHANGED=true
+    TEMPLATE_CHANGED=true
+    rm -f /etc/systemd/system/beszel-maintenance.socket \
+      /etc/systemd/system/beszel-maintenance@.service \
+      /etc/systemd/system/beszel-maintenance-helper@.service
+    if [ -e "$MAINTENANCE_HELPER_PATH" ]; then
+      HELPER_REPLACED=true
+      HELPER_REMOVED=true
+      rm -f "$MAINTENANCE_HELPER_PATH"
     fi
   fi
 

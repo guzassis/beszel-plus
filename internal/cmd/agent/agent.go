@@ -53,6 +53,12 @@ func (opts *cmdOptions) parse() bool {
 		}
 		fmt.Println("maintenance IPC smoke test passed")
 		return true
+	case "diagnose-install":
+		status := runDiagnoseInstall(os.Args[2:], os.Stdout, os.Stderr, "/", 2*time.Second)
+		if status != 0 {
+			os.Exit(status)
+		}
+		return true
 	}
 
 	// pflag.CommandLine.ParseErrorsWhitelist.UnknownFlags = true
@@ -89,6 +95,7 @@ func (opts *cmdOptions) parse() bool {
 		builder.WriteString("\nCommands:\n")
 		builder.WriteString("  fingerprint  View or reset the agent fingerprint\n")
 		builder.WriteString("  health       Check if the agent is running\n")
+		builder.WriteString("  diagnose-install  Check whether a local install can safely proceed\n")
 		builder.WriteString("  update       Update to the latest version\n")
 		builder.WriteString("\nFlags:\n")
 		fmt.Print(builder.String())

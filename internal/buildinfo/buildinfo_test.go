@@ -14,7 +14,7 @@ func TestProductMetadata(t *testing.T) {
 	if RepositoryOwner != "guzassis" || RepositoryName != "beszel-plus" {
 		t.Fatal("unexpected repository identity")
 	}
-	if Version != "0.2.1-dev" {
+	if Version != "0.2.2-dev" {
 		t.Fatalf("unexpected development product version %q", Version)
 	}
 }
@@ -22,16 +22,16 @@ func TestProductMetadata(t *testing.T) {
 func TestVersionFallbacksAndInstallersStayAligned(t *testing.T) {
 	root := filepath.Join("..", "..")
 	for _, check := range []struct{ path, marker string }{
-		{"internal/site/src/lib/build-info.ts", `"0.2.1-dev"`},
-		{"supplemental/scripts/install-agent.sh", `PRODUCT_VERSION="0.2.1"`},
-		{"supplemental/scripts/install-hub.sh", `PRODUCT_VERSION="0.2.1"`},
+		{"internal/site/src/lib/build-info.ts", `"0.2.2-dev"`},
+		{"supplemental/scripts/install-agent.sh", `PRODUCT_VERSION="0.2.2"`},
+		{"supplemental/scripts/install-hub.sh", `PRODUCT_VERSION="0.2.2"`},
 	} {
 		data, err := os.ReadFile(filepath.Join(root, check.path))
 		if err != nil {
 			t.Fatal(err)
 		}
 		if !strings.Contains(string(data), check.marker) {
-			t.Errorf("%s is not aligned with v0.2.1", check.path)
+			t.Errorf("%s is not aligned with v0.2.2", check.path)
 		}
 	}
 }
@@ -62,7 +62,7 @@ func TestGeneratedLinuxInstallCommandExposesManagementChoices(t *testing.T) {
 		t.Fatal(err)
 	}
 	text := string(commandSource)
-	for _, flag := range []string{"--agent-auto-update=${options.agentAutoUpdate}", "--os-update-management=${options.osUpdateManagement}", "--os-update-policy=${options.osUpdatePolicy}", "--power-management=${options.powerManagement}"} {
+	for _, flag := range []string{"--agent-auto-update=${options.agentAutoUpdate}", "--os-update-management=${options.osUpdateManagement}", "--os-update-policy=${options.osUpdatePolicy}", "--power-management=${options.powerManagement}", "--wait-for-apt=60"} {
 		if !strings.Contains(text, flag) {
 			t.Errorf("generated command is missing %q", flag)
 		}

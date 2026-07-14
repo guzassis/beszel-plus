@@ -28,6 +28,11 @@ func TestInstallerContainsSafeMaintenanceUpgradeFlow(t *testing.T) {
 			t.Fatalf("installer missing upgrade safeguard %q", required)
 		}
 	}
+	for _, required := range []string{"--wait-for-apt", "diagnose-install --apt-required=true", "diagnose-install --apt-required=false", "DPkg::Lock::Timeout", "AGENT_ENV_PATH", `chmod 0600 "$AGENT_ENV_NEW"`, "EnvironmentFile=-$AGENT_ENV_PATH"} {
+		if !strings.Contains(script, required) {
+			t.Fatalf("installer missing v0.2.2 safeguard %q", required)
+		}
+	}
 	if strings.Contains(script, "Preserving existing maintenance helper") {
 		t.Fatal("installer still preserves a helper from an older release")
 	}
@@ -53,6 +58,13 @@ func TestInstallerContainsSafeMaintenanceUpgradeFlow(t *testing.T) {
 	assetValidation := strings.Index(script, `Downloaded Agent does not report Beszel Plus v${INSTALL_VERSION}.`)
 	if assetValidation < 0 || assetValidation >= preflight {
 		t.Fatal("existing services may be quiesced before release assets are validated")
+	}
+	aptDecision := strings.Index(script, `diagnose-install --apt-required=true`)
+	if aptDecision < 0 || aptDecision >= preflight {
+		t.Fatal("required APT coordination must finish before Beszel services are quiesced")
+	}
+	if strings.Contains(script, "Upgrade not started: APT/dpkg is active") {
+		t.Fatal("installer still aborts unconditionally when any APT process is active")
 	}
 	if strings.Contains(script, "systemctl list-units --all --no-legend 'beszel-maintenance@*.service' 2>/dev/null |") {
 		t.Fatal("maintenance unit loop still runs in a POSIX pipeline subshell")

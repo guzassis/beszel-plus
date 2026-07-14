@@ -41,7 +41,7 @@ export function copyLinuxCommand(
 	token: string,
 	options: LinuxInstallOptions = defaultLinuxInstallOptions
 ) {
-	let cmd = `curl -sL ${getScriptUrl()} -o /tmp/install-agent.sh && chmod +x /tmp/install-agent.sh && /tmp/install-agent.sh -p ${port} -k "${publicKey}" -t "${token}" -url "${getHubURL()}" --agent-auto-update=${options.agentAutoUpdate} --os-update-management=${options.osUpdateManagement} --os-update-policy=${options.osUpdatePolicy} --power-management=${options.powerManagement}`
+	let cmd = `curl -sL ${getScriptUrl()} -o /tmp/install-agent.sh && chmod +x /tmp/install-agent.sh && /tmp/install-agent.sh -p ${port} -k "${publicKey}" -t "${token}" -url "${getHubURL()}" --agent-auto-update=${options.agentAutoUpdate} --os-update-management=${options.osUpdateManagement} --os-update-policy=${options.osUpdatePolicy} --power-management=${options.powerManagement} --wait-for-apt=60`
 	if ((i18n.locale + navigator.language).includes("zh-CN")) {
 		cmd += ` --china-mirrors`
 	}

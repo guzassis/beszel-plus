@@ -52,7 +52,7 @@ The helper accepts only versioned operations defined in the maintenance protocol
 
 From v0.1.3, upgrades are transactional. Detection of a legacy helper is time-bounded, Agent and helper binaries are validated before activation, and the previous binaries and managed systemd units are restored if installation fails or is interrupted. The maintenance socket and IPC smoke test run before the initial policy, and the Agent starts only after that attempt finishes.
 
-APT coordination uses ownership of the known dpkg/APT lock files reported by `/proc/locks`; a process name alone is never considered a lock. Update collection and maintenance are serialized inside the Agent. Eligibility is calculated through the privileged helper, and a temporary lock produces a partial snapshot while preserving other update data and the last successful eligibility result. If APT remains busy for the installer's bounded attempt, the helper persists the pending policy and the Agent retries it at a limited interval.
+APT coordination uses ownership of the known dpkg/APT lock files reported by `/proc/locks`; a process name alone is never considered a lock. Update collection and maintenance are serialized inside the Agent. Eligibility is calculated through the privileged helper, and a temporary lock produces a partial snapshot while preserving other update data and the last successful eligibility result. During installation, APT activity blocks progress only when a missing dependency must be installed. The installer waits for up to 60 seconds by default (`--wait-for-apt=SECONDS`), reports the exact lock holders, and never kills or suspends APT, dpkg, or `unattended-upgrades`. When no package change is needed, installation may safely continue while those processes run.
 
 Defense in depth consists of Hub administrator and system-membership checks, the authenticated Agent handler and typed payload validation, socket permissions, and a second allowlist/validation layer in the root helper. The helper logs request ID, enumerated operation, and result to journald without logging tokens, keys, or arbitrary command strings.
 
@@ -77,7 +77,7 @@ Beszel owns only `/etc/apt/apt.conf.d/52beszel-plus-unattended-upgrades` and the
 --os-update-policy=monitor|security|official-all
 ```
 
-The legacy `--auto-update` remains a deprecated alias for `--agent-auto-update`. Agent binary updates and operating-system package updates are independent. On supported new installations, the script verifies release checksums, installs `unattended-upgrades` when missing, installs the helper and systemd units, enables the APT timers, and applies the selected initial policy. Upgrades preserve `KEY`, `TOKEN`, `HUB_URL`, fingerprint identity, service configuration, and existing APT policy. Neither path reboots the machine.
+The legacy `--auto-update` remains a deprecated alias for `--agent-auto-update`. Agent binary updates and operating-system package updates are independent. On supported new installations, the script verifies release checksums, installs `unattended-upgrades` when missing, installs the helper and systemd units, enables the APT timers, and applies the selected initial policy. Upgrades preserve `KEY`, `TOKEN`, `HUB_URL`, fingerprint identity, service configuration, and existing APT policy. Connection credentials are stored in `/etc/beszel-agent/agent.env`, owned by root with mode `0600`, rather than embedded in the service unit. Neither path reboots the machine.
 
 ## Operations and recovery
 

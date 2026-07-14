@@ -15,14 +15,13 @@ import (
 	"os/exec"
 	"path/filepath"
 	"sort"
-	"strconv"
 	"strings"
 	"syscall"
 	"time"
 
+	"github.com/henrygd/beszel/internal/aptstatus"
 	entity "github.com/henrygd/beszel/internal/entities/maintenance"
 	powerentity "github.com/henrygd/beszel/internal/entities/power"
-	"golang.org/x/sys/unix"
 )
 
 const maxIPCRequestBytes = 64 * 1024
@@ -630,56 +629,16 @@ type aptLockInfo struct {
 }
 
 func (h *Helper) aptActivity() *aptLockInfo {
-	data, err := os.ReadFile(h.path("/proc/locks"))
-	if err != nil {
+	status, err := aptstatus.Inspect(h.Root)
+	if err != nil || !status.Busy || len(status.Holders) == 0 {
 		return nil
 	}
-	for _, path := range []string{"/var/lib/dpkg/lock", "/var/lib/dpkg/lock-frontend", "/var/lib/apt/lists/lock", "/var/cache/apt/archives/lock", "/run/unattended-upgrades.lock"} {
-		info, err := os.Stat(h.path(path))
-		if err != nil {
-			continue
-		}
-		stat, ok := info.Sys().(*syscall.Stat_t)
-		if !ok {
-			continue
-		}
-		for line := range strings.Lines(string(data)) {
-			fields := strings.Fields(line)
-			if len(fields) < 6 {
-				continue
-			}
-			parts := strings.Split(fields[5], ":")
-			if len(parts) != 3 {
-				continue
-			}
-			major, e1 := strconv.ParseUint(parts[0], 16, 32)
-			minor, e2 := strconv.ParseUint(parts[1], 16, 32)
-			inode, e3 := strconv.ParseUint(parts[2], 10, 64)
-			if e1 != nil || e2 != nil || e3 != nil || uint32(major) != unix.Major(uint64(stat.Dev)) || uint32(minor) != unix.Minor(uint64(stat.Dev)) || inode != stat.Ino {
-				continue
-			}
-			pid, _ := strconv.Atoi(fields[4])
-			command, _ := os.ReadFile(h.path(fmt.Sprintf("/proc/%d/comm", pid)))
-			return &aptLockInfo{File: path, PID: pid, Command: sanitize(string(command), 80), Unit: h.processUnit(pid)}
-		}
+	holder := status.Holders[0]
+	file := ""
+	if len(holder.Locks) > 0 {
+		file = holder.Locks[0]
 	}
-	return nil
-}
-
-func (h *Helper) processUnit(pid int) string {
-	data, err := os.ReadFile(h.path(fmt.Sprintf("/proc/%d/cgroup", pid)))
-	if err != nil {
-		return ""
-	}
-	for line := range strings.Lines(string(data)) {
-		for part := range strings.SplitSeq(line, "/") {
-			part = strings.TrimSpace(part)
-			if strings.HasSuffix(part, ".service") {
-				return sanitize(part, 120)
-			}
-		}
-	}
-	return ""
+	return &aptLockInfo{File: file, PID: holder.PID, Command: sanitize(holder.Command, 80), Unit: sanitize(holder.Unit, 120)}
 }
 
 func aptLockBusy(output []byte) bool {
