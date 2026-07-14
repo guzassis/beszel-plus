@@ -9,7 +9,7 @@ before:
 builds:
   - id: beszel
     binary: beszel
-    main: internal/cmd/hub/hub.go
+    main: ./internal/cmd/hub
     env: [CGO_ENABLED=0]
     goos: [linux]
     goarch: [amd64, arm64]
@@ -29,7 +29,7 @@ builds:
 
   - id: beszel-agent
     binary: beszel-agent
-    main: internal/cmd/agent/agent.go
+    main: ./internal/cmd/agent
     env: [CGO_ENABLED=0]
     goos: [linux]
     goarch: [amd64, arm64]
@@ -37,7 +37,7 @@ builds:
 
   - id: beszel-maintenance-helper
     binary: beszel-maintenance-helper
-    main: internal/cmd/maintenance-helper/main.go
+    main: ./internal/cmd/maintenance-helper
     env: [CGO_ENABLED=0]
     goos: [linux]
     goarch: [amd64, arm64]

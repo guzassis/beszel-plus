@@ -2,6 +2,8 @@ name: Make release and binaries
 
 on:
   push:
+    branches:
+      - main
     tags:
       - "v*"
 
@@ -13,7 +15,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout
-        uses: actions/checkout@v4
+        uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
@@ -33,12 +35,12 @@ jobs:
           check-latest: true
 
       - name: GoReleaser beszel
-        uses: goreleaser/goreleaser-action@v6
+        uses: goreleaser/goreleaser-action@v7
         with:
           workdir: ./
           distribution: goreleaser
-          version: latest
-          args: release --clean
+          version: v2.17.0
+          args: ${{ startsWith(github.ref, 'refs/tags/') && 'release --clean' || 'release --snapshot --clean' }}
         env:
           GITHUB_TOKEN: ${{ secrets.TOKEN || secrets.GITHUB_TOKEN }}
 
@@ -46,8 +48,30 @@ jobs:
         run: |
           set -eu
           assets=$(find dist -maxdepth 1 -type f -printf '%f\n')
-          checksum="beszel_${GITHUB_REF_NAME#v}_checksums.txt"
+          case "$GITHUB_REF" in
+            refs/tags/*) checksum="beszel_${GITHUB_REF_NAME#v}_checksums.txt" ;;
+            *)
+              checksum=$(printf '%s\n' "$assets" | grep -E '^beszel_.+_checksums\.txt$')
+              [ "$(printf '%s\n' "$checksum" | wc -l)" -eq 1 ] || {
+                echo "Expected exactly one snapshot checksum manifest." >&2
+                exit 1
+              }
+              ;;
+          esac
           printf '%s\n' "$assets" | grep -qx "$checksum"
+          for required in \
+            beszel_linux_amd64.tar.gz \
+            beszel_linux_arm64.tar.gz \
+            beszel-agent_linux_amd64.tar.gz \
+            beszel-agent_linux_arm64.tar.gz \
+            beszel-maintenance-helper_linux_amd64.tar.gz \
+            beszel-maintenance-helper_linux_arm64.tar.gz
+          do
+            printf '%s\n' "$assets" | grep -qx "$required" || {
+              echo "Missing required release asset: $required" >&2
+              exit 1
+            }
+          done
           printf '%s\n' "$assets" | while IFS= read -r asset; do
             case "$asset" in
               beszel-agent_linux_*.tar.gz)

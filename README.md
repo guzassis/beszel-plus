@@ -5,7 +5,7 @@ Beszel Plus is a public fork of [Beszel](https://github.com/henrygd/beszel), a l
 The fork preserves compatibility with the original project while adding operational features used by Beszel Plus deployments.
 
 [![Fork original version](https://img.shields.io/badge/fork_original-v0.18.2-2563eb)](https://github.com/henrygd/beszel/releases/tag/v0.18.2)
-[![Beszel Plus version](https://img.shields.io/badge/Beszel_Plus-v0.2.2-7c3aed)](https://github.com/guzassis/beszel-plus/releases/tag/v0.2.2)
+[![Beszel Plus version](https://img.shields.io/badge/Beszel_Plus-v0.2.3-7c3aed)](https://github.com/guzassis/beszel-plus/releases/tag/v0.2.3)
 [![MIT license](https://img.shields.io/github/license/henrygd/beszel?color=%239944ee)](https://github.com/henrygd/beszel/blob/main/LICENSE)
 [![Crowdin](https://badges.crowdin.net/beszel/localized.svg)](https://crowdin.com/project/beszel)
 
@@ -35,6 +35,7 @@ The fork preserves compatibility with the original project while adding operatio
 - **Transactional Agent upgrades**: The v0.2.1 installer drains new maintenance requests, postpones safely when a critical operation is active, preserves omitted management flags, replaces executables atomically, and validates rollback before reporting success.
 - **Context-aware APT coordination**: The v0.2.2 installer identifies actual kernel lock owners, waits up to 60 seconds only when a missing dependency requires APT, and otherwise continues safely alongside `unattended-upgrades`. It never kills or suspends package-management processes.
 - **Hardened native installers**: Agent connection credentials are stored in a root-only environment file, omitted upgrade settings are preserved, and both Agent and Hub installers serialize concurrent runs, validate checksums and component versions, write atomically, and roll back failed transactions.
+- **Reproducible native releases**: The v0.2.3 pipeline builds complete Go command packages with a pinned GoReleaser version, validates the full six-archive Linux matrix, and runs the same release as a non-publishing snapshot on every push to `main`.
 - **Upgrade diagnostics**: Run the Agent installer with `--diagnose` to inspect installed component versions, service state, active maintenance, APT locks, pending policy, power management, and upgrade readiness without changing the installation.
 <!-- - **REST API**: Use or update your data in your own scripts and applications. -->
 
@@ -94,7 +95,7 @@ The deprecated `--auto-update` flag remains an alias for `--agent-auto-update`. 
 
 ## Versioning
 
-Beszel Plus tracks the original fork baseline as `v0.18.2` and uses an independent release sequence for its own changes. The current Beszel Plus release is `v0.2.2`. Hub, Agent, maintenance helper, frontend, installers, update checks, and release assets use the same product version injected from `internal/buildinfo`; upstream protocol and Go module compatibility are tracked separately and are not displayed as the Beszel Plus product version.
+Beszel Plus tracks the original fork baseline as `v0.18.2` and uses an independent release sequence for its own changes. The current Beszel Plus release is `v0.2.3`. Hub, Agent, maintenance helper, frontend, installers, update checks, and release assets use the same product version injected from `internal/buildinfo`; upstream protocol and Go module compatibility are tracked separately and are not displayed as the Beszel Plus product version.
 
 Each Beszel Plus release must update this README whenever user-visible functionality, installation behavior, supported platforms, security architecture, or operational requirements change.
 

@@ -14,7 +14,7 @@ func TestProductMetadata(t *testing.T) {
 	if RepositoryOwner != "guzassis" || RepositoryName != "beszel-plus" {
 		t.Fatal("unexpected repository identity")
 	}
-	if Version != "0.2.2-dev" {
+	if Version != "0.2.3-dev" {
 		t.Fatalf("unexpected development product version %q", Version)
 	}
 }
@@ -22,16 +22,16 @@ func TestProductMetadata(t *testing.T) {
 func TestVersionFallbacksAndInstallersStayAligned(t *testing.T) {
 	root := filepath.Join("..", "..")
 	for _, check := range []struct{ path, marker string }{
-		{"internal/site/src/lib/build-info.ts", `"0.2.2-dev"`},
-		{"supplemental/scripts/install-agent.sh", `PRODUCT_VERSION="0.2.2"`},
-		{"supplemental/scripts/install-hub.sh", `PRODUCT_VERSION="0.2.2"`},
+		{"internal/site/src/lib/build-info.ts", `"0.2.3-dev"`},
+		{"supplemental/scripts/install-agent.sh", `PRODUCT_VERSION="0.2.3"`},
+		{"supplemental/scripts/install-hub.sh", `PRODUCT_VERSION="0.2.3"`},
 	} {
 		data, err := os.ReadFile(filepath.Join(root, check.path))
 		if err != nil {
 			t.Fatal(err)
 		}
 		if !strings.Contains(string(data), check.marker) {
-			t.Errorf("%s is not aligned with v0.2.2", check.path)
+			t.Errorf("%s is not aligned with v0.2.3", check.path)
 		}
 	}
 }
@@ -92,6 +92,37 @@ func TestReleaseMatrixIsNativeLinuxOnly(t *testing.T) {
 	}
 	if strings.Count(text, "goos: [linux]") != 3 || strings.Count(text, "goarch: [amd64, arm64]") != 3 {
 		t.Fatal("Hub, Agent and helper must all target linux/amd64 and linux/arm64")
+	}
+	for _, mainPackage := range []string{
+		"main: ./internal/cmd/hub",
+		"main: ./internal/cmd/agent",
+		"main: ./internal/cmd/maintenance-helper",
+	} {
+		if !strings.Contains(text, mainPackage) {
+			t.Errorf("GoReleaser is missing complete command package %q", mainPackage)
+		}
+	}
+	for line := range strings.Lines(text) {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "main:") && strings.HasSuffix(line, ".go") {
+			t.Errorf("GoReleaser entrypoint must be a package, not a single file: %s", line)
+		}
+	}
+	releaseWorkflow, err := os.ReadFile(filepath.Join(root, ".github/workflows/release.yml"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	workflow := string(releaseWorkflow)
+	for _, marker := range []string{
+		"actions/checkout@v6",
+		"goreleaser/goreleaser-action@v7",
+		"version: v2.17.0",
+		"release --snapshot --clean",
+		"beszel-maintenance-helper_linux_arm64.tar.gz",
+	} {
+		if !strings.Contains(workflow, marker) {
+			t.Errorf("release workflow is missing %q", marker)
+		}
 	}
 	dockerWorkflow, err := os.ReadFile(filepath.Join(root, ".github/workflows/docker-images.yml"))
 	if err != nil {
