@@ -37,6 +37,32 @@ type Status struct {
 	Holders []Holder `json:"holders,omitempty"`
 }
 
+type lockFileID struct {
+	major uint64
+	minor uint64
+	inode uint64
+}
+
+func parseLockFileID(value string) (lockFileID, bool) {
+	parts := strings.Split(value, ":")
+	if len(parts) != 3 {
+		return lockFileID{}, false
+	}
+	major, err := strconv.ParseUint(parts[0], 16, 64)
+	if err != nil {
+		return lockFileID{}, false
+	}
+	minor, err := strconv.ParseUint(parts[1], 16, 64)
+	if err != nil {
+		return lockFileID{}, false
+	}
+	inode, err := strconv.ParseUint(parts[2], 10, 64)
+	if err != nil {
+		return lockFileID{}, false
+	}
+	return lockFileID{major: major, minor: minor, inode: inode}, true
+}
+
 func Inspect(root string) (Status, error) {
 	if root == "" {
 		root = "/"
@@ -46,22 +72,22 @@ func Inspect(root string) (Status, error) {
 		return Status{}, fmt.Errorf("read /proc/locks: %w", err)
 	}
 	type lockOwner struct{ pid int }
-	owners := make(map[string]lockOwner)
+	owners := make(map[lockFileID]lockOwner)
 	scanner := bufio.NewScanner(strings.NewReader(string(data)))
 	for scanner.Scan() {
 		fields := strings.Fields(scanner.Text())
 		if len(fields) < 6 {
 			continue
 		}
-		parts := strings.Split(fields[5], ":")
-		if len(parts) != 3 {
+		id, ok := parseLockFileID(fields[5])
+		if !ok {
 			continue
 		}
 		pid, err := strconv.Atoi(fields[4])
 		if err != nil || pid <= 0 {
 			continue
 		}
-		owners[strings.ToLower(parts[0])+":"+strings.ToLower(parts[1])+":"+parts[2]] = lockOwner{pid: pid}
+		owners[id] = lockOwner{pid: pid}
 	}
 	if err := scanner.Err(); err != nil {
 		return Status{}, err
@@ -77,7 +103,7 @@ func Inspect(root string) (Status, error) {
 		if !ok {
 			continue
 		}
-		key := fmt.Sprintf("%x:%x:%d", unix.Major(uint64(stat.Dev)), unix.Minor(uint64(stat.Dev)), stat.Ino)
+		key := lockFileID{major: uint64(unix.Major(uint64(stat.Dev))), minor: uint64(unix.Minor(uint64(stat.Dev))), inode: stat.Ino}
 		owner, ok := owners[key]
 		if !ok {
 			continue

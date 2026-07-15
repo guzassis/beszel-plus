@@ -24,6 +24,14 @@ func TestInstallerContainsSafeMaintenanceUpgradeFlow(t *testing.T) {
 			t.Fatalf("installer missing %q", required)
 		}
 	}
+	for _, required := range []string{`AGENT_ARCHIVE="$TEMP_DIR/$FILE_NAME"`, `tar -xzf "$AGENT_ARCHIVE" -C "$TEMP_DIR"`, `HELPER_ARCHIVE="$TEMP_DIR/$HELPER_FILE_NAME"`, `tar -xzf "$HELPER_ARCHIVE" -C "$TEMP_DIR"`, "WorkingDirectory=/"} {
+		if !strings.Contains(script, required) {
+			t.Fatalf("installer missing stable workspace safeguard %q", required)
+		}
+	}
+	if strings.Contains(script, `cd "$TEMP_DIR"`) {
+		t.Fatal("installer still changes into a temporary directory that it later removes")
+	}
 	for _, required := range []string{"10-beszel-connection.conf", "maintenance-smoke", "TRANSACTION_DIR", "rollback_install", "Maintenance helper protocol compatibility verified", `"retryable":true`, "maintenance_preflight", "PHASE_PREFLIGHT", "PHASE_QUIESCE", "PHASE_TRANSACTION", "PHASE_ROLLBACK", "upgrade postponed", "No binaries or configuration files were changed", "--wait-for-maintenance", "--diagnose", "upgrade-in-progress", "beszel-plus-agent-install.lock"} {
 		if !strings.Contains(script, required) {
 			t.Fatalf("installer missing upgrade safeguard %q", required)
@@ -97,6 +105,44 @@ func TestInstallerContainsSafeMaintenanceUpgradeFlow(t *testing.T) {
 	success := strings.LastIndex(script, "Beszel Plus Agent has been installed successfully")
 	if socketCheck < 0 || success < 0 || socketCheck >= success || !strings.Contains(script[socketCheck:success], "exit 1") {
 		t.Fatal("installer can report success without failing an inactive maintenance socket")
+	}
+}
+
+func TestInstallerTempCleanupKeepsCallerWorkingDirectory(t *testing.T) {
+	data, err := os.ReadFile("../../supplemental/scripts/install-agent.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	script := string(data)
+	start := strings.Index(script, "cleanup_temp_dir() {")
+	end := strings.Index(script[start:], "\n}\n\njson_string_value() {")
+	if start < 0 || end < 0 {
+		t.Fatal("temporary directory cleanup function not found")
+	}
+	function := script[start : start+end+3]
+	callerDir := t.TempDir()
+	downloadDir := filepath.Join(t.TempDir(), "download")
+	harness := function + `
+TEMP_DIR="$DOWNLOAD_DIR"
+mkdir -p "$TEMP_DIR"
+before=$(pwd -P)
+cleanup_temp_dir
+after=$(pwd -P)
+printf 'BEFORE=%s\nAFTER=%s\nTEMP=%s\n' "$before" "$after" "$TEMP_DIR"
+`
+	cmd := exec.Command("sh", "-c", harness)
+	cmd.Dir = callerDir
+	cmd.Env = append(os.Environ(), "DOWNLOAD_DIR="+downloadDir)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		t.Fatalf("cleanup failed: %v: %s", err, output)
+	}
+	want := "BEFORE=" + callerDir + "\nAFTER=" + callerDir + "\nTEMP=\n"
+	if string(output) != want {
+		t.Fatalf("output=%q want=%q", output, want)
+	}
+	if _, err := os.Stat(downloadDir); !os.IsNotExist(err) {
+		t.Fatalf("temporary directory was not removed: %v", err)
 	}
 }
 
@@ -502,6 +548,13 @@ func TestMaintenanceSocketAcceptHasCorrespondingTemplate(t *testing.T) {
 	}
 	if _, err := os.Stat(servicePath); err != nil {
 		t.Fatalf("socket template %q is missing: %v", servicePath, err)
+	}
+	service, err := os.ReadFile(servicePath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !strings.Contains(string(service), "WorkingDirectory=/") {
+		t.Fatal("maintenance helper template does not use a stable working directory")
 	}
 }
 

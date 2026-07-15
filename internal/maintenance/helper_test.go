@@ -35,6 +35,13 @@ func (r *fakeRunner) Run(_ context.Context, name string, args ...string) ([]byte
 	return r.output, r.err
 }
 
+func TestExecRunnerUsesStableRootWorkingDirectory(t *testing.T) {
+	output, err := (ExecRunner{}).Run(context.Background(), "pwd")
+	if err != nil || string(output) != "/\n" {
+		t.Fatalf("output=%q err=%v", output, err)
+	}
+}
+
 func testHelper(t *testing.T) *Helper {
 	t.Helper()
 	root := t.TempDir()
@@ -44,6 +51,9 @@ func testHelper(t *testing.T) *Helper {
 		}
 	}
 	if err := os.WriteFile(filepath.Join(root, "etc/os-release"), []byte("ID=debian\n"), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "proc/locks"), nil, 0o644); err != nil {
 		t.Fatal(err)
 	}
 	return &Helper{Root: root, Runner: &fakeRunner{}, Now: func() time.Time { return time.Unix(100, 0).UTC() }}
@@ -72,7 +82,7 @@ func setAPTLock(t *testing.T, h *Helper, lockPath string, pid int, command, unit
 		t.Fatal(err)
 	}
 	stat := info.Sys().(*syscall.Stat_t)
-	line := fmt.Sprintf("1: POSIX ADVISORY WRITE %d %x:%x:%d 0 EOF\n", pid, unix.Major(uint64(stat.Dev)), unix.Minor(uint64(stat.Dev)), stat.Ino)
+	line := fmt.Sprintf("1: POSIX ADVISORY WRITE %d %02x:%02x:%d 0 EOF\n", pid, unix.Major(uint64(stat.Dev)), unix.Minor(uint64(stat.Dev)), stat.Ino)
 	if err := os.WriteFile(h.path("/proc/locks"), []byte(line), 0o644); err != nil {
 		t.Fatal(err)
 	}
@@ -89,7 +99,7 @@ func TestAPTActivityRequiresARealKnownLock(t *testing.T) {
 	if err := os.WriteFile(h.path("/proc/4242/cgroup"), []byte("0::/system.slice/apt-daily.service\n"), 0o644); err != nil {
 		t.Fatal(err)
 	}
-	if lock := h.aptActivity(); lock != nil {
+	if lock, err := h.aptActivity(); err != nil || lock != nil {
 		t.Fatalf("process name without a lock was treated as busy: %#v", lock)
 	}
 
@@ -106,12 +116,12 @@ func TestAPTActivityRequiresARealKnownLock(t *testing.T) {
 				t.Fatal(err)
 			}
 			stat := info.Sys().(*syscall.Stat_t)
-			line := fmt.Sprintf("1: POSIX ADVISORY WRITE 4242 %x:%x:%d 0 EOF\n", unix.Major(uint64(stat.Dev)), unix.Minor(uint64(stat.Dev)), stat.Ino)
+			line := fmt.Sprintf("1: POSIX ADVISORY WRITE 4242 %02x:%02x:%d 0 EOF\n", unix.Major(uint64(stat.Dev)), unix.Minor(uint64(stat.Dev)), stat.Ino)
 			if err := os.WriteFile(h.path("/proc/locks"), []byte(line), 0o644); err != nil {
 				t.Fatal(err)
 			}
-			lock := h.aptActivity()
-			if lock == nil || lock.File != lockPath || lock.PID != 4242 || lock.Command != "apt-get" || lock.Unit != "apt-daily.service" {
+			lock, err := h.aptActivity()
+			if err != nil || lock == nil || lock.File != lockPath || lock.PID != 4242 || lock.Command != "apt-get" || lock.Unit != "apt-daily.service" {
 				t.Fatalf("real lock was not attributed: %#v", lock)
 			}
 			if err := os.Remove(h.path(lockPath)); err != nil {
@@ -131,6 +141,23 @@ func TestAPTLockMessagesAreNarrowlyClassified(t *testing.T) {
 		if aptLockBusy([]byte(output)) {
 			t.Fatalf("non-lock output treated as busy: %q", output)
 		}
+	}
+}
+
+func TestAPTInspectionFailureIsRetryableAndDoesNotRunCommand(t *testing.T) {
+	h := testHelper(t)
+	if err := os.Remove(h.path("/proc/locks")); err != nil {
+		t.Fatal(err)
+	}
+	attempts := 0
+	h.Runner = helperRunnerFunc(func(context.Context, string, ...string) ([]byte, error) {
+		attempts++
+		return nil, nil
+	})
+	_, err := h.unattendedDryRun(context.Background())
+	var typed *operationError
+	if !errors.As(err, &typed) || typed.code != "apt_lock_inspection_failed" || !typed.retryable || attempts != 0 {
+		t.Fatalf("attempts=%d err=%#v", attempts, err)
 	}
 }
 
@@ -216,7 +243,7 @@ func TestRealAPTLockReleaseAndTimeout(t *testing.T) {
 			t.Fatal(err)
 		}
 		stat := info.Sys().(*syscall.Stat_t)
-		line := fmt.Sprintf("1: POSIX ADVISORY WRITE 4242 %x:%x:%d 0 EOF\n", unix.Major(uint64(stat.Dev)), unix.Minor(uint64(stat.Dev)), stat.Ino)
+		line := fmt.Sprintf("1: POSIX ADVISORY WRITE 4242 %02x:%02x:%d 0 EOF\n", unix.Major(uint64(stat.Dev)), unix.Minor(uint64(stat.Dev)), stat.Ino)
 		if err := os.WriteFile(h.path("/proc/locks"), []byte(line), 0o644); err != nil {
 			t.Fatal(err)
 		}
@@ -378,6 +405,29 @@ func TestRetryablePolicyPersistsUntilSuccessfulRetry(t *testing.T) {
 	}
 	if _, err := os.Stat(filepath.Join(h.stateDir(), "pending-policy.json")); !os.IsNotExist(err) {
 		t.Fatalf("successful retry did not clear pending state: %v", err)
+	}
+}
+
+func TestPolicyInspectionFailureStaysPendingWithoutChangingAPTConfig(t *testing.T) {
+	h := testHelper(t)
+	h.RunSystemCommands = true
+	if err := os.Remove(h.path("/proc/locks")); err != nil {
+		t.Fatal(err)
+	}
+	policy := entity.DefaultPolicy()
+	request := req(entity.ApplyUpdatePolicy)
+	request.Policy = &policy
+	response := h.Execute(context.Background(), request)
+	if response.Status != entity.StateFailed || response.ErrorCode != "apt_lock_inspection_failed" || !response.Retryable || response.NextAttemptAt == nil {
+		t.Fatalf("unexpected response: %#v", response)
+	}
+	for _, path := range []string{"/etc/apt/apt.conf.d/20auto-upgrades", "/etc/apt/apt.conf.d/52beszel-plus-unattended-upgrades"} {
+		if _, err := os.Stat(h.path(path)); !os.IsNotExist(err) {
+			t.Fatalf("APT config %s changed before lock inspection succeeded: %v", path, err)
+		}
+	}
+	if _, err := os.Stat(filepath.Join(h.stateDir(), "pending-policy.json")); err != nil {
+		t.Fatalf("pending policy was not persisted: %v", err)
 	}
 }
 

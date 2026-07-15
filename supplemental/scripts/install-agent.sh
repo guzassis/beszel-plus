@@ -1,7 +1,7 @@
 #!/bin/sh
 
 PRODUCT_NAME="Beszel Plus"
-PRODUCT_VERSION="0.2.4"
+PRODUCT_VERSION="0.2.5"
 REPOSITORY="guzassis/beszel-plus"
 
 is_alpine() {
@@ -485,6 +485,7 @@ ROLLBACK_REPORT_PATH="/var/lib/beszel-maintenance/last-install-rollback.json"
 PHASE="PHASE_INITIAL"
 TRANSACTION_ACTIVE=false
 TRANSACTION_DIR=""
+TEMP_DIR=""
 QUIESCE_ACTIVE=false
 AGENT_PREVIOUS_STATE="not-found"
 SOCKET_PREVIOUS_STATE="not-found"
@@ -506,6 +507,13 @@ ROLLBACK_RESTORED_COMPONENTS=""
 APT_TIMERS_QUIESCED=false
 APT_DAILY_TIMER_WAS_ACTIVE=false
 APT_UPGRADE_TIMER_WAS_ACTIVE=false
+
+cleanup_temp_dir() {
+  if [ -n "${TEMP_DIR:-}" ]; then
+    rm -rf "$TEMP_DIR"
+    TEMP_DIR=""
+  fi
+}
 
 json_string_value() {
   json_file="$1"
@@ -764,7 +772,7 @@ on_installer_exit() {
   rm -f "${DRAIN_PATH}.new.$$"
   rm -f "${AGENT_ENV_PATH}.new.$$" "/etc/systemd/system/beszel-agent.service.new.$$" \
     "/etc/systemd/system/beszel-agent.service.d/10-beszel-connection.conf.new.$$"
-  [ -z "${TEMP_DIR:-}" ] || rm -rf "$TEMP_DIR"
+  cleanup_temp_dir
   [ -z "${PREFLIGHT_UNITS_FILE:-}" ] || rm -f "$PREFLIGHT_UNITS_FILE"
   [ -z "$TRANSACTION_DIR" ] || rm -rf "$TRANSACTION_DIR"
   if [ "$LOCK_KIND" = "mkdir" ] && [ -n "$LOCK_DIR" ]; then rm -rf "$LOCK_DIR"; fi
@@ -1356,9 +1364,13 @@ fi
 echo "Downloading beszel-agent v${INSTALL_VERSION}..."
 
 # Download checksums file
-TEMP_DIR=$(mktemp -d)
-cd "$TEMP_DIR" || exit 1
+if ! TEMP_DIR=$(mktemp -d) || [ ! -d "$TEMP_DIR" ]; then
+  echo "Failed to create a temporary download directory." >&2
+  exit 1
+fi
 CHECKSUM_MANIFEST="$TEMP_DIR/beszel_${INSTALL_VERSION}_checksums.txt"
+AGENT_ARCHIVE="$TEMP_DIR/$FILE_NAME"
+AGENT_EXTRACTED="$TEMP_DIR/beszel-agent"
 if ! curl -fsSL "$GITHUB_URL/$REPOSITORY/releases/download/v${INSTALL_VERSION}/beszel_${INSTALL_VERSION}_checksums.txt" -o "$CHECKSUM_MANIFEST"; then
   echo "Failed to download the checksum manifest." >&2
   exit 1
@@ -1367,42 +1379,36 @@ CHECKSUM=$(awk -v file="$FILE_NAME" '$2 == file { print $1 }' "$CHECKSUM_MANIFES
 if [ -z "$CHECKSUM" ] || ! echo "$CHECKSUM" | grep -qE "^[a-fA-F0-9]{64}$"; then
   echo "Failed to get checksum or invalid checksum format"
   echo "Try again with --mirror (or --mirror <url>) if GitHub is not reachable."
-  rm -rf "$TEMP_DIR"
   exit 1
 fi
 
-if ! curl -fL# --retry 3 --retry-delay 2 --connect-timeout 10 "$GITHUB_URL/$REPOSITORY/releases/download/v${INSTALL_VERSION}/$FILE_NAME" -o "$FILE_NAME"; then
+if ! curl -fL# --retry 3 --retry-delay 2 --connect-timeout 10 "$GITHUB_URL/$REPOSITORY/releases/download/v${INSTALL_VERSION}/$FILE_NAME" -o "$AGENT_ARCHIVE"; then
   echo "Failed to download the agent from $GITHUB_URL/$REPOSITORY/releases/download/v${INSTALL_VERSION}/$FILE_NAME"
   echo "Try again with --mirror (or --mirror <url>) if GitHub is not reachable."
-  rm -rf "$TEMP_DIR"
   exit 1
 fi
 
-if ! tar -tzf "$FILE_NAME" >/dev/null 2>&1; then
+if ! tar -tzf "$AGENT_ARCHIVE" >/dev/null 2>&1; then
   echo "Downloaded archive is invalid or incomplete (possible network/proxy issue)."
   echo "Try again with --mirror (or --mirror <url>) if the download path is unstable."
-  rm -rf "$TEMP_DIR"
   exit 1
 fi
 
-if [ "$($CHECK_CMD "$FILE_NAME" | cut -d' ' -f1)" != "$CHECKSUM" ]; then
-  echo "Checksum verification failed: $($CHECK_CMD "$FILE_NAME" | cut -d' ' -f1) & $CHECKSUM"
-  rm -rf "$TEMP_DIR"
+if [ "$($CHECK_CMD "$AGENT_ARCHIVE" | cut -d' ' -f1)" != "$CHECKSUM" ]; then
+  echo "Checksum verification failed: $($CHECK_CMD "$AGENT_ARCHIVE" | cut -d' ' -f1) & $CHECKSUM"
   exit 1
 fi
 
-if ! tar -xzf "$FILE_NAME" beszel-agent; then
+if ! tar -xzf "$AGENT_ARCHIVE" -C "$TEMP_DIR" beszel-agent; then
   echo "Failed to extract the agent"
-  rm -rf "$TEMP_DIR"
   exit 1
 fi
 
-if [ ! -s "$TEMP_DIR/beszel-agent" ]; then
+if [ ! -s "$AGENT_EXTRACTED" ]; then
   echo "Downloaded binary is missing or empty."
-  rm -rf "$TEMP_DIR"
   exit 1
 fi
-AGENT_VERSION_OUTPUT=$(./beszel-agent --version 2>&1) || { echo "Downloaded Agent version check failed" >&2; exit 1; }
+AGENT_VERSION_OUTPUT=$("$AGENT_EXTRACTED" --version 2>&1) || { echo "Downloaded Agent version check failed" >&2; exit 1; }
 if ! printf '%s\n' "$AGENT_VERSION_OUTPUT" | grep -qx "Beszel Plus Agent v${INSTALL_VERSION}"; then
   echo "Downloaded Agent does not report Beszel Plus v${INSTALL_VERSION}." >&2
   exit 1
@@ -1427,14 +1433,16 @@ OS_UPDATE_SUPPORTED=false
 if [ "$OS" = "linux" ] && grep -Eq '^ID=("?)(debian|ubuntu|raspbian)\1$' /etc/os-release 2>/dev/null; then OS_UPDATE_SUPPORTED=true; fi
 if { [ "$OS_UPDATE_MANAGEMENT_FLAG" = "true" ] || [ "$POWER_MANAGEMENT_FLAG" = "true" ]; } && [ "$OS_UPDATE_SUPPORTED" = "true" ]; then
   HELPER_FILE_NAME="beszel-maintenance-helper_${OS}_${ARCH}.tar.gz"
+  HELPER_ARCHIVE="$TEMP_DIR/$HELPER_FILE_NAME"
+  HELPER_EXTRACTED="$TEMP_DIR/beszel-maintenance-helper"
   echo "Downloading maintenance helper v${INSTALL_VERSION}..."
   HELPER_CHECKSUM=$(awk -v file="$HELPER_FILE_NAME" '$2 == file { print $1 }' "$CHECKSUM_MANIFEST")
   if [ -z "$HELPER_CHECKSUM" ] || ! echo "$HELPER_CHECKSUM" | grep -qE '^[a-fA-F0-9]{64}$'; then echo "Invalid maintenance helper checksum" >&2; exit 1; fi
-  curl -fL# --retry 3 --retry-delay 2 --connect-timeout 10 "$GITHUB_URL/$REPOSITORY/releases/download/v${INSTALL_VERSION}/$HELPER_FILE_NAME" -o "$HELPER_FILE_NAME"
-  if [ "$($CHECK_CMD "$HELPER_FILE_NAME" | cut -d' ' -f1)" != "$HELPER_CHECKSUM" ]; then echo "Maintenance helper checksum verification failed" >&2; exit 1; fi
-  if ! tar -xzf "$HELPER_FILE_NAME" beszel-maintenance-helper; then echo "Failed to extract maintenance helper" >&2; exit 1; fi
-  chmod 0755 beszel-maintenance-helper
-  HELPER_VERSION_OUTPUT=$(./beszel-maintenance-helper --version 2>&1) || { echo "New maintenance helper version check failed" >&2; exit 1; }
+  if ! curl -fL# --retry 3 --retry-delay 2 --connect-timeout 10 "$GITHUB_URL/$REPOSITORY/releases/download/v${INSTALL_VERSION}/$HELPER_FILE_NAME" -o "$HELPER_ARCHIVE"; then echo "Failed to download maintenance helper" >&2; exit 1; fi
+  if [ "$($CHECK_CMD "$HELPER_ARCHIVE" | cut -d' ' -f1)" != "$HELPER_CHECKSUM" ]; then echo "Maintenance helper checksum verification failed" >&2; exit 1; fi
+  if ! tar -xzf "$HELPER_ARCHIVE" -C "$TEMP_DIR" beszel-maintenance-helper; then echo "Failed to extract maintenance helper" >&2; exit 1; fi
+  chmod 0755 "$HELPER_EXTRACTED"
+  HELPER_VERSION_OUTPUT=$("$HELPER_EXTRACTED" --version 2>&1) || { echo "New maintenance helper version check failed" >&2; exit 1; }
   if ! printf '%s\n' "$HELPER_VERSION_OUTPUT" | grep -qx "Beszel Plus Maintenance Helper v${INSTALL_VERSION}" || ! printf '%s\n' "$HELPER_VERSION_OUTPUT" | grep -qx 'protocol 2'; then
     echo "Maintenance helper version or protocol does not match Agent v${INSTALL_VERSION}." >&2
     exit 1
@@ -1520,7 +1528,7 @@ fi
 set_selinux_context
 
 # Cleanup
-rm -rf "$TEMP_DIR"
+cleanup_temp_dir
 
 # Make sure /etc/machine-id exists for persistent fingerprint
 if [ ! -f /etc/machine-id ]; then
@@ -1893,6 +1901,7 @@ Description=Beszel Plus privileged maintenance helper
 [Service]
 Type=oneshot
 TimeoutStartSec=3h
+WorkingDirectory=/
 ExecStart=$MAINTENANCE_HELPER_PATH
 StandardInput=socket
 StandardOutput=socket

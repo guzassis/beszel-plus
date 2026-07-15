@@ -34,6 +34,8 @@ type ExecRunner struct{}
 
 func (ExecRunner) Run(ctx context.Context, name string, args ...string) ([]byte, error) {
 	cmd := exec.CommandContext(ctx, name, args...)
+	// Privileged commands must not inherit a caller's deleted or untrusted CWD.
+	cmd.Dir = "/"
 	output, err := cmd.CombinedOutput()
 	if len(output) > maxCommandOutputBytes {
 		output = output[len(output)-maxCommandOutputBytes:]
@@ -286,7 +288,11 @@ func (h *Helper) powerCapabilities() *powerentity.Capabilities {
 }
 
 func (h *Helper) schedulePoweroff(ctx context.Context, delay uint32) (*entity.Result, bool, error) {
-	if lock := h.aptActivity(); lock != nil {
+	lock, err := h.aptActivity()
+	if err != nil {
+		return nil, false, aptLockInspectionError("power_guard", err)
+	}
+	if lock != nil {
 		return nil, false, &operationError{code: "apt_lock_busy", stage: "power_guard", retryable: true, message: "APT is currently in use", lock: lock}
 	}
 	if status := h.poweroffStatus(ctx); status.Scheduled {
@@ -361,7 +367,11 @@ func (h *Helper) applyPolicy(ctx context.Context, req entity.Request) (*entity.R
 	}
 	runSystemCommands := h.Root == "" || h.Root == "/" || h.RunSystemCommands
 	if runSystemCommands {
-		if lock := h.aptActivity(); lock != nil {
+		lock, err := h.aptActivity()
+		if err != nil {
+			return nil, false, aptLockInspectionError("unattended_upgrade_dry_run", err)
+		}
+		if lock != nil {
 			return nil, false, &operationError{code: "apt_lock_busy", stage: "unattended_upgrade_dry_run", retryable: true, message: "APT is currently in use; policy validation was postponed", lock: lock}
 		}
 	}
@@ -525,7 +535,11 @@ func (h *Helper) command(ctx context.Context, timeout time.Duration, name string
 }
 
 func (h *Helper) unattendedDryRun(ctx context.Context) ([]byte, error) {
-	if lock := h.aptActivity(); lock != nil {
+	lock, err := h.aptActivity()
+	if err != nil {
+		return nil, aptLockInspectionError("unattended_upgrade_dry_run", err)
+	}
+	if lock != nil {
 		return nil, &operationError{code: "apt_lock_busy", stage: "unattended_upgrade_dry_run", retryable: true, message: "APT is currently in use; dry-run was not started", lock: lock}
 	}
 	timeout := h.APTLockTimeout
@@ -555,7 +569,11 @@ func (h *Helper) unattendedDryRun(ctx context.Context) ([]byte, error) {
 		if !aptLockBusy(output) {
 			return output, classifyDryRunFailure(output, err)
 		}
-		if lock := h.aptActivity(); lock != nil {
+		lock, inspectErr := h.aptActivity()
+		if inspectErr != nil {
+			return output, aptLockInspectionError("unattended_upgrade_dry_run", inspectErr)
+		}
+		if lock != nil {
 			return output, &operationError{code: "apt_lock_busy", stage: "unattended_upgrade_dry_run", retryable: true, message: "APT became busy during policy validation", lock: lock}
 		}
 		if attempt == 1 {
@@ -606,7 +624,10 @@ func (h *Helper) waitForAPT(ctx context.Context) error {
 func (h *Helper) waitForAPTUntil(ctx context.Context, deadline time.Time, base time.Duration) error {
 	started := time.Now()
 	for attempt := 0; ; attempt++ {
-		lock := h.aptActivity()
+		lock, err := h.aptActivity()
+		if err != nil {
+			return aptLockInspectionError("apt_lock_wait", err)
+		}
 		if lock == nil {
 			return nil
 		}
@@ -634,17 +655,24 @@ type aptLockInfo struct {
 	Command, Unit string
 }
 
-func (h *Helper) aptActivity() *aptLockInfo {
+func (h *Helper) aptActivity() (*aptLockInfo, error) {
 	status, err := aptstatus.Inspect(h.Root)
-	if err != nil || !status.Busy || len(status.Holders) == 0 {
-		return nil
+	if err != nil {
+		return nil, err
+	}
+	if !status.Busy || len(status.Holders) == 0 {
+		return nil, nil
 	}
 	holder := status.Holders[0]
 	file := ""
 	if len(holder.Locks) > 0 {
 		file = holder.Locks[0]
 	}
-	return &aptLockInfo{File: file, PID: holder.PID, Command: sanitize(holder.Command, 80), Unit: sanitize(holder.Unit, 120)}
+	return &aptLockInfo{File: file, PID: holder.PID, Command: sanitize(holder.Command, 80), Unit: sanitize(holder.Unit, 120)}, nil
+}
+
+func aptLockInspectionError(stage string, err error) *operationError {
+	return &operationError{code: "apt_lock_inspection_failed", stage: stage, retryable: true, message: "APT lock state could not be inspected: " + sanitize(err.Error(), 512)}
 }
 
 func aptLockBusy(output []byte) bool {

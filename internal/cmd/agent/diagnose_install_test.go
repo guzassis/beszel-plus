@@ -30,7 +30,7 @@ func diagnosticRoot(t *testing.T, busy bool) string {
 	if busy {
 		info, _ := os.Stat(lock)
 		stat := info.Sys().(*syscall.Stat_t)
-		contents = fmt.Sprintf("1: POSIX ADVISORY WRITE %d %x:%x:%d 0 EOF\n", pid, unix.Major(uint64(stat.Dev)), unix.Minor(uint64(stat.Dev)), stat.Ino)
+		contents = fmt.Sprintf("1: POSIX ADVISORY WRITE %d %02x:%02x:%d 0 EOF\n", pid, unix.Major(uint64(stat.Dev)), unix.Minor(uint64(stat.Dev)), stat.Ino)
 	}
 	_ = os.WriteFile(filepath.Join(root, "proc/locks"), []byte(contents), 0o644)
 	return root
