@@ -13,15 +13,61 @@ type Network = { id: string; name: string; interface: string; broadcast: string;
 type PowerAPIResponse = { state?: string; status?: string }
 const errorMessage = (error: unknown) => (error instanceof Error ? error.message : String(error))
 
+function readinessLabel(state?: string) {
+	switch (state) {
+		case "ready":
+			return t`Ready`
+		case "disabled":
+			return t`Disabled`
+		case "unsupported":
+			return t`Wake-on-LAN is not supported`
+		case "no_physical_ethernet":
+			return t`No physical Ethernet interface was found`
+		case "no_carrier":
+			return t`The Ethernet cable is disconnected`
+		case "invalid_mac":
+			return t`The network interface has an invalid MAC address`
+		case "wol_not_enabled":
+			return t`Wake-on-LAN is supported but disabled on the interface`
+		case "ethtool_missing":
+			return t`ethtool is not installed`
+		case "network_unassigned":
+			return t`The interface has no IPv4 address`
+		default:
+			return t`Unknown`
+	}
+}
+
+function operationLabel(value?: string) {
+	switch (value) {
+		case "queued":
+			return t`Queued`
+		case "packet_sent":
+			return t`Wake packet sent`
+		case "already_online":
+			return t`System is already online`
+		case "completed":
+			return t`Completed`
+		default:
+			return value ? t`Operation accepted` : t`Operation queued`
+	}
+}
+
 export default function PowerManagement({ system }: { system: SystemRecord }) {
 	const diagnostics = system.info.power
+	const selectedInterface =
+		diagnostics?.interfaces?.find((item) => item.interface === diagnostics.selected_interface) ??
+		diagnostics?.interfaces?.[0]
+	const powerEnabled = Boolean(system.power_management_enabled || diagnostics?.enabled)
+	const wolReady = diagnostics?.state === "ready"
+	const canConfigure = Boolean(diagnostics?.enabled)
 	const [busy, setBusy] = useState(false)
 	const [editing, setEditing] = useState(false)
 	const [networks, setNetworks] = useState<Network[]>([])
-	const [mac, setMac] = useState(system.wol_mac || diagnostics?.interfaces?.[0]?.mac || "")
-	const [broadcast, setBroadcast] = useState(system.wol_broadcast || diagnostics?.interfaces?.[0]?.broadcast || "")
+	const [mac, setMac] = useState(system.wol_mac || selectedInterface?.mac || "")
+	const [broadcast, setBroadcast] = useState(system.wol_broadcast || selectedInterface?.broadcast || "")
 	const [networkId, setNetworkId] = useState(system.power_network_id || "")
-	const [interfaceName, setInterfaceName] = useState(system.wol_interface || "")
+	const [interfaceName, setInterfaceName] = useState(system.wol_interface || diagnostics?.selected_interface || "")
 	const [customMinutes, setCustomMinutes] = useState("45")
 	const hubHostname = (() => {
 		try {
@@ -60,7 +106,7 @@ export default function PowerManagement({ system }: { system: SystemRecord }) {
 				method: "POST",
 				body: { system_id: system.id, action, delay_seconds: delaySeconds },
 			})
-			toast({ title: t`Power operation`, description: result.state || result.status || t`Operation queued` })
+			toast({ title: t`Power operation`, description: operationLabel(result.state || result.status) })
 		} catch (error: unknown) {
 			toast({
 				title: t`Power operation failed`,
@@ -77,7 +123,7 @@ export default function PowerManagement({ system }: { system: SystemRecord }) {
 		try {
 			await pb.collection("systems").update(system.id, {
 				power_management_enabled: true,
-				wol_enabled: true,
+				wol_enabled: wolReady,
 				power_network_id: networkId,
 				wol_interface: interfaceName,
 				wol_mac: mac,
@@ -111,8 +157,8 @@ export default function PowerManagement({ system }: { system: SystemRecord }) {
 						<span className="font-medium">
 							<Trans>Readiness</Trans>:
 						</span>{" "}
-						{stale ? t`stale` : diagnostics.state}
-						{diagnostics.reason ? ` — ${diagnostics.reason}` : ""}
+						{stale ? t`Stale` : readinessLabel(diagnostics.state)}
+						{diagnostics.reason === "wol_probe_failed" ? ` — ${t`Unable to query Wake-on-LAN support`}` : ""}
 					</div>
 				)}
 				{isHubHost ? (
@@ -122,9 +168,15 @@ export default function PowerManagement({ system }: { system: SystemRecord }) {
 				) : null}
 				{isAdmin() && editing && (
 					<div className="grid md:grid-cols-2 gap-2">
+						{!canConfigure && (
+							<p className="md:col-span-2 text-muted-foreground">
+								<Trans>Power management is unavailable. The current controls are read-only.</Trans>
+							</p>
+						)}
 						<select
 							className="h-9 rounded-md border bg-background px-3"
 							value={networkId}
+							disabled={!canConfigure}
 							onChange={(event) => {
 								const selected = networks.find((network) => network.id === event.target.value)
 								setNetworkId(event.target.value)
@@ -148,12 +200,14 @@ export default function PowerManagement({ system }: { system: SystemRecord }) {
 						</select>
 						<Input
 							value={mac}
+							disabled={!canConfigure}
 							onChange={(e) => setMac(e.target.value)}
 							placeholder="02:11:22:33:44:55"
 							aria-label={t`Wake-on-LAN MAC address`}
 						/>
 						<Input
 							value={broadcast}
+							disabled={!canConfigure}
 							onChange={(e) => setBroadcast(e.target.value)}
 							placeholder="192.168.1.255"
 							aria-label={t`Broadcast address`}
@@ -172,12 +226,21 @@ export default function PowerManagement({ system }: { system: SystemRecord }) {
 				)}
 				{isAdmin() && (
 					<div className="flex flex-wrap gap-2">
-						<Button size="sm" variant="outline" disabled={busy} onClick={() => (editing ? save() : setEditing(true))}>
+						<Button
+							size="sm"
+							variant="outline"
+							disabled={busy || (editing && !canConfigure)}
+							onClick={() => (editing ? save() : setEditing(true))}
+						>
 							{editing ? <SaveIcon className="size-4 me-1" /> : null}
 							{editing ? t`Save configuration` : t`Configure`}
 						</Button>
 						{system.status === "down" && (
-							<Button size="sm" disabled={busy || !system.wol_enabled || isHubHost} onClick={() => action("wake")}>
+							<Button
+								size="sm"
+								disabled={busy || !system.wol_enabled || !wolReady || isHubHost}
+								onClick={() => action("wake")}
+							>
 								<Trans>Wake system</Trans>
 							</Button>
 						)}
@@ -186,7 +249,7 @@ export default function PowerManagement({ system }: { system: SystemRecord }) {
 								<Button
 									size="sm"
 									variant="destructive"
-									disabled={busy || !system.power_management_enabled}
+									disabled={busy || !powerEnabled}
 									onClick={() => action("shutdown", 3)}
 								>
 									<Trans>Shut down now</Trans>
@@ -194,7 +257,7 @@ export default function PowerManagement({ system }: { system: SystemRecord }) {
 								<Button
 									size="sm"
 									variant="outline"
-									disabled={busy || !system.power_management_enabled}
+									disabled={busy || !powerEnabled}
 									onClick={() => action("shutdown", 900)}
 								>
 									<Trans>Shut down in 15 minutes</Trans>
@@ -204,7 +267,7 @@ export default function PowerManagement({ system }: { system: SystemRecord }) {
 										key={minutes}
 										size="sm"
 										variant="outline"
-										disabled={busy || !system.power_management_enabled}
+										disabled={busy || !powerEnabled}
 										onClick={() => action("shutdown", minutes * 60)}
 									>
 										{t`Shut down in ${minutes} minutes`}
@@ -224,7 +287,7 @@ export default function PowerManagement({ system }: { system: SystemRecord }) {
 									variant="outline"
 									disabled={
 										busy ||
-										!system.power_management_enabled ||
+										!powerEnabled ||
 										!Number.isInteger(Number(customMinutes)) ||
 										Number(customMinutes) < 1 ||
 										Number(customMinutes) > 10080

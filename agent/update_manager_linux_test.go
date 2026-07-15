@@ -218,7 +218,7 @@ func TestParseLatestAptHistoryDetectsUnattendedUpgrade(t *testing.T) {
 func TestUpdateSnapshotCopiesCache(t *testing.T) {
 	now := time.Now().UTC().Add(-2 * time.Second)
 	m := &updateManager{status: nil, lastAttempt: now}
-	if got := m.snapshot(); got == nil || got.OverallState != "monitoring_incomplete" {
+	if got := m.snapshot(); got == nil || got.OverallState != "monitoring_incomplete" || got.CollectionStatus != "collecting" || got.CollectedAt != nil {
 		t.Fatalf("unexpected initial snapshot: %#v", got)
 	}
 }

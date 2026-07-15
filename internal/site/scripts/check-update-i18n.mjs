@@ -157,9 +157,30 @@ const pt = {
 	"Maintenance helper incompatible": "Helper de manutenção incompatível",
 	"Agent incompatible with maintenance operations": "Agent incompatível com operações de manutenção",
 	"Maintenance operation timed out": "A operação de manutenção excedeu o tempo limite",
+	Ready: "Pronto",
+	"Wake-on-LAN is not supported": "Wake-on-LAN não é suportado",
+	"No physical Ethernet interface was found": "Nenhuma interface Ethernet física foi encontrada",
+	"The Ethernet cable is disconnected": "O cabo Ethernet está desconectado",
+	"The network interface has an invalid MAC address": "A interface de rede tem um endereço MAC inválido",
+	"Wake-on-LAN is supported but disabled on the interface": "Wake-on-LAN é suportado, mas está desativado na interface",
+	"ethtool is not installed": "O ethtool não está instalado",
+	"The interface has no IPv4 address": "A interface não possui endereço IPv4",
+	"Wake packet sent": "Pacote de ativação enviado",
+	"System is already online": "O sistema já está online",
+	"Operation accepted": "Operação aceita",
+	Stale: "Desatualizado",
+	"Unable to query Wake-on-LAN support": "Não foi possível consultar o suporte a Wake-on-LAN",
+	"Power management is unavailable. The current controls are read-only.":
+		"O gerenciamento de energia está indisponível. Os controles atuais são somente leitura.",
+	"Update management is unavailable. The current controls are read-only.":
+		"O gerenciamento de atualizações está indisponível. Os controles atuais são somente leitura.",
+	"Collecting update information…": "Coletando informações de atualização…",
+	"Waiting for the first collection": "Aguardando a primeira coleta",
+	"Official repositories": "Repositórios oficiais",
 }
 
-const updateReference = /automatic-updates\.tsx|alerts-history-columns\.tsx|src\/lib\/alerts\.ts/
+const featureReference =
+	/automatic-updates\.tsx|power-management\.tsx|add-system\.tsx|alerts-history-columns\.tsx|src\/lib\/alerts\.ts/
 const decode = (value) => JSON.parse(`"${value.replaceAll("\\", "\\\\").replaceAll('"', '\\"')}"`)
 const placeholders = (value) =>
 	[...value.matchAll(/\{([A-Za-z0-9_]+)(?:,|\})/g)]
@@ -173,7 +194,7 @@ for (const locale of locales) {
 	const path = join(root, "src", "locales", locale, `${locale}.po`)
 	const source = readFileSync(path, "utf8")
 	const blocks = source.split("\n\n").map((block) => {
-		if (!updateReference.test(block)) return block
+		if (!featureReference.test(block)) return block
 		const idMatch = block.match(/^msgid "([^"]*)"$/m)
 		const valueMatch = block.match(/^msgstr "([^"]*)"$/m)
 		if (!idMatch || !valueMatch) return block
@@ -198,9 +219,15 @@ for (const locale of locales) {
 	if (fix && next !== source) writeFileSync(path, next)
 }
 
-const component = readFileSync(join(root, "src/components/routes/system/automatic-updates.tsx"), "utf8")
-if (/ >\s*[A-Z][A-Za-z ]+\s*</.test(component)) {
-	console.error("Visible hardcoded string found in automatic-updates.tsx")
-	failed = true
+for (const relative of [
+	"src/components/routes/system/automatic-updates.tsx",
+	"src/components/routes/system/power-management.tsx",
+	"src/components/add-system.tsx",
+]) {
+	const component = readFileSync(join(root, relative), "utf8")
+	if (/ >\s*[A-Z][A-Za-z ]+\s*</.test(component)) {
+		console.error(`Visible hardcoded string found in ${relative}`)
+		failed = true
+	}
 }
 if (failed) process.exit(1)

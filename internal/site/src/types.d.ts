@@ -111,6 +111,7 @@ export interface PowerInterfaceDiagnostic {
 	physical: boolean
 	wol_supported: boolean
 	wol_enabled: boolean
+	wol_probe_error?: string
 }
 
 export interface PowerDiagnostics {
@@ -119,6 +120,7 @@ export interface PowerDiagnostics {
 	reason?: string
 	interfaces?: PowerInterfaceDiagnostic[]
 	collected_at: string
+	selected_interface?: string
 }
 
 export type UpdateOverallState =
@@ -158,7 +160,7 @@ export interface UpdateStatus {
 	recently_updated_packages?: string[]
 	reboot_required: boolean
 	reboot_required_by?: string[]
-	collected_at: string
+	collected_at?: string
 	cache_age_seconds: number
 	data_sources?: string[]
 	timers?: UpdateUnitStatus[]
@@ -170,7 +172,7 @@ export interface UpdateStatus {
 	excluded_repositories?: string[]
 	data_stale?: boolean
 	collection_errors?: string[]
-	collection_status?: "complete" | "partial" | "collection_skipped_maintenance_active"
+	collection_status?: "collecting" | "complete" | "partial" | "collection_skipped_maintenance_active"
 	eligibility_status?: "available" | "busy" | "unavailable" | "stale"
 	eligibility_error_code?: string
 	eligibility_retryable?: boolean

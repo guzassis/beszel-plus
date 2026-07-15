@@ -148,7 +148,7 @@ export const SystemDialog = ({ setOpen, system }: { setOpen: (open: boolean) => 
 
 	return (
 		<DialogContent
-			className="w-[90%] sm:w-auto sm:ns-dialog max-w-full rounded-lg"
+			className="w-[calc(100%-1rem)] sm:w-auto sm:ns-dialog max-w-full max-h-[calc(100dvh-1rem)] overflow-y-auto overscroll-contain rounded-lg pb-[max(1.5rem,env(safe-area-inset-bottom))]"
 			onCloseAutoFocus={() => {
 				setHostValue(system?.host ?? "")
 			}}
@@ -250,9 +250,15 @@ export const SystemDialog = ({ setOpen, system }: { setOpen: (open: boolean) => 
 										})
 									}
 								>
-									<option value="monitor">Monitor</option>
-									<option value="security">Security</option>
-									<option value="official-all">Official repositories</option>
+									<option value="monitor">
+										<Trans>Monitoring only</Trans>
+									</option>
+									<option value="security">
+										<Trans>Security updates</Trans>
+									</option>
+									<option value="official-all">
+										<Trans>Official repositories</Trans>
+									</option>
 								</select>
 							</label>
 							<label className="flex items-center gap-2">

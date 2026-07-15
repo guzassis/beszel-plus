@@ -1,0 +1,1 @@
+export const MAINTENANCE_PROTOCOL_VERSION = 2

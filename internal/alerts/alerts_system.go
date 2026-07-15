@@ -347,10 +347,10 @@ func evaluateUpdateAlert(name string, threshold float64, data *system.CombinedDa
 		days := max(now.Sub(*status.RebootRequiredSince).Hours()/24, 0)
 		return days > threshold, true, days, " days"
 	case "Update information stale":
-		if status.CollectedAt.IsZero() {
+		if status.CollectedAt == nil || status.CollectedAt.IsZero() {
 			return false, false, 0, ""
 		}
-		hours := now.Sub(status.CollectedAt).Hours()
+		hours := now.Sub(*status.CollectedAt).Hours()
 		if hours < 0 {
 			hours = 0
 		}

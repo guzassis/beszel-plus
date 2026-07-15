@@ -19,6 +19,7 @@ export default [
 	["no", "Norsk", "🇳🇴"],
 	["pl", "Polski", "🇵🇱"],
 	["pt", "Português", "🇵🇹"],
+	["pt-BR", "Português (Brasil)", "🇧🇷"],
 	["ru", "Русский", "🇷🇺"],
 	["sl", "Slovenščina", "🇸🇮"],
 	["sr", "Српски", "🇷🇸"],

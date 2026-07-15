@@ -136,6 +136,9 @@ func NewAgent(dataDir ...string) (agent *Agent, err error) {
 	}
 	agent.updateManager = newUpdateManager(agent.systemdManager, agent.dataDir)
 	agent.maintenanceManager = newMaintenanceManager(agent)
+	if agent.updateManager != nil {
+		agent.updateManager.start()
+	}
 
 	agent.smartManager, err = NewSmartManager()
 	if err != nil {

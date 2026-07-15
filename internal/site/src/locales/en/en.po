@@ -526,6 +526,10 @@ msgid "Collected"
 msgstr "Collected"
 
 #: src/components/routes/system/automatic-updates.tsx
+msgid "Collecting update information…"
+msgstr "Collecting update information…"
+
+#: src/components/routes/system/automatic-updates.tsx
 msgid "Collection error"
 msgstr "Collection error"
 
@@ -535,6 +539,7 @@ msgid "Command line instructions"
 msgstr "Command line instructions"
 
 #: src/components/alerts-history-columns.tsx
+#: src/components/routes/system/power-management.tsx
 msgid "Completed"
 msgstr "Completed"
 
@@ -759,6 +764,7 @@ msgid "Device"
 msgstr "Device"
 
 #: src/components/routes/system/automatic-updates.tsx
+#: src/components/routes/system/power-management.tsx
 msgid "Disabled"
 msgstr "Disabled"
 
@@ -920,6 +926,10 @@ msgstr "Ephemeral"
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Error"
 msgstr "Error"
+
+#: src/components/routes/system/power-management.tsx
+msgid "ethtool is not installed"
+msgstr "ethtool is not installed"
 
 #: src/components/alerts-history-columns.tsx
 msgid "Event"
@@ -1358,6 +1368,7 @@ msgstr "Missing"
 msgid "Model"
 msgstr "Model"
 
+#: src/components/add-system.tsx
 #: src/components/routes/system/automatic-updates.tsx
 msgid "Monitoring only"
 msgstr "Monitoring only"
@@ -1406,6 +1417,10 @@ msgstr "No"
 msgid "No installation command was copied. Please retry."
 msgstr "No installation command was copied. Please retry."
 
+#: src/components/routes/system/power-management.tsx
+msgid "No physical Ethernet interface was found"
+msgstr "No physical Ethernet interface was found"
+
 #: src/components/command-palette.tsx
 #: src/components/systemd-table/systemd-table.tsx
 msgid "No results found."
@@ -1447,6 +1462,10 @@ msgstr "Notifications"
 msgid "OAuth 2 / OIDC support"
 msgstr "OAuth 2 / OIDC support"
 
+#: src/components/add-system.tsx
+msgid "Official repositories"
+msgstr "Official repositories"
+
 #: src/components/routes/system/automatic-updates.tsx
 msgid "Official repository"
 msgstr "Official repository"
@@ -1471,6 +1490,10 @@ msgstr "One-time password"
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Open menu"
 msgstr "Open menu"
+
+#: src/components/routes/system/power-management.tsx
+msgid "Operation accepted"
+msgstr "Operation accepted"
 
 #: src/components/routes/system/automatic-updates.tsx
 msgid "Operation completed successfully"
@@ -1642,6 +1665,10 @@ msgid "Power management"
 msgstr "Power management"
 
 #: src/components/routes/system/power-management.tsx
+msgid "Power management is unavailable. The current controls are read-only."
+msgstr "Power management is unavailable. The current controls are read-only."
+
+#: src/components/routes/system/power-management.tsx
 msgid "Power network"
 msgstr "Power network"
 
@@ -1690,6 +1717,7 @@ msgid "Queue Depth"
 msgstr "Queue Depth"
 
 #: src/components/alerts-history-columns.tsx
+#: src/components/routes/system/power-management.tsx
 msgid "Queued"
 msgstr "Queued"
 
@@ -1716,6 +1744,10 @@ msgstr "Read update policy"
 #: src/components/routes/system/power-management.tsx
 msgid "Readiness"
 msgstr "Readiness"
+
+#: src/components/routes/system/power-management.tsx
+msgid "Ready"
+msgstr "Ready"
 
 #: src/components/alerts-history-columns.tsx
 #: src/components/routes/system/automatic-updates.tsx
@@ -1892,6 +1924,7 @@ msgstr "Search for systems or settings..."
 msgid "Seconds between pings (default: 60)"
 msgstr "Seconds between pings (default: 60)"
 
+#: src/components/add-system.tsx
 #: src/components/routes/system/automatic-updates.tsx
 #: src/components/routes/system/automatic-updates.tsx
 msgid "Security updates"
@@ -2005,8 +2038,12 @@ msgid "Sort By"
 msgstr "Sort By"
 
 #: src/components/routes/system/power-management.tsx
-msgid "stale"
-msgstr "stale"
+#~ msgid "stale"
+#~ msgstr "stale"
+
+#: src/components/routes/system/power-management.tsx
+msgid "Stale"
+msgstr "Stale"
 
 #: src/components/routes/system/automatic-updates.tsx
 msgid "Stale data"
@@ -2068,6 +2105,10 @@ msgstr "Switch theme"
 #: src/lib/alerts.ts
 msgid "System"
 msgstr "System"
+
+#: src/components/routes/system/power-management.tsx
+msgid "System is already online"
+msgstr "System is already online"
 
 #: src/components/routes/system/charts/load-average-chart.tsx
 msgid "System load averages over time"
@@ -2138,8 +2179,20 @@ msgid "The Agent remains unprivileged. A restricted local helper applies validat
 msgstr "The Agent remains unprivileged. A restricted local helper applies validated APT policies."
 
 #: src/components/routes/system/power-management.tsx
+msgid "The Ethernet cable is disconnected"
+msgstr "The Ethernet cable is disconnected"
+
+#: src/components/routes/system/power-management.tsx
 msgid "The Hub cannot wake itself. Use another Hub on the same power network."
 msgstr "The Hub cannot wake itself. Use another Hub on the same power network."
+
+#: src/components/routes/system/power-management.tsx
+msgid "The interface has no IPv4 address"
+msgstr "The interface has no IPv4 address"
+
+#: src/components/routes/system/power-management.tsx
+msgid "The network interface has an invalid MAC address"
+msgstr "The network interface has an invalid MAC address"
 
 #: src/components/routes/settings/heartbeat.tsx
 msgid "The overall status is <0>ok</0> when all systems are up, <1>warn</1> when alerts are triggered, and <2>error</2> when any system is down."
@@ -2331,6 +2384,10 @@ msgid "Unable to load update policy"
 msgstr "Unable to load update policy"
 
 #: src/components/routes/system/power-management.tsx
+msgid "Unable to query Wake-on-LAN support"
+msgstr "Unable to query Wake-on-LAN support"
+
+#: src/components/routes/system/power-management.tsx
 msgid "Unable to save power settings"
 msgstr "Unable to save power settings"
 
@@ -2367,6 +2424,7 @@ msgstr "Universal token"
 #: src/components/routes/system/automatic-updates.tsx
 #: src/components/routes/system/automatic-updates.tsx
 #: src/components/routes/system/automatic-updates.tsx
+#: src/components/routes/system/power-management.tsx
 #: src/lib/i18n.ts
 msgid "Unknown"
 msgstr "Unknown"
@@ -2405,6 +2463,11 @@ msgstr "Update failed"
 #: src/lib/alerts.ts
 msgid "Update information stale"
 msgstr "Update information stale"
+
+#: src/components/routes/system/automatic-updates.tsx
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Update management is unavailable. The current controls are read-only."
+msgstr "Update management is unavailable. The current controls are read-only."
 
 #: src/components/alerts-history-columns.tsx
 msgid "Update monitoring error"
@@ -2534,9 +2597,25 @@ msgstr "Visible Fields"
 msgid "Waiting for enough records to display"
 msgstr "Waiting for enough records to display"
 
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Waiting for the first collection"
+msgstr "Waiting for the first collection"
+
+#: src/components/routes/system/power-management.tsx
+msgid "Wake packet sent"
+msgstr "Wake packet sent"
+
 #: src/components/routes/system/power-management.tsx
 msgid "Wake system"
 msgstr "Wake system"
+
+#: src/components/routes/system/power-management.tsx
+msgid "Wake-on-LAN is not supported"
+msgstr "Wake-on-LAN is not supported"
+
+#: src/components/routes/system/power-management.tsx
+msgid "Wake-on-LAN is supported but disabled on the interface"
+msgstr "Wake-on-LAN is supported but disabled on the interface"
 
 #: src/components/routes/system/power-management.tsx
 msgid "Wake-on-LAN MAC address"

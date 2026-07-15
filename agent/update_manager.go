@@ -93,9 +93,10 @@ func newUpdateManager(systemd *systemdManager, dataDirs ...string) *updateManage
 		m.statePath = filepath.Join(dataDir, "update-monitor-state.json")
 		m.loadState()
 	}
-	go m.run()
 	return m
 }
+
+func (m *updateManager) start() { go m.run() }
 
 func (m *updateManager) run() {
 	m.refresh()
@@ -171,7 +172,7 @@ func (m *updateManager) refresh() {
 		if status.CollectionStatus == "" {
 			status.CollectionStatus = "complete"
 		}
-		status.CollectedAt = now
+		status.CollectedAt = &now
 		status.CacheAgeSeconds = 0
 		if status.PendingSecurityUpdates != nil && *status.PendingSecurityUpdates > 0 {
 			status.SecurityUpdatesSince = &now
@@ -283,15 +284,15 @@ func (m *updateManager) snapshot() *updateentity.Status {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 	if m.status == nil {
-		return &updateentity.Status{InstallationState: updateentity.InstallationUnknown, ConfigurationState: updateentity.ConfigurationUnknown, TimerState: updateentity.TimerUnknown, ServiceState: updateentity.ServiceUnknown, LastResult: updateentity.ResultUnknown, OverallState: updateentity.OverallMonitoringIncomplete, CollectedAt: m.lastAttempt}
+		return &updateentity.Status{InstallationState: updateentity.InstallationUnknown, ConfigurationState: updateentity.ConfigurationUnknown, TimerState: updateentity.TimerUnknown, ServiceState: updateentity.ServiceUnknown, LastResult: updateentity.ResultUnknown, OverallState: updateentity.OverallMonitoringIncomplete, CollectionStatus: "collecting"}
 	}
 	copy := *m.status
 	copy.RecentlyUpdatedPackages = append([]string(nil), m.status.RecentlyUpdatedPackages...)
 	copy.RebootRequiredBy = append([]string(nil), m.status.RebootRequiredBy...)
 	copy.DataSources = append([]string(nil), m.status.DataSources...)
 	copy.Timers = append([]updateentity.UnitStatus(nil), m.status.Timers...)
-	if !copy.CollectedAt.IsZero() {
-		age := time.Since(copy.CollectedAt)
+	if copy.CollectedAt != nil && !copy.CollectedAt.IsZero() {
+		age := time.Since(*copy.CollectedAt)
 		if age > 0 {
 			copy.CacheAgeSeconds = uint32(min(age/time.Second, time.Duration(^uint32(0))))
 		}

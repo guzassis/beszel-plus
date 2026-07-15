@@ -16,6 +16,7 @@ import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
 import { isAdmin, pb } from "@/lib/api"
 import { cn } from "@/lib/utils"
+import { MAINTENANCE_PROTOCOL_VERSION } from "@/lib/maintenance"
 import type {
 	MaintenanceResponse,
 	UpdateOverallState,
@@ -94,7 +95,7 @@ function valueLabel(value: string) {
 function dateLabel(value?: string) {
 	if (!value) return "—"
 	const date = new Date(value)
-	return Number.isNaN(date.getTime()) ? "—" : date.toLocaleString()
+	return Number.isNaN(date.getTime()) || date.getUTCFullYear() <= 1 ? "—" : date.toLocaleString()
 }
 function Row({ label, children }: { label: ReactNode; children: ReactNode }) {
 	return (
@@ -124,7 +125,7 @@ function maintenance(systemId: string, operation: string, policy?: UpdatePolicy)
 		body: {
 			system_id: systemId,
 			request: {
-				version: 1,
+				version: MAINTENANCE_PROTOCOL_VERSION,
 				request_id: requestId,
 				operation,
 				idempotency_key: crypto.randomUUID(),
@@ -168,11 +169,17 @@ function PolicyDialog({
 	const [message, setMessage] = useState("")
 	const [output, setOutput] = useState("")
 	const capabilities = status.capabilities
+	const readOnly = !capabilities?.privileged_helper || !capabilities?.update_management || !capabilities?.policy_read
 
 	async function load() {
 		setBusy(true)
 		setMessage("")
 		setOutput("")
+		if (!capabilities?.policy_read) {
+			setMessage(t`Update management is unavailable. The current controls are read-only.`)
+			setBusy(false)
+			return
+		}
 		try {
 			const [policyResponse, repositoryResponse] = await Promise.all([
 				maintenance(systemId, "get-update-policy"),
@@ -224,7 +231,13 @@ function PolicyDialog({
 
 	return (
 		<Dialog open={open} onOpenChange={setOpen}>
-			<DialogContent className="max-w-2xl max-h-[90vh] overflow-auto" onOpenAutoFocus={load}>
+			<DialogContent
+				className="max-w-2xl max-h-[calc(100dvh-1rem)] overflow-y-auto overscroll-contain"
+				onOpenAutoFocus={(event) => {
+					event.preventDefault()
+					load().catch(console.error)
+				}}
+			>
 				<DialogHeader>
 					<DialogTitle>
 						<Trans>Configure automatic updates</Trans>
@@ -240,12 +253,18 @@ function PolicyDialog({
 						</Trans>
 					</p>
 				)}
+				{readOnly && (
+					<p className="text-sm text-muted-foreground">
+						<Trans>Update management is unavailable. The current controls are read-only.</Trans>
+					</p>
+				)}
 				<div className="grid gap-4">
 					<label htmlFor="package-list-frequency" className="grid gap-1 text-sm">
 						<Trans>Update policy</Trans>
 						<select
 							className="h-9 rounded-md border bg-background px-3"
 							value={policy.mode}
+							disabled={readOnly}
 							onChange={(event) => setPolicy({ ...policy, mode: event.target.value as UpdatePolicyMode })}
 						>
 							<option value="monitor_only">{t`Monitoring only`}</option>
@@ -263,6 +282,7 @@ function PolicyDialog({
 								min={0}
 								max={365}
 								value={policy.update_package_lists_days}
+								disabled={readOnly}
 								onChange={(event) => setPolicy({ ...policy, update_package_lists_days: Number(event.target.value) })}
 							/>
 						</label>
@@ -274,6 +294,7 @@ function PolicyDialog({
 								min={0}
 								max={365}
 								value={policy.unattended_upgrade_days}
+								disabled={readOnly}
 								onChange={(event) => setPolicy({ ...policy, unattended_upgrade_days: Number(event.target.value) })}
 							/>
 						</label>
@@ -285,6 +306,7 @@ function PolicyDialog({
 						<Switch
 							aria-label={t`Remove unused dependencies`}
 							checked={policy.remove_unused_dependencies}
+							disabled={readOnly}
 							onCheckedChange={(checked) => setPolicy({ ...policy, remove_unused_dependencies: checked })}
 						/>
 					</div>
@@ -295,6 +317,7 @@ function PolicyDialog({
 						<Switch
 							aria-label={t`Automatic reboot`}
 							checked={policy.automatic_reboot}
+							disabled={readOnly}
 							onCheckedChange={(checked) => setPolicy({ ...policy, automatic_reboot: checked })}
 						/>
 					</div>
@@ -309,6 +332,7 @@ function PolicyDialog({
 									id="automatic-reboot-time"
 									type="time"
 									value={policy.automatic_reboot_time}
+									disabled={readOnly}
 									onChange={(event) => setPolicy({ ...policy, automatic_reboot_time: event.target.value })}
 								/>
 							</label>
@@ -323,6 +347,7 @@ function PolicyDialog({
 								<label key={repo.id} className="flex items-start gap-2 rounded border p-2 text-sm">
 									<input
 										type="checkbox"
+										disabled={readOnly}
 										checked={policy.allowed_repositories?.includes(repo.id)}
 										onChange={(event) => toggleRepository(repo, event.target.checked)}
 									/>
@@ -338,6 +363,7 @@ function PolicyDialog({
 								<label className="flex items-center gap-2 text-sm text-orange-600">
 									<input
 										type="checkbox"
+										disabled={readOnly}
 										checked={!!policy.confirm_third_party}
 										onChange={(event) => setPolicy({ ...policy, confirm_third_party: event.target.checked })}
 									/>
@@ -366,7 +392,7 @@ function PolicyDialog({
 							<Trans>Install required dependencies</Trans>
 						</Button>
 					)}
-					<Button variant="outline" disabled={busy} onClick={() => run("validate-update-policy", true)}>
+					<Button variant="outline" disabled={busy || readOnly} onClick={() => run("validate-update-policy", true)}>
 						<Trans>Validate</Trans>
 					</Button>
 					<Button variant="outline" disabled={busy || !capabilities?.dry_run} onClick={() => run("run-update-dry-run")}>
@@ -411,7 +437,7 @@ export default function AutomaticUpdates({ status, systemId }: { status?: Update
 					<Trans>Automatic updates</Trans>
 				</CardTitle>
 				<div className="flex gap-2">
-					{isAdmin() && caps?.update_management && (
+					{isAdmin() && (
 						<Button size="sm" variant="outline" onClick={() => setOpen(true)}>
 							<Trans>Configure</Trans>
 						</Button>
@@ -425,7 +451,9 @@ export default function AutomaticUpdates({ status, systemId }: { status?: Update
 			</CardHeader>
 			<CardContent>
 				<Row label={<Trans>Status</Trans>}>
-					<strong className={cn(stateColors[status.overall_state])}>{updateSummary(status)}</strong>
+					<strong className={cn(stateColors[status.overall_state])}>
+						{status.collection_status === "collecting" ? t`Collecting update information…` : updateSummary(status)}
+					</strong>
 				</Row>
 				<Row label="unattended-upgrades">{valueLabel(status.installation_state)}</Row>
 				<Row label={<Trans>Configuration</Trans>}>{valueLabel(status.configuration_state)}</Row>
@@ -473,8 +501,14 @@ export default function AutomaticUpdates({ status, systemId }: { status?: Update
 					<Row label={<Trans>Recently updated</Trans>}>{status.recently_updated_packages.join(", ")}</Row>
 				)}
 				<Row label={<Trans>Collected</Trans>}>
-					{dateLabel(status.collected_at)} ·{" "}
-					{plural(status.cache_age_seconds, { one: "# second old", other: "# seconds old" })}
+					{status.collected_at ? (
+						<>
+							{dateLabel(status.collected_at)} ·{" "}
+							{plural(status.cache_age_seconds, { one: "# second old", other: "# seconds old" })}
+						</>
+					) : (
+						t`Waiting for the first collection`
+					)}
 					{status.data_stale && (
 						<>
 							{" "}

@@ -81,7 +81,7 @@ type Status struct {
 	RecentlyUpdatedPackages []string                        `json:"recently_updated_packages,omitempty" cbor:"13,keyasint,omitempty"`
 	RebootRequired          bool                            `json:"reboot_required" cbor:"14,keyasint"`
 	RebootRequiredBy        []string                        `json:"reboot_required_by,omitempty" cbor:"15,keyasint,omitempty"`
-	CollectedAt             time.Time                       `json:"collected_at" cbor:"16,keyasint"`
+	CollectedAt             *time.Time                      `json:"collected_at,omitempty" cbor:"16,keyasint,omitempty"`
 	CacheAgeSeconds         uint32                          `json:"cache_age_seconds" cbor:"17,keyasint"`
 	DataSources             []string                        `json:"data_sources,omitempty" cbor:"18,keyasint,omitempty"`
 	Timers                  []UnitStatus                    `json:"timers,omitempty" cbor:"19,keyasint,omitempty"`

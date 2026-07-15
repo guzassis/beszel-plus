@@ -63,7 +63,7 @@ msgstr "{eligible, plural, one {# atualização} other {# atualizações}}"
 
 #: src/components/routes/system/info-bar.tsx
 msgid "{threads, plural, one {# thread} other {# threads}}"
-msgstr ""
+msgstr "{threads, plural, one {# thread de execução} other {# threads de execução}}"
 
 #. placeholder {0}: status.pending_security_updates
 #: src/components/routes/system/automatic-updates.tsx
@@ -77,7 +77,7 @@ msgstr "1 hora"
 #. Load average
 #: src/components/routes/system/charts/load-average-chart.tsx
 msgid "1 min"
-msgstr ""
+msgstr "1 min"
 
 #: src/lib/utils.ts
 msgid "1 minute"
@@ -94,7 +94,7 @@ msgstr "12 horas"
 #. Load average
 #: src/components/routes/system/charts/load-average-chart.tsx
 msgid "15 min"
-msgstr ""
+msgstr "15 min"
 
 #: src/lib/utils.ts
 msgid "24 hours"
@@ -107,7 +107,7 @@ msgstr "30 dias"
 #. Load average
 #: src/components/routes/system/charts/load-average-chart.tsx
 msgid "5 min"
-msgstr ""
+msgstr "5 min"
 
 #. Table column
 #: src/components/routes/settings/quiet-hours.tsx
@@ -144,7 +144,7 @@ msgstr "Adicionar {foo}"
 
 #: src/components/add-system.tsx
 msgid "Add system and copy Linux command"
-msgstr ""
+msgstr "Adicionar sistema e copiar comando Linux"
 
 #: src/components/routes/settings/notifications.tsx
 msgid "Add URL"
@@ -162,7 +162,7 @@ msgstr "Ajustar a largura do layout principal"
 #: src/components/command-palette.tsx
 #: src/components/navbar.tsx
 msgid "Admin"
-msgstr ""
+msgstr "Administrador"
 
 #: src/components/systemd-table/systemd-table.tsx
 msgid "After"
@@ -174,7 +174,7 @@ msgstr "Depois"
 
 #: src/components/routes/settings/heartbeat.tsx
 msgid "After setting the environment variables, restart your Beszel Plus Hub for changes to take effect."
-msgstr ""
+msgstr "Após definir as variáveis de ambiente, reinicie o Hub Beszel Plus para aplicar as alterações."
 
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Agent"
@@ -186,7 +186,7 @@ msgstr "Agent incompatível com operações de manutenção"
 
 #: src/components/add-system.tsx
 msgid "Agent installation options"
-msgstr ""
+msgstr "Opções de instalação do Agente"
 
 #: src/components/command-palette.tsx
 #: src/components/routes/settings/alerts-history-data-table.tsx
@@ -226,15 +226,15 @@ msgstr "Aplicar política de atualizações"
 
 #: src/components/routes/system/automatic-updates.tsx
 msgid "APT dry-run failed after the configuration was validated."
-msgstr ""
+msgstr "A simulação do APT falhou após a validação da configuração."
 
 #: src/components/routes/system/automatic-updates.tsx
 msgid "APT is currently busy. This operation will be retried automatically."
-msgstr ""
+msgstr "O APT está ocupado. A operação será tentada novamente automaticamente."
 
 #: src/components/routes/system/automatic-updates.tsx
 msgid "APT rejected the generated configuration."
-msgstr ""
+msgstr "O APT rejeitou a configuração gerada."
 
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Are you sure you want to delete {name}?"
@@ -250,7 +250,7 @@ msgstr "Automática"
 
 #: src/components/add-system.tsx
 msgid "Automatic Agent updates"
-msgstr ""
+msgstr "Atualizações automáticas do Agente"
 
 #: src/components/copy-to-clipboard.tsx
 msgid "Automatic copy requires a secure context."
@@ -349,7 +349,7 @@ msgstr "Largura de Banda"
 #. Battery label in systems table header
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Bat"
-msgstr ""
+msgstr "Bateria"
 
 #: src/components/routes/system/charts/sensor-charts.tsx
 #: src/lib/alerts.ts
@@ -377,11 +377,11 @@ msgstr "Abaixo de {0}{1} no último {2, plural, one {# minuto} other {# minutos}
 
 #: src/components/login/auth-form.tsx
 msgid "Beszel Plus supports OpenID Connect and many OAuth2 authentication providers."
-msgstr ""
+msgstr "O Beszel Plus oferece suporte a OpenID Connect e diversos provedores de autenticação OAuth2."
 
 #: src/components/routes/settings/notifications.tsx
 msgid "Beszel Plus uses <0>Shoutrrr</0> to integrate with popular notification services."
-msgstr ""
+msgstr "O Beszel Plus usa o <0>Shoutrrr</0> para integrar serviços populares de notificação."
 
 #: src/components/login/auth-form.tsx
 #~ msgid "Beszel supports OpenID Connect and many OAuth2 authentication providers."
@@ -398,7 +398,7 @@ msgstr "Binário"
 #: src/components/routes/settings/general.tsx
 #: src/components/routes/settings/general.tsx
 msgid "Bits (Kbps, Mbps, Gbps)"
-msgstr ""
+msgstr "Bits (Kbps, Mbps, Gbps)"
 
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Boot state"
@@ -406,20 +406,20 @@ msgstr "Estado de inicialização"
 
 #: src/components/routes/system/power-management.tsx
 msgid "Broadcast address"
-msgstr ""
+msgstr "Endereço de broadcast"
 
 #: src/components/routes/system/power-management.tsx
 msgid "Broadcast override"
-msgstr ""
+msgstr "Substituição de broadcast"
 
 #: src/components/routes/settings/general.tsx
 #: src/components/routes/settings/general.tsx
 msgid "Bytes (KB/s, MB/s, GB/s)"
-msgstr ""
+msgstr "Bytes (KB/s, MB/s, GB/s)"
 
 #: src/components/routes/system/charts/memory-charts.tsx
 msgid "Cache / Buffers"
-msgstr ""
+msgstr "Cache / buffers"
 
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Can reload"
@@ -441,7 +441,7 @@ msgstr "Cancelar"
 
 #: src/components/routes/system/power-management.tsx
 msgid "Cancel shutdown"
-msgstr ""
+msgstr "Cancelar desligamento"
 
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Capabilities"
@@ -457,7 +457,7 @@ msgstr "Cuidado - possível perda de dados"
 
 #: src/components/routes/settings/general.tsx
 msgid "Celsius (°C)"
-msgstr ""
+msgstr "Celsius (°C)"
 
 #: src/components/routes/settings/general.tsx
 msgid "Change display units for metrics."
@@ -494,7 +494,7 @@ msgstr "Verifique os logs para mais detalhes."
 
 #: src/components/routes/system/power-management.tsx
 msgid "Check system logs for details."
-msgstr ""
+msgstr "Consulte os logs do sistema para obter detalhes."
 
 #: src/components/routes/settings/heartbeat.tsx
 msgid "Check your monitoring service"
@@ -531,6 +531,10 @@ msgid "Collected"
 msgstr "Coletado"
 
 #: src/components/routes/system/automatic-updates.tsx
+msgid "Collecting update information…"
+msgstr "Coletando informações de atualização…"
+
+#: src/components/routes/system/automatic-updates.tsx
 msgid "Collection error"
 msgstr "Erro de coleta"
 
@@ -540,6 +544,7 @@ msgid "Command line instructions"
 msgstr "Instruções de linha de comando"
 
 #: src/components/alerts-history-columns.tsx
+#: src/components/routes/system/power-management.tsx
 msgid "Completed"
 msgstr "Concluída"
 
@@ -567,7 +572,7 @@ msgstr "Confirmar senha"
 
 #: src/components/routes/system/power-management.tsx
 msgid "Confirm shutdown of this system?"
-msgstr ""
+msgstr "Confirma o desligamento deste sistema?"
 
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Conflicts"
@@ -644,13 +649,13 @@ msgstr "Copiar YAML"
 #: src/components/routes/system.tsx
 msgctxt "Core system metrics"
 msgid "Core"
-msgstr ""
+msgstr "Núcleo"
 
 #: src/components/containers-table/containers-table-columns.tsx
 #: src/components/systemd-table/systemd-table-columns.tsx
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "CPU"
-msgstr ""
+msgstr "CPU"
 
 #: src/components/routes/system/cpu-sheet.tsx
 msgid "CPU Cores"
@@ -711,7 +716,7 @@ msgstr "Repositórios personalizados"
 
 #: src/components/routes/system/power-management.tsx
 msgid "Custom shutdown delay in minutes"
-msgstr ""
+msgstr "Atraso personalizado para desligamento em minutos"
 
 #. Power Cycles
 #: src/components/routes/system/smart-table.tsx
@@ -764,6 +769,7 @@ msgid "Device"
 msgstr "Dispositivo"
 
 #: src/components/routes/system/automatic-updates.tsx
+#: src/components/routes/system/power-management.tsx
 msgid "Disabled"
 msgstr "Desativado"
 
@@ -869,7 +875,7 @@ msgstr "Atualizações elegíveis"
 #: src/components/login/forgot-pass-form.tsx
 #: src/components/login/otp-forms.tsx
 msgid "Email"
-msgstr ""
+msgstr "E-mail"
 
 #: src/components/routes/settings/notifications.tsx
 msgid "Email notifications"
@@ -926,6 +932,10 @@ msgstr "Efêmero"
 msgid "Error"
 msgstr "Erro"
 
+#: src/components/routes/system/power-management.tsx
+msgid "ethtool is not installed"
+msgstr "O ethtool não está instalado"
+
 #: src/components/alerts-history-columns.tsx
 msgid "Event"
 msgstr "Evento"
@@ -975,7 +985,7 @@ msgstr "Exporte a configuração atual dos seus sistemas."
 
 #: src/components/routes/settings/general.tsx
 msgid "Fahrenheit (°F)"
-msgstr ""
+msgstr "Fahrenheit (°F)"
 
 #: src/components/alerts-history-columns.tsx
 #: src/components/routes/system/automatic-updates.tsx
@@ -999,7 +1009,7 @@ msgstr "Falha ao guardar as definições"
 
 #: src/components/add-system.tsx
 msgid "Failed to save system"
-msgstr ""
+msgstr "Falha ao salvar o sistema"
 
 #: src/components/routes/settings/heartbeat.tsx
 msgid "Failed to send heartbeat"
@@ -1033,7 +1043,7 @@ msgstr "Impressão digital"
 
 #: src/components/routes/system/smart-table.tsx
 msgid "Firmware"
-msgstr ""
+msgstr "Firmware"
 
 #: src/components/alerts/alerts-sheet.tsx
 msgid "For <0>{min}</0> {min, plural, one {minute} other {minutes}}"
@@ -1063,11 +1073,11 @@ msgstr "Geral"
 
 #: src/components/routes/settings/quiet-hours.tsx
 msgid "Global"
-msgstr ""
+msgstr "Global"
 
 #: src/components/routes/system.tsx
 msgid "GPU"
-msgstr ""
+msgstr "GPU"
 
 #: src/components/routes/system/charts/gpu-charts.tsx
 msgid "GPU Engines"
@@ -1092,7 +1102,7 @@ msgstr "Saúde"
 
 #: src/components/routes/settings/layout.tsx
 msgid "Heartbeat"
-msgstr ""
+msgstr "Sinal de vida"
 
 #: src/components/routes/settings/heartbeat.tsx
 msgid "Heartbeat Monitoring"
@@ -1110,7 +1120,7 @@ msgstr "Heartbeat enviado com sucesso"
 
 #: src/components/add-system.tsx
 msgid "Host / IP"
-msgstr ""
+msgstr "Host / IP"
 
 #: src/components/routes/settings/heartbeat.tsx
 msgid "HTTP Method"
@@ -1160,7 +1170,7 @@ msgstr "Inativo"
 
 #: src/components/add-system.tsx
 msgid "Initial update policy"
-msgstr ""
+msgstr "Política inicial de atualizações"
 
 #: src/components/routes/system/automatic-updates.tsx
 msgid "Install required dependencies"
@@ -1275,7 +1285,7 @@ msgstr "Tentativa de login falhou"
 #: src/components/containers-table/containers-table.tsx
 #: src/components/navbar.tsx
 msgid "Logs"
-msgstr ""
+msgstr "Logs"
 
 #: src/components/routes/settings/notifications.tsx
 msgid "Looking instead for where to create alerts? Click the bell <0/> icons in the systems table."
@@ -1295,7 +1305,7 @@ msgstr "Helper de manutenção incompatível"
 
 #: src/components/routes/system/automatic-updates.tsx
 msgid "Maintenance helper version is incompatible with this Agent. Re-run the Agent installer."
-msgstr ""
+msgstr "A versão do helper de manutenção é incompatível com este Agente. Execute novamente o instalador do Agente."
 
 #: src/components/alerts-history-columns.tsx
 msgid "Maintenance operation refused"
@@ -1363,6 +1373,7 @@ msgstr "Ausente"
 msgid "Model"
 msgstr "Modelo"
 
+#: src/components/add-system.tsx
 #: src/components/routes/system/automatic-updates.tsx
 msgid "Monitoring only"
 msgstr "Somente monitoramento"
@@ -1409,7 +1420,11 @@ msgstr "Não"
 
 #: src/components/add-system.tsx
 msgid "No installation command was copied. Please retry."
-msgstr ""
+msgstr "Nenhum comando de instalação foi copiado. Tente novamente."
+
+#: src/components/routes/system/power-management.tsx
+msgid "No physical Ethernet interface was found"
+msgstr "Nenhuma interface Ethernet física foi encontrada"
 
 #: src/components/command-palette.tsx
 #: src/components/systemd-table/systemd-table.tsx
@@ -1452,6 +1467,10 @@ msgstr "Notificações"
 msgid "OAuth 2 / OIDC support"
 msgstr "Suporte a OAuth 2 / OIDC"
 
+#: src/components/add-system.tsx
+msgid "Official repositories"
+msgstr "Repositórios oficiais"
+
 #: src/components/routes/system/automatic-updates.tsx
 msgid "Official repository"
 msgstr "Repositório oficial"
@@ -1476,6 +1495,10 @@ msgstr "Senha de uso único"
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Open menu"
 msgstr "Abrir menu"
+
+#: src/components/routes/system/power-management.tsx
+msgid "Operation accepted"
+msgstr "Operação aceita"
 
 #: src/components/routes/system/automatic-updates.tsx
 msgid "Operation completed successfully"
@@ -1644,11 +1667,15 @@ msgstr "Portas"
 #: src/components/add-system.tsx
 #: src/components/routes/system/power-management.tsx
 msgid "Power management"
-msgstr ""
+msgstr "Gerenciamento de energia"
+
+#: src/components/routes/system/power-management.tsx
+msgid "Power management is unavailable. The current controls are read-only."
+msgstr "O gerenciamento de energia está indisponível. Os controles atuais são somente leitura."
 
 #: src/components/routes/system/power-management.tsx
 msgid "Power network"
-msgstr ""
+msgstr "Rede de energia"
 
 #. Power On Time
 #: src/components/routes/system/smart-table.tsx
@@ -1657,15 +1684,15 @@ msgstr "Ligado"
 
 #: src/components/routes/system/power-management.tsx
 msgid "Power operation"
-msgstr ""
+msgstr "Operação de energia"
 
 #: src/components/routes/system/power-management.tsx
 msgid "Power operation failed"
-msgstr ""
+msgstr "Falha na operação de energia"
 
 #: src/components/routes/system/power-management.tsx
 msgid "Power settings saved"
-msgstr ""
+msgstr "Configurações de energia salvas"
 
 #: src/components/routes/system/charts/gpu-charts.tsx
 #: src/components/routes/system/charts/memory-charts.tsx
@@ -1695,6 +1722,7 @@ msgid "Queue Depth"
 msgstr "Profundidade da fila"
 
 #: src/components/alerts-history-columns.tsx
+#: src/components/routes/system/power-management.tsx
 msgid "Queued"
 msgstr "Enfileirada"
 
@@ -1720,7 +1748,11 @@ msgstr "Ler política de atualizações"
 
 #: src/components/routes/system/power-management.tsx
 msgid "Readiness"
-msgstr ""
+msgstr "Prontidão"
+
+#: src/components/routes/system/power-management.tsx
+msgid "Ready"
+msgstr "Pronto"
 
 #: src/components/alerts-history-columns.tsx
 #: src/components/routes/system/automatic-updates.tsx
@@ -1797,7 +1829,7 @@ msgstr "Retomar"
 #: src/components/systems-table/systems-table-columns.tsx
 msgctxt "Root disk label"
 msgid "Root"
-msgstr ""
+msgstr "Raiz"
 
 #: src/components/routes/settings/tokens-fingerprints.tsx
 msgid "Rotate token"
@@ -1858,7 +1890,7 @@ msgstr "Salvar e aplicar"
 
 #: src/components/routes/system/power-management.tsx
 msgid "Save configuration"
-msgstr ""
+msgstr "Salvar configuração"
 
 #: src/components/routes/settings/general.tsx
 #: src/components/routes/settings/notifications.tsx
@@ -1875,7 +1907,7 @@ msgstr "Agendar"
 
 #: src/components/routes/system/power-management.tsx
 msgid "Schedule custom shutdown"
-msgstr ""
+msgstr "Agendar desligamento personalizado"
 
 #: src/components/routes/settings/quiet-hours.tsx
 msgid "Schedule quiet hours where notifications will not be sent, such as during maintenance periods."
@@ -1897,6 +1929,7 @@ msgstr "Pesquisar por sistemas ou configurações..."
 msgid "Seconds between pings (default: 60)"
 msgstr "Segundos entre pings (predefinido: 60)"
 
+#: src/components/add-system.tsx
 #: src/components/routes/system/automatic-updates.tsx
 #: src/components/routes/system/automatic-updates.tsx
 msgid "Security updates"
@@ -1924,7 +1957,7 @@ msgstr "Envie um único ping de heartbeat para verificar se o seu endpoint está
 
 #: src/components/routes/settings/heartbeat.tsx
 msgid "Send periodic outbound pings to an external monitoring service so you can monitor Beszel Plus without exposing it to the internet."
-msgstr ""
+msgstr "Envie pings periódicos para um serviço externo e monitore o Beszel Plus sem expô-lo à internet."
 
 #: src/components/routes/settings/heartbeat.tsx
 #~ msgid "Send periodic outbound pings to an external monitoring service so you can monitor Beszel without exposing it to the internet."
@@ -1965,7 +1998,7 @@ msgstr "Defina os limiares de porcentagem para as cores do medidor."
 
 #: src/components/routes/settings/heartbeat.tsx
 msgid "Set the following environment variables on your Beszel Plus Hub to enable heartbeat monitoring:"
-msgstr ""
+msgstr "Defina as variáveis de ambiente abaixo no Hub Beszel Plus para habilitar o monitoramento por sinal de vida:"
 
 #: src/components/command-palette.tsx
 #: src/components/command-palette.tsx
@@ -1987,15 +2020,15 @@ msgstr "A mostrar o último resultado de elegibilidade bem-sucedido."
 
 #: src/components/routes/system/power-management.tsx
 msgid "Shut down in {minutes} minutes"
-msgstr ""
+msgstr "Desligar em {minutes} minutos"
 
 #: src/components/routes/system/power-management.tsx
 msgid "Shut down in 15 minutes"
-msgstr ""
+msgstr "Desligar em 15 minutos"
 
 #: src/components/routes/system/power-management.tsx
 msgid "Shut down now"
-msgstr ""
+msgstr "Desligar agora"
 
 #: src/components/login/auth-form.tsx
 msgid "Sign in"
@@ -2010,8 +2043,12 @@ msgid "Sort By"
 msgstr "Ordenar Por"
 
 #: src/components/routes/system/power-management.tsx
-msgid "stale"
-msgstr ""
+#~ msgid "stale"
+#~ msgstr "desatualizado"
+
+#: src/components/routes/system/power-management.tsx
+msgid "Stale"
+msgstr "Desatualizado"
 
 #: src/components/routes/system/automatic-updates.tsx
 msgid "Stale data"
@@ -2057,7 +2094,7 @@ msgstr "Uso de Swap"
 #: src/components/mode-toggle.tsx
 #: src/components/mode-toggle.tsx
 msgid "Switch theme"
-msgstr ""
+msgstr "Alternar tema"
 
 #: src/components/add-system.tsx
 #: src/components/alerts-history-columns.tsx
@@ -2074,13 +2111,17 @@ msgstr ""
 msgid "System"
 msgstr "Sistema"
 
+#: src/components/routes/system/power-management.tsx
+msgid "System is already online"
+msgstr "O sistema já está online"
+
 #: src/components/routes/system/charts/load-average-chart.tsx
 msgid "System load averages over time"
 msgstr "Médias de carga do sistema ao longo do tempo"
 
 #: src/components/add-system.tsx
 msgid "System update management"
-msgstr ""
+msgstr "Gerenciamento de atualizações do sistema"
 
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Systemd Services"
@@ -2111,7 +2152,7 @@ msgstr "Tarefas"
 #: src/components/routes/system/smart-table.tsx
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Temp"
-msgstr ""
+msgstr "Temperatura"
 
 #: src/components/routes/system/charts/sensor-charts.tsx
 #: src/lib/alerts.ts
@@ -2143,8 +2184,20 @@ msgid "The Agent remains unprivileged. A restricted local helper applies validat
 msgstr "O Agent continua sem privilégios. Um helper local restrito aplica políticas do APT previamente validadas."
 
 #: src/components/routes/system/power-management.tsx
+msgid "The Ethernet cable is disconnected"
+msgstr "O cabo Ethernet está desconectado"
+
+#: src/components/routes/system/power-management.tsx
 msgid "The Hub cannot wake itself. Use another Hub on the same power network."
-msgstr ""
+msgstr "O Hub não pode acordar a si próprio. Use outro Hub na mesma rede de energia."
+
+#: src/components/routes/system/power-management.tsx
+msgid "The interface has no IPv4 address"
+msgstr "A interface não possui endereço IPv4"
+
+#: src/components/routes/system/power-management.tsx
+msgid "The network interface has an invalid MAC address"
+msgstr "A interface de rede tem um endereço MAC inválido"
 
 #: src/components/routes/settings/heartbeat.tsx
 msgid "The overall status is <0>ok</0> when all systems are up, <1>warn</1> when alerts are triggered, and <2>error</2> when any system is down."
@@ -2152,7 +2205,7 @@ msgstr "O estado geral é <0>ok</0> quando todos os sistemas estão ativos, <1>a
 
 #: src/components/routes/system/automatic-updates.tsx
 msgid "The update policy was restored because APT timers could not be updated."
-msgstr ""
+msgstr "A política de atualizações foi restaurada porque não foi possível atualizar os timers do APT."
 
 #: src/components/login/forgot-pass-form.tsx
 msgid "Then log into the backend and reset your user account password in the users table."
@@ -2168,11 +2221,11 @@ msgstr "Esta ação não pode ser desfeita. Isso excluirá permanentemente todos
 
 #: src/components/routes/system/power-management.tsx
 msgid "This Agent is older than v0.2.0 or does not expose power diagnostics."
-msgstr ""
+msgstr "Este Agente é anterior à v0.2.0 ou não fornece diagnósticos de energia."
 
 #: src/components/routes/system/power-management.tsx
 msgid "This system hosts Beszel Plus. Shutting it down will make the dashboard unavailable, and this Hub cannot wake itself. Continue?"
-msgstr ""
+msgstr "Este sistema hospeda o Beszel Plus. Desligá-lo deixará o painel indisponível, e este Hub não poderá acordar a si próprio. Continuar?"
 
 #: src/components/routes/settings/alerts-history-data-table.tsx
 msgid "This will permanently delete all selected records from the database."
@@ -2202,7 +2255,7 @@ msgstr "Para email(s)"
 #: src/components/add-system.tsx
 #: src/components/routes/settings/tokens-fingerprints.tsx
 msgid "Token"
-msgstr ""
+msgstr "Token"
 
 #: src/components/command-palette.tsx
 #: src/components/routes/settings/layout.tsx
@@ -2221,7 +2274,7 @@ msgstr "Tokens e impressões digitais são usados para autenticar conexões WebS
 #: src/components/ui/chart.tsx
 #: src/components/ui/chart.tsx
 msgid "Total"
-msgstr ""
+msgstr "Total"
 
 #: src/components/routes/system/network-sheet.tsx
 msgid "Total data received for each interface"
@@ -2234,12 +2287,12 @@ msgstr "Dados totais enviados para cada interface"
 #: src/components/routes/system/disk-io-sheet.tsx
 msgctxt "Disk I/O"
 msgid "Total time spent on read/write (can exceed 100%)"
-msgstr ""
+msgstr "Tempo total gasto em leitura/gravação (pode exceder 100%)"
 
 #. placeholder {0}: data.length
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Total: {0}"
-msgstr ""
+msgstr "Total: {0}"
 
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Triggered by"
@@ -2260,10 +2313,6 @@ msgstr "Dispara quando a média de carga de 15 minutos excede um limite"
 #: src/lib/alerts.ts
 msgid "Triggers when 5 minute load average exceeds a threshold"
 msgstr "Dispara quando a média de carga de 5 minutos excede um limite"
-
-#: src/lib/alerts.ts
-#~ msgid "Triggers when a reboot is required"
-#~ msgstr ""
 
 #: src/lib/alerts.ts
 msgid "Triggers when a reboot remains required longer than the threshold"
@@ -2296,10 +2345,6 @@ msgstr "Dispara quando o uso de GPU excede um limite"
 #: src/lib/alerts.ts
 msgid "Triggers when memory usage exceeds a threshold"
 msgstr "Dispara quando o uso de memória excede um limite"
-
-#: src/lib/alerts.ts
-#~ msgid "Triggers when security updates are pending"
-#~ msgstr ""
 
 #: src/lib/alerts.ts
 msgid "Triggers when security updates remain pending longer than the threshold"
@@ -2336,8 +2381,12 @@ msgid "Unable to load update policy"
 msgstr "Não foi possível carregar a política de atualizações"
 
 #: src/components/routes/system/power-management.tsx
+msgid "Unable to query Wake-on-LAN support"
+msgstr "Não foi possível consultar o suporte a Wake-on-LAN"
+
+#: src/components/routes/system/power-management.tsx
 msgid "Unable to save power settings"
-msgstr ""
+msgstr "Não foi possível salvar as configurações de energia"
 
 #: src/lib/alerts.ts
 msgid "Unattended upgrades package missing"
@@ -2372,6 +2421,7 @@ msgstr "Token universal"
 #: src/components/routes/system/automatic-updates.tsx
 #: src/components/routes/system/automatic-updates.tsx
 #: src/components/routes/system/automatic-updates.tsx
+#: src/components/routes/system/power-management.tsx
 #: src/lib/i18n.ts
 msgid "Unknown"
 msgstr "Desconhecida"
@@ -2411,6 +2461,11 @@ msgstr "A atualização falhou"
 msgid "Update information stale"
 msgstr "Informações de atualização desatualizadas"
 
+#: src/components/routes/system/automatic-updates.tsx
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Update management is unavailable. The current controls are read-only."
+msgstr "O gerenciamento de atualizações está indisponível. Os controles atuais são somente leitura."
+
 #: src/components/alerts-history-columns.tsx
 msgid "Update monitoring error"
 msgstr "Erro no monitoramento de atualizações"
@@ -2435,7 +2490,7 @@ msgstr "Atualizado a cada 10 minutos."
 
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Updates"
-msgstr ""
+msgstr "Atualizações"
 
 #: src/components/alerts-history-columns.tsx
 msgid "Updates available"
@@ -2539,13 +2594,29 @@ msgstr "Campos Visíveis"
 msgid "Waiting for enough records to display"
 msgstr "Aguardando registros suficientes para exibir"
 
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Waiting for the first collection"
+msgstr "Aguardando a primeira coleta"
+
+#: src/components/routes/system/power-management.tsx
+msgid "Wake packet sent"
+msgstr "Pacote de ativação enviado"
+
 #: src/components/routes/system/power-management.tsx
 msgid "Wake system"
-msgstr ""
+msgstr "Acordar sistema"
+
+#: src/components/routes/system/power-management.tsx
+msgid "Wake-on-LAN is not supported"
+msgstr "Wake-on-LAN não é suportado"
+
+#: src/components/routes/system/power-management.tsx
+msgid "Wake-on-LAN is supported but disabled on the interface"
+msgstr "Wake-on-LAN é suportado, mas está desativado na interface"
 
 #: src/components/routes/system/power-management.tsx
 msgid "Wake-on-LAN MAC address"
-msgstr ""
+msgstr "Endereço MAC para Wake-on-LAN"
 
 #: src/components/routes/settings/general.tsx
 msgid "Want to help improve our translations? Check <0>Crowdin</0> for details."

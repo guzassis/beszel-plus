@@ -13,7 +13,8 @@ func TestEvaluateUpdateAlert(t *testing.T) {
 	now := time.Now().UTC()
 	securitySince := now.Add(-49 * time.Hour)
 	rebootSince := now.Add(-8 * 24 * time.Hour)
-	data := &system.CombinedData{Updates: &updateentity.Status{Supported: true, InstallationState: updateentity.InstallationNotInstalled, PendingSecurityUpdates: &security, SecurityUpdatesSince: &securitySince, RebootRequired: true, RebootRequiredSince: &rebootSince, CollectedAt: now.Add(-25 * time.Hour)}}
+	collectedAt := now.Add(-25 * time.Hour)
+	data := &system.CombinedData{Updates: &updateentity.Status{Supported: true, InstallationState: updateentity.InstallationNotInstalled, PendingSecurityUpdates: &security, SecurityUpdatesSince: &securitySince, RebootRequired: true, RebootRequiredSince: &rebootSince, CollectedAt: &collectedAt}}
 	tests := []struct {
 		name      string
 		threshold float64

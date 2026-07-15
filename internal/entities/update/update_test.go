@@ -1,6 +1,10 @@
 package update
 
-import "testing"
+import (
+	"bytes"
+	"encoding/json"
+	"testing"
+)
 
 func u16(value uint16) *uint16 { return &value }
 
@@ -37,5 +41,15 @@ func TestDeriveOverallStatePrecedence(t *testing.T) {
 				t.Fatalf("got %q, want %q", got, test.want)
 			}
 		})
+	}
+}
+
+func TestStatusOmitsCollectionTimeBeforeFirstCollection(t *testing.T) {
+	data, err := json.Marshal(Status{CollectionStatus: "collecting"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if bytes.Contains(data, []byte("collected_at")) {
+		t.Fatalf("initial snapshot contains a collection time: %s", data)
 	}
 }

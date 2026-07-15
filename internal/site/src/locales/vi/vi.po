@@ -144,7 +144,7 @@ msgstr "Thêm {foo}"
 
 #: src/components/add-system.tsx
 msgid "Add system and copy Linux command"
-msgstr ""
+msgstr "Add system and copy Linux command"
 
 #: src/components/routes/settings/notifications.tsx
 msgid "Add URL"
@@ -186,7 +186,7 @@ msgstr "Agent incompatible with maintenance operations"
 
 #: src/components/add-system.tsx
 msgid "Agent installation options"
-msgstr ""
+msgstr "Agent installation options"
 
 #: src/components/command-palette.tsx
 #: src/components/routes/settings/alerts-history-data-table.tsx
@@ -226,15 +226,15 @@ msgstr "Apply update policy"
 
 #: src/components/routes/system/automatic-updates.tsx
 msgid "APT dry-run failed after the configuration was validated."
-msgstr ""
+msgstr "APT dry-run failed after the configuration was validated."
 
 #: src/components/routes/system/automatic-updates.tsx
 msgid "APT is currently busy. This operation will be retried automatically."
-msgstr ""
+msgstr "APT is currently busy. This operation will be retried automatically."
 
 #: src/components/routes/system/automatic-updates.tsx
 msgid "APT rejected the generated configuration."
-msgstr ""
+msgstr "APT rejected the generated configuration."
 
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Are you sure you want to delete {name}?"
@@ -250,7 +250,7 @@ msgstr "Automatic"
 
 #: src/components/add-system.tsx
 msgid "Automatic Agent updates"
-msgstr ""
+msgstr "Automatic Agent updates"
 
 #: src/components/copy-to-clipboard.tsx
 msgid "Automatic copy requires a secure context."
@@ -406,11 +406,11 @@ msgstr "Trạng thái khởi động"
 
 #: src/components/routes/system/power-management.tsx
 msgid "Broadcast address"
-msgstr ""
+msgstr "Broadcast address"
 
 #: src/components/routes/system/power-management.tsx
 msgid "Broadcast override"
-msgstr ""
+msgstr "Broadcast override"
 
 #: src/components/routes/settings/general.tsx
 #: src/components/routes/settings/general.tsx
@@ -441,7 +441,7 @@ msgstr "Hủy bỏ"
 
 #: src/components/routes/system/power-management.tsx
 msgid "Cancel shutdown"
-msgstr ""
+msgstr "Cancel shutdown"
 
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Capabilities"
@@ -494,7 +494,7 @@ msgstr "Kiểm tra nhật ký để biết thêm chi tiết."
 
 #: src/components/routes/system/power-management.tsx
 msgid "Check system logs for details."
-msgstr ""
+msgstr "Check system logs for details."
 
 #: src/components/routes/settings/heartbeat.tsx
 msgid "Check your monitoring service"
@@ -531,6 +531,10 @@ msgid "Collected"
 msgstr "Collected"
 
 #: src/components/routes/system/automatic-updates.tsx
+msgid "Collecting update information…"
+msgstr "Collecting update information…"
+
+#: src/components/routes/system/automatic-updates.tsx
 msgid "Collection error"
 msgstr "Collection error"
 
@@ -540,6 +544,7 @@ msgid "Command line instructions"
 msgstr "Hướng dẫn dòng lệnh"
 
 #: src/components/alerts-history-columns.tsx
+#: src/components/routes/system/power-management.tsx
 msgid "Completed"
 msgstr "Completed"
 
@@ -567,7 +572,7 @@ msgstr "Xác nhận mật khẩu"
 
 #: src/components/routes/system/power-management.tsx
 msgid "Confirm shutdown of this system?"
-msgstr ""
+msgstr "Confirm shutdown of this system?"
 
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Conflicts"
@@ -711,7 +716,7 @@ msgstr "Custom repositories"
 
 #: src/components/routes/system/power-management.tsx
 msgid "Custom shutdown delay in minutes"
-msgstr ""
+msgstr "Custom shutdown delay in minutes"
 
 #. Power Cycles
 #: src/components/routes/system/smart-table.tsx
@@ -764,6 +769,7 @@ msgid "Device"
 msgstr "Thiết bị"
 
 #: src/components/routes/system/automatic-updates.tsx
+#: src/components/routes/system/power-management.tsx
 msgid "Disabled"
 msgstr "Disabled"
 
@@ -849,17 +855,17 @@ msgstr "Chỉnh sửa {foo}"
 
 #: src/components/routes/system/automatic-updates.tsx
 msgid "Eligibility is temporarily unavailable because APT is in use."
-msgstr ""
+msgstr "Eligibility is temporarily unavailable because APT is in use."
 
 #: src/components/routes/system/automatic-updates.tsx
 msgid "Eligibility is unavailable; other update information is still current."
-msgstr ""
+msgstr "Eligibility is unavailable; other update information is still current."
 
 #: src/components/routes/system/automatic-updates.tsx
 #: src/components/routes/system/automatic-updates.tsx
 #: src/components/routes/system/automatic-updates.tsx
 msgid "Eligibility status"
-msgstr ""
+msgstr "Eligibility status"
 
 #: src/components/routes/system/automatic-updates.tsx
 msgid "Eligible updates"
@@ -925,6 +931,10 @@ msgstr "Tạm thời"
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Error"
 msgstr "Lỗi"
+
+#: src/components/routes/system/power-management.tsx
+msgid "ethtool is not installed"
+msgstr "ethtool is not installed"
 
 #: src/components/alerts-history-columns.tsx
 msgid "Event"
@@ -999,7 +1009,7 @@ msgstr "Lưu cài đặt thất bại"
 
 #: src/components/add-system.tsx
 msgid "Failed to save system"
-msgstr ""
+msgstr "Failed to save system"
 
 #: src/components/routes/settings/heartbeat.tsx
 msgid "Failed to send heartbeat"
@@ -1160,7 +1170,7 @@ msgstr "Không hoạt động"
 
 #: src/components/add-system.tsx
 msgid "Initial update policy"
-msgstr ""
+msgstr "Initial update policy"
 
 #: src/components/routes/system/automatic-updates.tsx
 msgid "Install required dependencies"
@@ -1295,7 +1305,7 @@ msgstr "Maintenance helper incompatible"
 
 #: src/components/routes/system/automatic-updates.tsx
 msgid "Maintenance helper version is incompatible with this Agent. Re-run the Agent installer."
-msgstr ""
+msgstr "Maintenance helper version is incompatible with this Agent. Re-run the Agent installer."
 
 #: src/components/alerts-history-columns.tsx
 msgid "Maintenance operation refused"
@@ -1363,6 +1373,7 @@ msgstr "Missing"
 msgid "Model"
 msgstr "Mô hình"
 
+#: src/components/add-system.tsx
 #: src/components/routes/system/automatic-updates.tsx
 msgid "Monitoring only"
 msgstr "Monitoring only"
@@ -1409,7 +1420,11 @@ msgstr "Không"
 
 #: src/components/add-system.tsx
 msgid "No installation command was copied. Please retry."
-msgstr ""
+msgstr "No installation command was copied. Please retry."
+
+#: src/components/routes/system/power-management.tsx
+msgid "No physical Ethernet interface was found"
+msgstr "No physical Ethernet interface was found"
 
 #: src/components/command-palette.tsx
 #: src/components/systemd-table/systemd-table.tsx
@@ -1452,6 +1467,10 @@ msgstr "Thông báo"
 msgid "OAuth 2 / OIDC support"
 msgstr "Hỗ trợ OAuth 2 / OIDC"
 
+#: src/components/add-system.tsx
+msgid "Official repositories"
+msgstr "Official repositories"
+
 #: src/components/routes/system/automatic-updates.tsx
 msgid "Official repository"
 msgstr "Official repository"
@@ -1476,6 +1495,10 @@ msgstr "Mật khẩu một lần"
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Open menu"
 msgstr "Mở menu"
+
+#: src/components/routes/system/power-management.tsx
+msgid "Operation accepted"
+msgstr "Operation accepted"
 
 #: src/components/routes/system/automatic-updates.tsx
 msgid "Operation completed successfully"
@@ -1644,11 +1667,15 @@ msgstr "Cổng"
 #: src/components/add-system.tsx
 #: src/components/routes/system/power-management.tsx
 msgid "Power management"
-msgstr ""
+msgstr "Power management"
+
+#: src/components/routes/system/power-management.tsx
+msgid "Power management is unavailable. The current controls are read-only."
+msgstr "Power management is unavailable. The current controls are read-only."
 
 #: src/components/routes/system/power-management.tsx
 msgid "Power network"
-msgstr ""
+msgstr "Power network"
 
 #. Power On Time
 #: src/components/routes/system/smart-table.tsx
@@ -1657,15 +1684,15 @@ msgstr "Bật nguồn"
 
 #: src/components/routes/system/power-management.tsx
 msgid "Power operation"
-msgstr ""
+msgstr "Power operation"
 
 #: src/components/routes/system/power-management.tsx
 msgid "Power operation failed"
-msgstr ""
+msgstr "Power operation failed"
 
 #: src/components/routes/system/power-management.tsx
 msgid "Power settings saved"
-msgstr ""
+msgstr "Power settings saved"
 
 #: src/components/routes/system/charts/gpu-charts.tsx
 #: src/components/routes/system/charts/memory-charts.tsx
@@ -1695,6 +1722,7 @@ msgid "Queue Depth"
 msgstr "Độ sâu hàng đợi"
 
 #: src/components/alerts-history-columns.tsx
+#: src/components/routes/system/power-management.tsx
 msgid "Queued"
 msgstr "Queued"
 
@@ -1720,7 +1748,11 @@ msgstr "Read update policy"
 
 #: src/components/routes/system/power-management.tsx
 msgid "Readiness"
-msgstr ""
+msgstr "Readiness"
+
+#: src/components/routes/system/power-management.tsx
+msgid "Ready"
+msgstr "Ready"
 
 #: src/components/alerts-history-columns.tsx
 #: src/components/routes/system/automatic-updates.tsx
@@ -1858,7 +1890,7 @@ msgstr "Save and apply"
 
 #: src/components/routes/system/power-management.tsx
 msgid "Save configuration"
-msgstr ""
+msgstr "Save configuration"
 
 #: src/components/routes/settings/general.tsx
 #: src/components/routes/settings/notifications.tsx
@@ -1875,7 +1907,7 @@ msgstr "Lịch trình"
 
 #: src/components/routes/system/power-management.tsx
 msgid "Schedule custom shutdown"
-msgstr ""
+msgstr "Schedule custom shutdown"
 
 #: src/components/routes/settings/quiet-hours.tsx
 msgid "Schedule quiet hours where notifications will not be sent, such as during maintenance periods."
@@ -1897,6 +1929,7 @@ msgstr "Tìm kiếm hệ thống hoặc cài đặt..."
 msgid "Seconds between pings (default: 60)"
 msgstr "Số giây giữa các lần ping (mặc định: 60)"
 
+#: src/components/add-system.tsx
 #: src/components/routes/system/automatic-updates.tsx
 #: src/components/routes/system/automatic-updates.tsx
 msgid "Security updates"
@@ -1983,19 +2016,19 @@ msgstr "Cài đặt đã được lưu"
 
 #: src/components/routes/system/automatic-updates.tsx
 msgid "Showing the last successful eligibility result."
-msgstr ""
+msgstr "Showing the last successful eligibility result."
 
 #: src/components/routes/system/power-management.tsx
 msgid "Shut down in {minutes} minutes"
-msgstr ""
+msgstr "Shut down in {minutes} minutes"
 
 #: src/components/routes/system/power-management.tsx
 msgid "Shut down in 15 minutes"
-msgstr ""
+msgstr "Shut down in 15 minutes"
 
 #: src/components/routes/system/power-management.tsx
 msgid "Shut down now"
-msgstr ""
+msgstr "Shut down now"
 
 #: src/components/login/auth-form.tsx
 msgid "Sign in"
@@ -2010,8 +2043,12 @@ msgid "Sort By"
 msgstr "Sắp xếp theo"
 
 #: src/components/routes/system/power-management.tsx
-msgid "stale"
-msgstr ""
+#~ msgid "stale"
+#~ msgstr ""
+
+#: src/components/routes/system/power-management.tsx
+msgid "Stale"
+msgstr "Stale"
 
 #: src/components/routes/system/automatic-updates.tsx
 msgid "Stale data"
@@ -2074,13 +2111,17 @@ msgstr ""
 msgid "System"
 msgstr "Hệ thống"
 
+#: src/components/routes/system/power-management.tsx
+msgid "System is already online"
+msgstr "System is already online"
+
 #: src/components/routes/system/charts/load-average-chart.tsx
 msgid "System load averages over time"
 msgstr "Tải trung bình của hệ thống theo thời gian"
 
 #: src/components/add-system.tsx
 msgid "System update management"
-msgstr ""
+msgstr "System update management"
 
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Systemd Services"
@@ -2143,8 +2184,20 @@ msgid "The Agent remains unprivileged. A restricted local helper applies validat
 msgstr "The Agent remains unprivileged. A restricted local helper applies validated APT policies."
 
 #: src/components/routes/system/power-management.tsx
+msgid "The Ethernet cable is disconnected"
+msgstr "The Ethernet cable is disconnected"
+
+#: src/components/routes/system/power-management.tsx
 msgid "The Hub cannot wake itself. Use another Hub on the same power network."
-msgstr ""
+msgstr "The Hub cannot wake itself. Use another Hub on the same power network."
+
+#: src/components/routes/system/power-management.tsx
+msgid "The interface has no IPv4 address"
+msgstr "The interface has no IPv4 address"
+
+#: src/components/routes/system/power-management.tsx
+msgid "The network interface has an invalid MAC address"
+msgstr "The network interface has an invalid MAC address"
 
 #: src/components/routes/settings/heartbeat.tsx
 msgid "The overall status is <0>ok</0> when all systems are up, <1>warn</1> when alerts are triggered, and <2>error</2> when any system is down."
@@ -2152,7 +2205,7 @@ msgstr "Trạng thái tổng thể là <0>ok</0> khi tất cả các hệ thốn
 
 #: src/components/routes/system/automatic-updates.tsx
 msgid "The update policy was restored because APT timers could not be updated."
-msgstr ""
+msgstr "The update policy was restored because APT timers could not be updated."
 
 #: src/components/login/forgot-pass-form.tsx
 msgid "Then log into the backend and reset your user account password in the users table."
@@ -2168,11 +2221,11 @@ msgstr "Hành động này không thể hoàn tác. Điều này sẽ xóa vĩnh
 
 #: src/components/routes/system/power-management.tsx
 msgid "This Agent is older than v0.2.0 or does not expose power diagnostics."
-msgstr ""
+msgstr "This Agent is older than v0.2.0 or does not expose power diagnostics."
 
 #: src/components/routes/system/power-management.tsx
 msgid "This system hosts Beszel Plus. Shutting it down will make the dashboard unavailable, and this Hub cannot wake itself. Continue?"
-msgstr ""
+msgstr "This system hosts Beszel Plus. Shutting it down will make the dashboard unavailable, and this Hub cannot wake itself. Continue?"
 
 #: src/components/routes/settings/alerts-history-data-table.tsx
 msgid "This will permanently delete all selected records from the database."
@@ -2202,7 +2255,7 @@ msgstr "Đến email(s)"
 #: src/components/add-system.tsx
 #: src/components/routes/settings/tokens-fingerprints.tsx
 msgid "Token"
-msgstr ""
+msgstr "Token"
 
 #: src/components/command-palette.tsx
 #: src/components/routes/settings/layout.tsx
@@ -2336,8 +2389,12 @@ msgid "Unable to load update policy"
 msgstr "Unable to load update policy"
 
 #: src/components/routes/system/power-management.tsx
+msgid "Unable to query Wake-on-LAN support"
+msgstr "Unable to query Wake-on-LAN support"
+
+#: src/components/routes/system/power-management.tsx
 msgid "Unable to save power settings"
-msgstr ""
+msgstr "Unable to save power settings"
 
 #: src/lib/alerts.ts
 msgid "Unattended upgrades package missing"
@@ -2372,6 +2429,7 @@ msgstr "Token chung"
 #: src/components/routes/system/automatic-updates.tsx
 #: src/components/routes/system/automatic-updates.tsx
 #: src/components/routes/system/automatic-updates.tsx
+#: src/components/routes/system/power-management.tsx
 #: src/lib/i18n.ts
 msgid "Unknown"
 msgstr "Không xác định"
@@ -2410,6 +2468,11 @@ msgstr "Update failed"
 #: src/lib/alerts.ts
 msgid "Update information stale"
 msgstr "Update information stale"
+
+#: src/components/routes/system/automatic-updates.tsx
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Update management is unavailable. The current controls are read-only."
+msgstr "Update management is unavailable. The current controls are read-only."
 
 #: src/components/alerts-history-columns.tsx
 msgid "Update monitoring error"
@@ -2539,13 +2602,29 @@ msgstr "Các cột hiển thị"
 msgid "Waiting for enough records to display"
 msgstr "Đang chờ đủ bản ghi để hiển thị"
 
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Waiting for the first collection"
+msgstr "Waiting for the first collection"
+
+#: src/components/routes/system/power-management.tsx
+msgid "Wake packet sent"
+msgstr "Wake packet sent"
+
 #: src/components/routes/system/power-management.tsx
 msgid "Wake system"
-msgstr ""
+msgstr "Wake system"
+
+#: src/components/routes/system/power-management.tsx
+msgid "Wake-on-LAN is not supported"
+msgstr "Wake-on-LAN is not supported"
+
+#: src/components/routes/system/power-management.tsx
+msgid "Wake-on-LAN is supported but disabled on the interface"
+msgstr "Wake-on-LAN is supported but disabled on the interface"
 
 #: src/components/routes/system/power-management.tsx
 msgid "Wake-on-LAN MAC address"
-msgstr ""
+msgstr "Wake-on-LAN MAC address"
 
 #: src/components/routes/settings/general.tsx
 msgid "Want to help improve our translations? Check <0>Crowdin</0> for details."

@@ -22,28 +22,30 @@ const (
 )
 
 type InterfaceDiagnostic struct {
-	Interface    string `json:"interface" cbor:"0,keyasint"`
-	Type         string `json:"type" cbor:"1,keyasint"`
-	MAC          string `json:"mac,omitempty" cbor:"2,keyasint,omitempty"`
-	IP           string `json:"ip,omitempty" cbor:"3,keyasint,omitempty"`
-	Prefix       int    `json:"prefix,omitempty" cbor:"4,keyasint,omitempty"`
-	Broadcast    string `json:"broadcast,omitempty" cbor:"5,keyasint,omitempty"`
-	Driver       string `json:"driver,omitempty" cbor:"6,keyasint,omitempty"`
-	OperState    string `json:"operstate,omitempty" cbor:"7,keyasint,omitempty"`
-	Carrier      bool   `json:"carrier" cbor:"8,keyasint"`
-	Speed        string `json:"speed,omitempty" cbor:"9,keyasint,omitempty"`
-	Duplex       string `json:"duplex,omitempty" cbor:"10,keyasint,omitempty"`
-	Physical     bool   `json:"physical" cbor:"11,keyasint"`
-	WOLSupported bool   `json:"wol_supported" cbor:"12,keyasint"`
-	WOLEnabled   bool   `json:"wol_enabled" cbor:"13,keyasint"`
+	Interface     string `json:"interface" cbor:"0,keyasint"`
+	Type          string `json:"type" cbor:"1,keyasint"`
+	MAC           string `json:"mac,omitempty" cbor:"2,keyasint,omitempty"`
+	IP            string `json:"ip,omitempty" cbor:"3,keyasint,omitempty"`
+	Prefix        int    `json:"prefix,omitempty" cbor:"4,keyasint,omitempty"`
+	Broadcast     string `json:"broadcast,omitempty" cbor:"5,keyasint,omitempty"`
+	Driver        string `json:"driver,omitempty" cbor:"6,keyasint,omitempty"`
+	OperState     string `json:"operstate,omitempty" cbor:"7,keyasint,omitempty"`
+	Carrier       bool   `json:"carrier" cbor:"8,keyasint"`
+	Speed         string `json:"speed,omitempty" cbor:"9,keyasint,omitempty"`
+	Duplex        string `json:"duplex,omitempty" cbor:"10,keyasint,omitempty"`
+	Physical      bool   `json:"physical" cbor:"11,keyasint"`
+	WOLSupported  bool   `json:"wol_supported" cbor:"12,keyasint"`
+	WOLEnabled    bool   `json:"wol_enabled" cbor:"13,keyasint"`
+	WOLProbeError string `json:"wol_probe_error,omitempty" cbor:"14,keyasint,omitempty"`
 }
 
 type Diagnostics struct {
-	Enabled     bool                  `json:"enabled" cbor:"0,keyasint"`
-	State       ReadinessState        `json:"state" cbor:"1,keyasint"`
-	Reason      string                `json:"reason,omitempty" cbor:"2,keyasint,omitempty"`
-	Interfaces  []InterfaceDiagnostic `json:"interfaces,omitempty" cbor:"3,keyasint,omitempty"`
-	CollectedAt time.Time             `json:"collected_at" cbor:"4,keyasint"`
+	Enabled           bool                  `json:"enabled" cbor:"0,keyasint"`
+	State             ReadinessState        `json:"state" cbor:"1,keyasint"`
+	Reason            string                `json:"reason,omitempty" cbor:"2,keyasint,omitempty"`
+	Interfaces        []InterfaceDiagnostic `json:"interfaces,omitempty" cbor:"3,keyasint,omitempty"`
+	CollectedAt       time.Time             `json:"collected_at" cbor:"4,keyasint"`
+	SelectedInterface string                `json:"selected_interface,omitempty" cbor:"5,keyasint,omitempty"`
 }
 
 type Capabilities struct {

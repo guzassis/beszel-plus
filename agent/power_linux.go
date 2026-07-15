@@ -61,7 +61,10 @@ func collectPowerDiagnostics(enabled bool) *powerentity.Diagnostics {
 			item.Broadcast = broadcast.String()
 			break
 		}
-		item.WOLSupported, item.WOLEnabled = ethtoolWOL(iface.Name)
+		item.WOLSupported, item.WOLEnabled, err = ethtoolWOL(iface.Name)
+		if err != nil {
+			item.WOLProbeError = sanitizeUpdateText(err.Error(), 256)
+		}
 		d.Interfaces = append(d.Interfaces, item)
 	}
 	if len(d.Interfaces) == 0 {
@@ -69,7 +72,9 @@ func collectPowerDiagnostics(enabled bool) *powerentity.Diagnostics {
 		d.Reason = "no physical ethernet interface"
 		return d
 	}
-	item := d.Interfaces[0]
+	selected := selectPowerInterface(d.Interfaces, explicitInterface)
+	d.SelectedInterface = selected.Interface
+	item := selected
 	if _, err := net.ParseMAC(item.MAC); err != nil {
 		d.State = powerentity.InvalidMAC
 		d.Reason = "invalid interface MAC"
@@ -82,12 +87,15 @@ func collectPowerDiagnostics(enabled bool) *powerentity.Diagnostics {
 	} else if _, err := exec.LookPath("ethtool"); err != nil {
 		d.State = powerentity.EthtoolMissing
 		d.Reason = "ethtool is unavailable"
+	} else if item.WOLProbeError != "" {
+		d.State = powerentity.Unknown
+		d.Reason = "wol_probe_failed"
 	} else if !item.WOLSupported {
 		d.State = powerentity.Unsupported
-		d.Reason = "interface does not report WOL support"
+		d.Reason = "wol_unsupported"
 	} else if !item.WOLEnabled {
 		d.State = powerentity.WOLNotEnabled
-		d.Reason = "Wake-on-LAN is supported but not enabled"
+		d.Reason = "wol_not_enabled"
 	} else {
 		d.State = powerentity.Ready
 	}
@@ -97,17 +105,21 @@ func collectPowerDiagnostics(enabled bool) *powerentity.Diagnostics {
 func mustAddrs(iface *net.Interface) []net.Addr { out, _ := iface.Addrs(); return out }
 func pathExists(path string) bool               { _, err := os.Stat(path); return err == nil }
 func readTrim(path string) string               { b, _ := os.ReadFile(path); return strings.TrimSpace(string(b)) }
-func ethtoolWOL(name string) (supported, enabled bool) {
+func ethtoolWOL(name string) (supported, enabled bool, probeErr error) {
 	path, err := exec.LookPath("ethtool")
 	if err != nil {
-		return false, false
+		return false, false, err
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 	out, err := exec.CommandContext(ctx, path, name).Output()
 	if err != nil {
-		return false, false
+		return false, false, err
 	}
+	return parseEthtoolWOL(out)
+}
+
+func parseEthtoolWOL(out []byte) (supported, enabled bool, probeErr error) {
 	for line := range strings.Lines(string(out)) {
 		line = strings.TrimSpace(line)
 		if value, ok := strings.CutPrefix(line, "Supports Wake-on:"); ok {
@@ -117,7 +129,40 @@ func ethtoolWOL(name string) (supported, enabled bool) {
 			enabled = strings.Contains(strings.TrimSpace(value), "g")
 		}
 	}
-	return supported, enabled
+	return supported, enabled, nil
+}
+
+func selectPowerInterface(items []powerentity.InterfaceDiagnostic, explicit string) powerentity.InterfaceDiagnostic {
+	if explicit != "" {
+		for _, item := range items {
+			if item.Interface == explicit {
+				return item
+			}
+		}
+	}
+	best, bestScore := items[0], -1
+	for _, item := range items {
+		score := 0
+		if item.Carrier {
+			score += 8
+		}
+		if item.IP != "" {
+			score += 4
+		}
+		if item.WOLProbeError == "" {
+			score += 2
+		}
+		if item.WOLSupported {
+			score += 16
+		}
+		if item.WOLEnabled {
+			score += 32
+		}
+		if score > bestScore {
+			best, bestScore = item, score
+		}
+	}
+	return best
 }
 func isVirtualPowerInterface(name string) bool {
 	for _, prefix := range []string{"docker", "veth", "br-", "virbr", "tailscale", "wg", "tun", "tap", "lo"} {

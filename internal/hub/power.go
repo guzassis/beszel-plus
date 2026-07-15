@@ -70,7 +70,7 @@ func (h *Hub) handlePower(e *core.RequestEvent) error {
 	if err != nil {
 		return e.NotFoundError("system not found", err)
 	}
-	if !record.GetBool("power_management_enabled") {
+	if !powerManagementEnabled(record) {
 		return e.BadRequestError("power management is disabled for this system", nil)
 	}
 	requestID := uuid.NewString()
@@ -82,6 +82,18 @@ func (h *Hub) handlePower(e *core.RequestEvent) error {
 	default:
 		return e.BadRequestError("unknown power action", nil)
 	}
+}
+
+func powerManagementEnabled(record *core.Record) bool {
+	diagnostics, err := storedPowerDiagnostics(record)
+	if err != nil {
+		diagnostics = nil
+	}
+	return powerManagementAvailable(record.GetBool("power_management_enabled"), diagnostics)
+}
+
+func powerManagementAvailable(configured bool, diagnostics *powerentity.Diagnostics) bool {
+	return configured || diagnostics != nil && diagnostics.Enabled
 }
 
 func (h *Hub) wakeSystem(e *core.RequestEvent, record *core.Record, requestID string) error {
