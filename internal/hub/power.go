@@ -23,6 +23,13 @@ type powerAPIRequest struct {
 	DelaySeconds uint32 `json:"delay_seconds,omitempty"`
 }
 
+type wakeTarget struct {
+	MAC       string
+	Broadcast string
+	Interface string
+	Port      int
+}
+
 func (h *Hub) handlePowerNetworks(e *core.RequestEvent) error {
 	var networks []powerexec.Network
 	records, _ := h.FindAllRecords("power_networks")
@@ -101,14 +108,8 @@ func (h *Hub) wakeSystem(e *core.RequestEvent, record *core.Record, requestID st
 		h.auditPower(record.Id, "wake", "already_online", requestID, "", e.Auth.Id)
 		return e.JSON(http.StatusOK, map[string]any{"request_id": requestID, "state": "already_online"})
 	}
-	if !record.GetBool("wol_enabled") {
-		return e.BadRequestError("Wake-on-LAN is disabled for this system", nil)
-	}
-	diagnostics, diagnosticsErr := storedPowerDiagnostics(record)
-	if diagnosticsErr != nil {
-		return e.BadRequestError("Wake-on-LAN readiness is unavailable", diagnosticsErr)
-	}
-	if err := powerexec.ValidateReadiness(diagnostics, record.GetString("wol_interface"), record.GetString("wol_mac")); err != nil {
+	target, err := h.resolveWakeTarget(record)
+	if err != nil {
 		return e.BadRequestError("Wake-on-LAN readiness check failed", err)
 	}
 	if h.isHubHost(record.GetString("host")) {
@@ -122,26 +123,9 @@ func (h *Hub) wakeSystem(e *core.RequestEvent, record *core.Record, requestID st
 	}
 	h.powerLast[record.Id] = time.Now()
 	h.powerMu.Unlock()
-	broadcast := record.GetString("wol_broadcast")
-	interfaceName := record.GetString("wol_interface")
-	if broadcast == "" && record.GetString("power_network_id") != "" {
-		if network, err := h.FindRecordById("power_networks", record.GetString("power_network_id")); err == nil && network.GetBool("enabled") {
-			broadcast = network.GetString("broadcast")
-			if interfaceName == "" {
-				interfaceName = network.GetString("interface")
-			}
-		}
-	}
-	if broadcast == "" {
-		return e.BadRequestError("no enabled power network or broadcast override is assigned", nil)
-	}
-	port := record.GetInt("wol_port")
-	if port == 0 {
-		port = 9
-	}
 	ctx, cancel := context.WithTimeout(e.Request.Context(), 5*time.Second)
 	defer cancel()
-	err := h.powerExecutor.Wake(ctx, powerexec.WakeRequest{MAC: record.GetString("wol_mac"), Broadcast: broadcast, Interface: interfaceName, Port: port})
+	err = h.powerExecutor.Wake(ctx, powerexec.WakeRequest{MAC: target.MAC, Broadcast: target.Broadcast, Interface: target.Interface, Port: target.Port})
 	if err != nil {
 		h.auditPower(record.Id, "wake", "failed", requestID, "wol_send_failed", e.Auth.Id)
 		return e.BadRequestError("Wake-on-LAN failed", err)
@@ -149,6 +133,107 @@ func (h *Hub) wakeSystem(e *core.RequestEvent, record *core.Record, requestID st
 	h.auditPower(record.Id, "wake", "packet_sent", requestID, "", e.Auth.Id)
 	go h.waitForPowerOnline(record.Id, requestID, e.Auth.Id)
 	return e.JSON(http.StatusAccepted, map[string]any{"request_id": requestID, "state": "packet_sent", "wait_timeout_seconds": 180})
+}
+
+func (h *Hub) resolveWakeTarget(record *core.Record) (wakeTarget, error) {
+	diagnostics, err := storedPowerDiagnostics(record)
+	if err != nil {
+		return wakeTarget{}, errors.New("power diagnostics are unavailable")
+	}
+	selected, err := selectWakeInterface(diagnostics, record.GetString("wol_interface"))
+	if err != nil {
+		return wakeTarget{}, err
+	}
+	if err := powerexec.ValidateReadiness(diagnostics, selected.Interface, selected.MAC); err != nil {
+		return wakeTarget{}, err
+	}
+	broadcast, hubInterface, err := h.resolveWakeNetwork(record, selected.IP, selected.Broadcast)
+	if err != nil {
+		return wakeTarget{}, err
+	}
+	port := record.GetInt("wol_port")
+	if port == 0 {
+		port = 9
+	}
+	return wakeTarget{MAC: selected.MAC, Broadcast: broadcast, Interface: hubInterface, Port: port}, nil
+}
+
+func selectWakeInterface(diagnostics *powerentity.Diagnostics, configured string) (powerentity.InterfaceDiagnostic, error) {
+	if diagnostics == nil || !diagnostics.Enabled {
+		return powerentity.InterfaceDiagnostic{}, errors.New("power diagnostics are unavailable")
+	}
+	// The Agent's selected interface is authoritative. Older installations may
+	// have stored the Hub's interface name in wol_interface, so use it only when
+	// it actually matches a diagnostic interface.
+	preferred := strings.TrimSpace(diagnostics.SelectedInterface)
+	if preferred == "" {
+		preferred = strings.TrimSpace(configured)
+	}
+	var fallback *powerentity.InterfaceDiagnostic
+	for i := range diagnostics.Interfaces {
+		item := &diagnostics.Interfaces[i]
+		if item.Interface == preferred {
+			if item.Physical && item.Type == "ethernet" && item.Carrier && item.WOLSupported && item.WOLEnabled {
+				return *item, nil
+			}
+		}
+		if fallback == nil && item.Physical && item.Type == "ethernet" && item.Carrier && item.WOLSupported && item.WOLEnabled {
+			fallback = item
+		}
+	}
+	if fallback != nil {
+		return *fallback, nil
+	}
+	return powerentity.InterfaceDiagnostic{}, errors.New("no ready physical Ethernet interface was reported")
+}
+
+func (h *Hub) resolveWakeNetwork(record *core.Record, targetIP, targetBroadcast string) (broadcast, hubInterface string, err error) {
+	if networkID := record.GetString("power_network_id"); networkID != "" {
+		if network, findErr := h.FindRecordById("power_networks", networkID); findErr == nil && network.GetBool("enabled") {
+			if broadcast = network.GetString("broadcast"); broadcast != "" {
+				return broadcast, network.GetString("interface"), nil
+			}
+		}
+	}
+	if networks, findErr := h.FindAllRecords("power_networks"); findErr == nil {
+		candidates := make([]powerexec.Network, 0, len(networks))
+		for _, network := range networks {
+			candidates = append(candidates, powerexec.Network{Interface: network.GetString("interface"), Prefix: network.GetString("prefix"), Broadcast: network.GetString("broadcast"), Enabled: network.GetBool("enabled")})
+		}
+		if selected, ok := selectWakeNetwork(candidates, targetIP); ok {
+			return selected.Broadcast, selected.Interface, nil
+		}
+	}
+	if broadcast = strings.TrimSpace(record.GetString("wol_broadcast")); broadcast != "" {
+		return broadcast, "", nil
+	}
+	if broadcast = strings.TrimSpace(targetBroadcast); broadcast != "" {
+		return broadcast, "", nil
+	}
+	return "", "", errors.New("no broadcast address is available for the Agent network")
+}
+
+func selectWakeNetwork(networks []powerexec.Network, targetIP string) (powerexec.Network, bool) {
+	ip := net.ParseIP(strings.TrimSpace(targetIP)).To4()
+	if ip == nil {
+		return powerexec.Network{}, false
+	}
+	var selected powerexec.Network
+	bestPrefix := -1
+	for _, network := range networks {
+		if !network.Enabled || network.Broadcast == "" {
+			continue
+		}
+		_, subnet, err := net.ParseCIDR(network.Prefix)
+		if err != nil || !subnet.Contains(ip) {
+			continue
+		}
+		prefix, _ := subnet.Mask.Size()
+		if prefix > bestPrefix {
+			selected, bestPrefix = network, prefix
+		}
+	}
+	return selected, bestPrefix >= 0
 }
 
 func storedPowerDiagnostics(record *core.Record) (*powerentity.Diagnostics, error) {

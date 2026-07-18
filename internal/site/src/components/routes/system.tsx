@@ -18,7 +18,6 @@ import { GpuIcon } from "../ui/icons"
 import SystemdTable from "../systemd-table/systemd-table"
 import ContainersTable from "../containers-table/containers-table"
 import AutomaticUpdates from "./system/automatic-updates"
-import PowerManagement from "./system/power-management"
 
 const SEMVER_0_14_0 = parseSemVer("0.14.0")
 const SEMVER_0_15_0 = parseSemVer("0.15.0")
@@ -280,7 +279,6 @@ export default memo(function SystemDetail({ id }: { id: string }) {
 				details={details}
 			/>
 			<AutomaticUpdates status={system.info.upd} systemId={system.id} />
-			<PowerManagement system={system} />
 
 			{displayMode === "tabs" ? tabbedLayout() : defaultLayout()}
 		</div>

@@ -42,6 +42,7 @@ import type { SystemRecord } from "@/types"
 import { updateSummary } from "../routes/system/automatic-updates"
 import { SystemDialog } from "../add-system"
 import AlertButton from "../alerts/alert-button"
+import PowerActions from "./power-actions"
 import { $router, Link } from "../router"
 import {
 	AlertDialog,
@@ -266,7 +267,7 @@ export function SystemsTableColumns(viewMode: "table" | "grid"): ColumnDef<Syste
 			accessorFn: ({ info }) => info.dt,
 			id: "temp",
 			name: () => t({ message: "Temp", comment: "Temperature label in systems table" }),
-			size: 50,
+			size: 120,
 			hideSort: true,
 			Icon: ThermometerIcon,
 			header: sortableHeader,
@@ -459,6 +460,7 @@ export function SystemsTableColumns(viewMode: "table" | "grid"): ColumnDef<Syste
 			size: 50,
 			cell: ({ row }) => (
 				<div className="relative z-10 flex justify-end items-center gap-1 -ms-3">
+					<PowerActions system={row.original} />
 					<AlertButton system={row.original} />
 					<ActionsButton system={row.original} />
 				</div>

@@ -405,12 +405,12 @@ msgid "Boot state"
 msgstr "Estado de inicialização"
 
 #: src/components/routes/system/power-management.tsx
-msgid "Broadcast address"
-msgstr "Endereço de broadcast"
+#~ msgid "Broadcast address"
+#~ msgstr "Endereço de broadcast"
 
 #: src/components/routes/system/power-management.tsx
-msgid "Broadcast override"
-msgstr "Substituição de broadcast"
+#~ msgid "Broadcast override"
+#~ msgstr "Substituição de broadcast"
 
 #: src/components/routes/settings/general.tsx
 #: src/components/routes/settings/general.tsx
@@ -435,13 +435,14 @@ msgstr "Pode parar"
 
 #: src/components/routes/settings/alerts-history-data-table.tsx
 #: src/components/routes/settings/quiet-hours.tsx
+#: src/components/systems-table/power-actions.tsx
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Cancel"
 msgstr "Cancelar"
 
 #: src/components/routes/system/power-management.tsx
-msgid "Cancel shutdown"
-msgstr "Cancelar desligamento"
+#~ msgid "Cancel shutdown"
+#~ msgstr "Cancelar desligamento"
 
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Capabilities"
@@ -492,7 +493,7 @@ msgstr "Verifique {email} para um link de redefinição."
 msgid "Check logs for more details."
 msgstr "Verifique os logs para mais detalhes."
 
-#: src/components/routes/system/power-management.tsx
+#: src/components/systems-table/power-actions.tsx
 msgid "Check system logs for details."
 msgstr "Consulte os logs do sistema para obter detalhes."
 
@@ -503,6 +504,11 @@ msgstr "Verifique o seu serviço de monitorização"
 #: src/components/routes/settings/notifications.tsx
 msgid "Check your notification service"
 msgstr "Verifique seu serviço de notificação"
+
+#. placeholder {0}: system.name
+#: src/components/systems-table/power-actions.tsx
+msgid "Choose how many minutes until {0} shuts down."
+msgstr "Escolha quantos minutos até {0} ser desligado."
 
 #: src/components/containers-table/containers-table.tsx
 #: src/components/routes/system/smart-table.tsx
@@ -544,7 +550,7 @@ msgid "Command line instructions"
 msgstr "Instruções de linha de comando"
 
 #: src/components/alerts-history-columns.tsx
-#: src/components/routes/system/power-management.tsx
+#: src/components/systems-table/power-actions.tsx
 msgid "Completed"
 msgstr "Concluída"
 
@@ -553,7 +559,6 @@ msgid "Configuration"
 msgstr "Configuração"
 
 #: src/components/routes/system/automatic-updates.tsx
-#: src/components/routes/system/power-management.tsx
 msgid "Configure"
 msgstr "Configurar"
 
@@ -570,7 +575,11 @@ msgstr "Configure como você recebe notificações de alerta."
 msgid "Confirm password"
 msgstr "Confirmar senha"
 
-#: src/components/routes/system/power-management.tsx
+#: src/components/systems-table/power-actions.tsx
+msgid "Confirm shutdown"
+msgstr "Confirmar desligamento"
+
+#: src/components/systems-table/power-actions.tsx
 msgid "Confirm shutdown of this system?"
 msgstr "Confirma o desligamento deste sistema?"
 
@@ -715,8 +724,8 @@ msgid "Custom repositories"
 msgstr "Repositórios personalizados"
 
 #: src/components/routes/system/power-management.tsx
-msgid "Custom shutdown delay in minutes"
-msgstr "Atraso personalizado para desligamento em minutos"
+#~ msgid "Custom shutdown delay in minutes"
+#~ msgstr "Atraso personalizado para desligamento em minutos"
 
 #. Power Cycles
 #: src/components/routes/system/smart-table.tsx
@@ -769,7 +778,6 @@ msgid "Device"
 msgstr "Dispositivo"
 
 #: src/components/routes/system/automatic-updates.tsx
-#: src/components/routes/system/power-management.tsx
 msgid "Disabled"
 msgstr "Desativado"
 
@@ -903,6 +911,10 @@ msgstr "URL do Endpoint"
 msgid "Endpoint URL to ping (required)"
 msgstr "URL do Endpoint para ping (obrigatório)"
 
+#: src/components/systems-table/power-actions.tsx
+msgid "Enter a positive duration between 3 seconds and 7 days."
+msgstr "Informe uma duração positiva entre 3 segundos e 7 dias."
+
 #: src/components/login/login.tsx
 msgid "Enter email address to reset password"
 msgstr "Digite o endereço de email para redefinir a senha"
@@ -933,8 +945,8 @@ msgid "Error"
 msgstr "Erro"
 
 #: src/components/routes/system/power-management.tsx
-msgid "ethtool is not installed"
-msgstr "O ethtool não está instalado"
+#~ msgid "ethtool is not installed"
+#~ msgstr "O ethtool não está instalado"
 
 #: src/components/alerts-history-columns.tsx
 msgid "Event"
@@ -1363,6 +1375,10 @@ msgstr "Uso de Memória"
 msgid "Memory usage of docker containers"
 msgstr "Uso de memória dos contêineres Docker"
 
+#: src/components/systems-table/power-actions.tsx
+msgid "Minutes"
+msgstr "Minutos"
+
 #: src/components/routes/system/automatic-updates.tsx
 #: src/components/routes/system/automatic-updates.tsx
 msgid "Missing"
@@ -1423,8 +1439,8 @@ msgid "No installation command was copied. Please retry."
 msgstr "Nenhum comando de instalação foi copiado. Tente novamente."
 
 #: src/components/routes/system/power-management.tsx
-msgid "No physical Ethernet interface was found"
-msgstr "Nenhuma interface Ethernet física foi encontrada"
+#~ msgid "No physical Ethernet interface was found"
+#~ msgstr "Nenhuma interface Ethernet física foi encontrada"
 
 #: src/components/command-palette.tsx
 #: src/components/systemd-table/systemd-table.tsx
@@ -1496,7 +1512,7 @@ msgstr "Senha de uso único"
 msgid "Open menu"
 msgstr "Abrir menu"
 
-#: src/components/routes/system/power-management.tsx
+#: src/components/systems-table/power-actions.tsx
 msgid "Operation accepted"
 msgstr "Operação aceita"
 
@@ -1516,7 +1532,7 @@ msgstr "Operação em andamento: {0}%"
 
 #: src/components/routes/system/automatic-updates.tsx
 #: src/components/routes/system/automatic-updates.tsx
-#: src/components/routes/system/power-management.tsx
+#: src/components/systems-table/power-actions.tsx
 msgid "Operation queued"
 msgstr "Operação enfileirada"
 
@@ -1664,35 +1680,42 @@ msgctxt "Container ports"
 msgid "Ports"
 msgstr "Portas"
 
+#: src/components/systems-table/power-actions.tsx
+msgid "Power actions"
+msgstr "Ações de energia"
+
 #: src/components/add-system.tsx
-#: src/components/routes/system/power-management.tsx
 msgid "Power management"
 msgstr "Gerenciamento de energia"
 
-#: src/components/routes/system/power-management.tsx
-msgid "Power management is unavailable. The current controls are read-only."
-msgstr "O gerenciamento de energia está indisponível. Os controles atuais são somente leitura."
+#: src/components/systems-table/power-actions.tsx
+msgid "Power management is disabled"
+msgstr "O gerenciamento de energia está desativado"
 
 #: src/components/routes/system/power-management.tsx
-msgid "Power network"
-msgstr "Rede de energia"
+#~ msgid "Power management is unavailable. The current controls are read-only."
+#~ msgstr "O gerenciamento de energia está indisponível. Os controles atuais são somente leitura."
+
+#: src/components/routes/system/power-management.tsx
+#~ msgid "Power network"
+#~ msgstr "Rede de energia"
 
 #. Power On Time
 #: src/components/routes/system/smart-table.tsx
 msgid "Power On"
 msgstr "Ligado"
 
-#: src/components/routes/system/power-management.tsx
+#: src/components/systems-table/power-actions.tsx
 msgid "Power operation"
 msgstr "Operação de energia"
 
-#: src/components/routes/system/power-management.tsx
+#: src/components/systems-table/power-actions.tsx
 msgid "Power operation failed"
 msgstr "Falha na operação de energia"
 
 #: src/components/routes/system/power-management.tsx
-msgid "Power settings saved"
-msgstr "Configurações de energia salvas"
+#~ msgid "Power settings saved"
+#~ msgstr "Configurações de energia salvas"
 
 #: src/components/routes/system/charts/gpu-charts.tsx
 #: src/components/routes/system/charts/memory-charts.tsx
@@ -1722,7 +1745,7 @@ msgid "Queue Depth"
 msgstr "Profundidade da fila"
 
 #: src/components/alerts-history-columns.tsx
-#: src/components/routes/system/power-management.tsx
+#: src/components/systems-table/power-actions.tsx
 msgid "Queued"
 msgstr "Enfileirada"
 
@@ -1747,12 +1770,12 @@ msgid "Read update policy"
 msgstr "Ler política de atualizações"
 
 #: src/components/routes/system/power-management.tsx
-msgid "Readiness"
-msgstr "Prontidão"
+#~ msgid "Readiness"
+#~ msgstr "Prontidão"
 
 #: src/components/routes/system/power-management.tsx
-msgid "Ready"
-msgstr "Pronto"
+#~ msgid "Ready"
+#~ msgstr "Pronto"
 
 #: src/components/alerts-history-columns.tsx
 #: src/components/routes/system/automatic-updates.tsx
@@ -1889,8 +1912,8 @@ msgid "Save and apply"
 msgstr "Salvar e aplicar"
 
 #: src/components/routes/system/power-management.tsx
-msgid "Save configuration"
-msgstr "Salvar configuração"
+#~ msgid "Save configuration"
+#~ msgstr "Salvar configuração"
 
 #: src/components/routes/settings/general.tsx
 #: src/components/routes/settings/notifications.tsx
@@ -1906,8 +1929,8 @@ msgid "Schedule"
 msgstr "Agendar"
 
 #: src/components/routes/system/power-management.tsx
-msgid "Schedule custom shutdown"
-msgstr "Agendar desligamento personalizado"
+#~ msgid "Schedule custom shutdown"
+#~ msgstr "Agendar desligamento personalizado"
 
 #: src/components/routes/settings/quiet-hours.tsx
 msgid "Schedule quiet hours where notifications will not be sent, such as during maintenance periods."
@@ -1916,6 +1939,11 @@ msgstr "Agende horas silenciosas onde as notificações não serão enviadas, co
 #: src/components/routes/settings/quiet-hours.tsx
 msgid "Schedule quiet hours where notifications will not be sent."
 msgstr "Agende horas silenciosas onde as notificações não serão enviadas."
+
+#: src/components/systems-table/power-actions.tsx
+#: src/components/systems-table/power-actions.tsx
+msgid "Schedule shutdown"
+msgstr "Agendar desligamento"
 
 #: src/components/navbar.tsx
 msgid "Search"
@@ -2018,17 +2046,21 @@ msgstr "Definições guardadas"
 msgid "Showing the last successful eligibility result."
 msgstr "A mostrar o último resultado de elegibilidade bem-sucedido."
 
-#: src/components/routes/system/power-management.tsx
-msgid "Shut down in {minutes} minutes"
-msgstr "Desligar em {minutes} minutos"
+#: src/components/systems-table/power-actions.tsx
+msgid "Shut down immediately"
+msgstr "Desligar imediatamente"
 
 #: src/components/routes/system/power-management.tsx
-msgid "Shut down in 15 minutes"
-msgstr "Desligar em 15 minutos"
+#~ msgid "Shut down in {minutes} minutes"
+#~ msgstr "Desligar em {minutes} minutos"
 
 #: src/components/routes/system/power-management.tsx
-msgid "Shut down now"
-msgstr "Desligar agora"
+#~ msgid "Shut down in 15 minutes"
+#~ msgstr "Desligar em 15 minutos"
+
+#: src/components/routes/system/power-management.tsx
+#~ msgid "Shut down now"
+#~ msgstr "Desligar agora"
 
 #: src/components/login/auth-form.tsx
 msgid "Sign in"
@@ -2047,8 +2079,8 @@ msgstr "Ordenar Por"
 #~ msgstr "desatualizado"
 
 #: src/components/routes/system/power-management.tsx
-msgid "Stale"
-msgstr "Desatualizado"
+#~ msgid "Stale"
+#~ msgstr "Desatualizado"
 
 #: src/components/routes/system/automatic-updates.tsx
 msgid "Stale data"
@@ -2111,9 +2143,14 @@ msgstr "Alternar tema"
 msgid "System"
 msgstr "Sistema"
 
-#: src/components/routes/system/power-management.tsx
+#: src/components/systems-table/power-actions.tsx
+#: src/components/systems-table/power-actions.tsx
 msgid "System is already online"
 msgstr "O sistema já está online"
+
+#: src/components/systems-table/power-actions.tsx
+msgid "System is offline"
+msgstr "O sistema está desligado"
 
 #: src/components/routes/system/charts/load-average-chart.tsx
 msgid "System load averages over time"
@@ -2184,20 +2221,24 @@ msgid "The Agent remains unprivileged. A restricted local helper applies validat
 msgstr "O Agent continua sem privilégios. Um helper local restrito aplica políticas do APT previamente validadas."
 
 #: src/components/routes/system/power-management.tsx
-msgid "The Ethernet cable is disconnected"
-msgstr "O cabo Ethernet está desconectado"
+#~ msgid "The Ethernet cable is disconnected"
+#~ msgstr "O cabo Ethernet está desconectado"
 
 #: src/components/routes/system/power-management.tsx
-msgid "The Hub cannot wake itself. Use another Hub on the same power network."
-msgstr "O Hub não pode acordar a si próprio. Use outro Hub na mesma rede de energia."
+#~ msgid "The Hub cannot wake itself. Use another Hub on the same power network."
+#~ msgstr "O Hub não pode acordar a si próprio. Use outro Hub na mesma rede de energia."
+
+#: src/components/systems-table/power-actions.tsx
+msgid "The Hub cannot wake this system"
+msgstr "O Hub não pode acordar este sistema"
 
 #: src/components/routes/system/power-management.tsx
-msgid "The interface has no IPv4 address"
-msgstr "A interface não possui endereço IPv4"
+#~ msgid "The interface has no IPv4 address"
+#~ msgstr "A interface não possui endereço IPv4"
 
 #: src/components/routes/system/power-management.tsx
-msgid "The network interface has an invalid MAC address"
-msgstr "A interface de rede tem um endereço MAC inválido"
+#~ msgid "The network interface has an invalid MAC address"
+#~ msgstr "A interface de rede tem um endereço MAC inválido"
 
 #: src/components/routes/settings/heartbeat.tsx
 msgid "The overall status is <0>ok</0> when all systems are up, <1>warn</1> when alerts are triggered, and <2>error</2> when any system is down."
@@ -2220,16 +2261,21 @@ msgid "This action cannot be undone. This will permanently delete all current re
 msgstr "Esta ação não pode ser desfeita. Isso excluirá permanentemente todos os registros atuais de {name} do banco de dados."
 
 #: src/components/routes/system/power-management.tsx
-msgid "This Agent is older than v0.2.0 or does not expose power diagnostics."
-msgstr "Este Agente é anterior à v0.2.0 ou não fornece diagnósticos de energia."
+#~ msgid "This Agent is older than v0.2.0 or does not expose power diagnostics."
+#~ msgstr "Este Agente é anterior à v0.2.0 ou não fornece diagnósticos de energia."
 
-#: src/components/routes/system/power-management.tsx
+#: src/components/systems-table/power-actions.tsx
 msgid "This system hosts Beszel Plus. Shutting it down will make the dashboard unavailable, and this Hub cannot wake itself. Continue?"
 msgstr "Este sistema hospeda o Beszel Plus. Desligá-lo deixará o painel indisponível, e este Hub não poderá acordar a si próprio. Continuar?"
 
 #: src/components/routes/settings/alerts-history-data-table.tsx
 msgid "This will permanently delete all selected records from the database."
 msgstr "Isso excluirá permanentemente todos os registros selecionados do banco de dados."
+
+#. placeholder {0}: powerDelayMinutesLabel(parsedSeconds)
+#: src/components/systems-table/power-actions.tsx
+msgid "This will schedule the shutdown in {0} minutes ({parsedSeconds} seconds)."
+msgstr "O desligamento será agendado para daqui a {0} minutos ({parsedSeconds} segundos)."
 
 #: src/components/routes/system/charts/disk-charts.tsx
 msgid "Throughput of {extraFsName}"
@@ -2381,12 +2427,12 @@ msgid "Unable to load update policy"
 msgstr "Não foi possível carregar a política de atualizações"
 
 #: src/components/routes/system/power-management.tsx
-msgid "Unable to query Wake-on-LAN support"
-msgstr "Não foi possível consultar o suporte a Wake-on-LAN"
+#~ msgid "Unable to query Wake-on-LAN support"
+#~ msgstr "Não foi possível consultar o suporte a Wake-on-LAN"
 
 #: src/components/routes/system/power-management.tsx
-msgid "Unable to save power settings"
-msgstr "Não foi possível salvar as configurações de energia"
+#~ msgid "Unable to save power settings"
+#~ msgstr "Não foi possível salvar as configurações de energia"
 
 #: src/lib/alerts.ts
 msgid "Unattended upgrades package missing"
@@ -2421,7 +2467,6 @@ msgstr "Token universal"
 #: src/components/routes/system/automatic-updates.tsx
 #: src/components/routes/system/automatic-updates.tsx
 #: src/components/routes/system/automatic-updates.tsx
-#: src/components/routes/system/power-management.tsx
 #: src/lib/i18n.ts
 msgid "Unknown"
 msgstr "Desconhecida"
@@ -2545,6 +2590,10 @@ msgstr "Uso"
 msgid "Usage of root partition"
 msgstr "Uso da partição raiz"
 
+#: src/components/systems-table/power-actions.tsx
+msgid "Use a value from 0.05 to 10080 minutes."
+msgstr "Use um valor de 0,05 a 10080 minutos."
+
 #: src/components/routes/system/charts/memory-charts.tsx
 #: src/components/routes/system/charts/memory-charts.tsx
 msgid "Used"
@@ -2598,25 +2647,29 @@ msgstr "Aguardando registros suficientes para exibir"
 msgid "Waiting for the first collection"
 msgstr "Aguardando a primeira coleta"
 
-#: src/components/routes/system/power-management.tsx
+#: src/components/systems-table/power-actions.tsx
 msgid "Wake packet sent"
 msgstr "Pacote de ativação enviado"
 
-#: src/components/routes/system/power-management.tsx
+#: src/components/systems-table/power-actions.tsx
 msgid "Wake system"
 msgstr "Acordar sistema"
 
-#: src/components/routes/system/power-management.tsx
-msgid "Wake-on-LAN is not supported"
-msgstr "Wake-on-LAN não é suportado"
+#: src/components/systems-table/power-actions.tsx
+msgid "Wake-on-LAN is not ready"
+msgstr "O Wake-on-LAN não está pronto"
 
 #: src/components/routes/system/power-management.tsx
-msgid "Wake-on-LAN is supported but disabled on the interface"
-msgstr "Wake-on-LAN é suportado, mas está desativado na interface"
+#~ msgid "Wake-on-LAN is not supported"
+#~ msgstr "Wake-on-LAN não é suportado"
 
 #: src/components/routes/system/power-management.tsx
-msgid "Wake-on-LAN MAC address"
-msgstr "Endereço MAC para Wake-on-LAN"
+#~ msgid "Wake-on-LAN is supported but disabled on the interface"
+#~ msgstr "Wake-on-LAN é suportado, mas está desativado na interface"
+
+#: src/components/routes/system/power-management.tsx
+#~ msgid "Wake-on-LAN MAC address"
+#~ msgstr "Endereço MAC para Wake-on-LAN"
 
 #: src/components/routes/settings/general.tsx
 msgid "Want to help improve our translations? Check <0>Crowdin</0> for details."

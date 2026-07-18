@@ -49,6 +49,7 @@ import AlertButton from "../alerts/alert-button"
 import { $router, Link } from "../router"
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "../ui/card"
 import { SystemsTableColumns, ActionsButton, IndicatorDot } from "./systems-table-columns"
+import PowerActions from "./power-actions"
 
 type ViewMode = "table" | "grid"
 type StatusFilter = "all" | SystemRecord["status"]
@@ -470,6 +471,7 @@ const SystemCard = memo(
 							</h3>
 							{table.getColumn("actions")?.getIsVisible() && (
 								<div className="flex gap-1 shrink-0 relative z-10">
+									<PowerActions system={system} />
 									<AlertButton system={system} />
 									<ActionsButton system={system} />
 								</div>

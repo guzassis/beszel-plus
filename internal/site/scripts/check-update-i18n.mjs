@@ -177,10 +177,30 @@ const pt = {
 	"Collecting update information…": "Coletando informações de atualização…",
 	"Waiting for the first collection": "Aguardando a primeira coleta",
 	"Official repositories": "Repositórios oficiais",
+	"Power actions": "Ações de energia",
+	"Power operation": "Operação de energia",
+	"Power operation failed": "Falha na operação de energia",
+	"The Hub cannot wake this system": "O Hub não pode acordar este sistema",
+	"Wake-on-LAN is not ready": "O Wake-on-LAN não está pronto",
+	"System is offline": "O sistema está desligado",
+	"Power management is disabled": "O gerenciamento de energia está desativado",
+	"This system hosts Beszel Plus. Shutting it down will make the dashboard unavailable, and this Hub cannot wake itself. Continue?":
+		"Este sistema hospeda o Beszel Plus. Desligá-lo tornará o painel indisponível, e este Hub não pode acordá-lo. Continuar?",
+	"Confirm shutdown of this system?": "Confirmar desligamento deste sistema?",
+	"Enter a positive duration between 3 seconds and 7 days.": "Informe uma duração positiva entre 3 segundos e 7 dias.",
+	"Wake system": "Acordar sistema",
+	"Shut down immediately": "Desligar imediatamente",
+	"Schedule shutdown": "Agendar desligamento",
+	"Choose how many minutes until {0} shuts down.": "Escolha quantos minutos até {0} ser desligado.",
+	Minutes: "Minutos",
+	"Use a value from 0.05 to 10080 minutes.": "Use um valor de 0,05 a 10080 minutos.",
+	"This will schedule the shutdown in {0} minutes ({parsedSeconds} seconds).":
+		"O desligamento será agendado para daqui a {0} minutos ({parsedSeconds} segundos).",
+	"Confirm shutdown": "Confirmar desligamento",
 }
 
 const featureReference =
-	/automatic-updates\.tsx|power-management\.tsx|add-system\.tsx|alerts-history-columns\.tsx|src\/lib\/alerts\.ts/
+	/automatic-updates\.tsx|power-actions\.tsx|add-system\.tsx|alerts-history-columns\.tsx|src\/lib\/alerts\.ts/
 const decode = (value) => JSON.parse(`"${value.replaceAll("\\", "\\\\").replaceAll('"', '\\"')}"`)
 const placeholders = (value) =>
 	[...value.matchAll(/\{([A-Za-z0-9_]+)(?:,|\})/g)]
@@ -221,7 +241,7 @@ for (const locale of locales) {
 
 for (const relative of [
 	"src/components/routes/system/automatic-updates.tsx",
-	"src/components/routes/system/power-management.tsx",
+	"src/components/systems-table/power-actions.tsx",
 	"src/components/add-system.tsx",
 ]) {
 	const component = readFileSync(join(root, relative), "utf8")
