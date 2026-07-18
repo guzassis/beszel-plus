@@ -77,18 +77,36 @@ func (h *Hub) handlePower(e *core.RequestEvent) error {
 	if err != nil {
 		return e.NotFoundError("system not found", err)
 	}
-	if !powerManagementEnabled(record) {
+	if req.Action != "refresh-diagnostics" && !powerManagementEnabled(record) {
 		return e.BadRequestError("power management is disabled for this system", nil)
 	}
 	requestID := uuid.NewString()
 	switch req.Action {
 	case "wake":
 		return h.wakeSystem(e, record, requestID)
+	case "refresh-diagnostics":
+		return h.refreshPowerDiagnostics(e, record, requestID)
 	case "shutdown", "cancel-shutdown", "shutdown-status":
 		return h.agentPower(e, record, req, requestID)
 	default:
 		return e.BadRequestError("unknown power action", nil)
 	}
+}
+
+func (h *Hub) refreshPowerDiagnostics(e *core.RequestEvent, record *core.Record, requestID string) error {
+	system, err := h.sm.GetSystem(record.Id)
+	if err != nil {
+		return e.BadRequestError("Agent unavailable", err)
+	}
+	ctx, cancel := context.WithTimeout(e.Request.Context(), 10*time.Second)
+	defer cancel()
+	diagnostics, err := system.RefreshPowerDiagnostics(ctx)
+	if err != nil {
+		h.auditPower(record.Id, "refresh-diagnostics", "failed", requestID, "power_diagnostics_refresh_failed", e.Auth.Id)
+		return e.BadRequestError("Unable to refresh Wake-on-LAN diagnostics", err)
+	}
+	h.auditPower(record.Id, "refresh-diagnostics", "completed", requestID, "", e.Auth.Id)
+	return e.JSON(http.StatusOK, map[string]any{"request_id": requestID, "state": diagnostics.State, "diagnostics": diagnostics})
 }
 
 func powerManagementEnabled(record *core.Record) bool {

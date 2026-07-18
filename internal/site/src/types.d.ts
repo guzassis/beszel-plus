@@ -112,6 +112,7 @@ export interface PowerInterfaceDiagnostic {
 	wol_supported: boolean
 	wol_enabled: boolean
 	wol_probe_error?: string
+	wol_probe_path?: string
 }
 
 export interface PowerDiagnostics {

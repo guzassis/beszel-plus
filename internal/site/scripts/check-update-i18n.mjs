@@ -182,6 +182,11 @@ const pt = {
 	"Power operation failed": "Falha na operação de energia",
 	"The Hub cannot wake this system": "O Hub não pode acordar este sistema",
 	"Wake-on-LAN is not ready": "O Wake-on-LAN não está pronto",
+	"Wake-on-LAN is ready": "O Wake-on-LAN está pronto",
+	"Wake-on-LAN diagnostics are unavailable": "Os diagnósticos do Wake-on-LAN estão indisponíveis",
+	"The Wake-on-LAN probe failed": "A verificação do Wake-on-LAN falhou",
+	"ethtool is unavailable to the Agent service": "O ethtool está indisponível para o serviço do Agent",
+	"Power diagnostics are disabled": "Os diagnósticos de energia estão desativados",
 	"System is offline": "O sistema está desligado",
 	"Power management is disabled": "O gerenciamento de energia está desativado",
 	"This system hosts Beszel Plus. Shutting it down will make the dashboard unavailable, and this Hub cannot wake itself. Continue?":

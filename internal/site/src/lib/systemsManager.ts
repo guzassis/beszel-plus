@@ -10,7 +10,7 @@ import {
 	$upSystems,
 } from "@/lib/stores"
 import { getVisualStringWidth, updateFavicon } from "@/lib/utils"
-import type { SystemRecord } from "@/types"
+import type { PowerDiagnostics, SystemRecord } from "@/types"
 import { SystemStatus } from "./enums"
 
 const COLLECTION = pb.collection<SystemRecord>("systems")
@@ -179,6 +179,19 @@ export async function refresh() {
 	} catch (error) {
 		console.error("Failed to refresh systems:", error)
 	}
+}
+
+/** Ask the Hub to re-probe WOL on an online Agent and refresh the local system store. */
+export async function refreshPowerDiagnostics(systemId: string): Promise<PowerDiagnostics> {
+	const response = await pb.send<{ diagnostics?: PowerDiagnostics }>("/api/beszel/power", {
+		method: "POST",
+		body: { system_id: systemId, action: "refresh-diagnostics" },
+	})
+	if (!response.diagnostics) {
+		throw new Error("The Hub did not return power diagnostics")
+	}
+	await refresh()
+	return response.diagnostics
 }
 
 /** Unsubscribe from real-time system updates */

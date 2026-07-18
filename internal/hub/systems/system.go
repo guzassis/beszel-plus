@@ -19,6 +19,7 @@ import (
 
 	"github.com/henrygd/beszel/internal/entities/container"
 	maintenanceentity "github.com/henrygd/beszel/internal/entities/maintenance"
+	powerentity "github.com/henrygd/beszel/internal/entities/power"
 	"github.com/henrygd/beszel/internal/entities/smart"
 	"github.com/henrygd/beszel/internal/entities/system"
 	"github.com/henrygd/beszel/internal/entities/systemd"
@@ -610,6 +611,32 @@ func (sys *System) FetchContainerInfoFromAgent(containerID string) (string, erro
 	var result string
 	err := sys.request(ctx, common.GetContainerInfo, common.ContainerInfoRequest{ContainerID: containerID}, &result)
 	return result, err
+}
+
+// RefreshPowerDiagnostics asks a reachable Agent for a fresh WOL probe without
+// collecting a new metrics sample, then persists only the power snapshot.
+func (sys *System) RefreshPowerDiagnostics(ctx context.Context) (*powerentity.Diagnostics, error) {
+	var data system.CombinedData
+	if err := sys.request(ctx, common.GetData, common.DataRequestOptions{CacheTimeMs: uint16(interval), ForcePowerDiagnostics: true}, &data); err != nil {
+		return nil, err
+	}
+	if data.Info.Power == nil {
+		return nil, errors.New("Agent did not return power diagnostics")
+	}
+	record, err := sys.getRecord(sys.manager.hub)
+	if err != nil {
+		return nil, err
+	}
+	var info system.Info
+	if err := record.UnmarshalJSONField("info", &info); err != nil {
+		return nil, err
+	}
+	info.Power = data.Info.Power
+	record.Set("info", info)
+	if err := sys.manager.hub.SaveNoValidate(record); err != nil {
+		return nil, err
+	}
+	return data.Info.Power, nil
 }
 
 // FetchContainerLogsFromAgent fetches container logs from the agent

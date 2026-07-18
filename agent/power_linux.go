@@ -4,6 +4,7 @@ package agent
 
 import (
 	"context"
+	"fmt"
 	"net"
 	"os"
 	"os/exec"
@@ -23,10 +24,11 @@ func collectPowerDiagnostics(enabled bool) *powerentity.Diagnostics {
 	interfaces, err := net.Interfaces()
 	if err != nil {
 		d.State = powerentity.Unknown
-		d.Reason = err.Error()
+		d.Reason = sanitizeUpdateText(err.Error(), 256)
 		return d
 	}
 	explicitInterface := strings.TrimSpace(os.Getenv("POWER_INTERFACE"))
+	ethtoolPath, ethtoolErr := exec.LookPath("ethtool")
 	for _, iface := range interfaces {
 		if iface.Flags&net.FlagLoopback != 0 || isVirtualPowerInterface(iface.Name) {
 			continue
@@ -61,7 +63,12 @@ func collectPowerDiagnostics(enabled bool) *powerentity.Diagnostics {
 			item.Broadcast = broadcast.String()
 			break
 		}
-		item.WOLSupported, item.WOLEnabled, err = ethtoolWOL(iface.Name)
+		if ethtoolErr != nil {
+			err = ethtoolErr
+		} else {
+			item.WOLProbePath = ethtoolPath
+			item.WOLSupported, item.WOLEnabled, err = ethtoolWOL(ethtoolPath, iface.Name)
+		}
 		if err != nil {
 			item.WOLProbeError = sanitizeUpdateText(err.Error(), 256)
 		}
@@ -84,12 +91,12 @@ func collectPowerDiagnostics(enabled bool) *powerentity.Diagnostics {
 	} else if item.IP == "" {
 		d.State = powerentity.NetworkUnassigned
 		d.Reason = "interface has no IPv4 address"
-	} else if _, err := exec.LookPath("ethtool"); err != nil {
+	} else if ethtoolErr != nil {
 		d.State = powerentity.EthtoolMissing
-		d.Reason = "ethtool is unavailable"
+		d.Reason = "ethtool is unavailable to the Agent service"
 	} else if item.WOLProbeError != "" {
 		d.State = powerentity.Unknown
-		d.Reason = "wol_probe_failed"
+		d.Reason = item.WOLProbeError
 	} else if !item.WOLSupported {
 		d.State = powerentity.Unsupported
 		d.Reason = "wol_unsupported"
@@ -105,38 +112,71 @@ func collectPowerDiagnostics(enabled bool) *powerentity.Diagnostics {
 func mustAddrs(iface *net.Interface) []net.Addr { out, _ := iface.Addrs(); return out }
 func pathExists(path string) bool               { _, err := os.Stat(path); return err == nil }
 func readTrim(path string) string               { b, _ := os.ReadFile(path); return strings.TrimSpace(string(b)) }
-func ethtoolWOL(name string) (supported, enabled bool, probeErr error) {
-	path, err := exec.LookPath("ethtool")
-	if err != nil {
-		return false, false, err
+func ethtoolWOL(path, name string) (supported, enabled bool, probeErr error) {
+	if path == "" {
+		return false, false, fmt.Errorf("ethtool is unavailable")
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	out, err := exec.CommandContext(ctx, path, name).Output()
-	if err != nil {
-		return false, false, err
+	out, commandErr := exec.CommandContext(ctx, path, name).CombinedOutput()
+	supported, enabled, parseErr := parseEthtoolWOL(out)
+	if parseErr != nil {
+		if commandErr != nil {
+			detail := sanitizeUpdateText(string(out), 256)
+			if detail == "" {
+				detail = commandErr.Error()
+			}
+			return false, false, fmt.Errorf("ethtool probe failed: %s", detail)
+		}
+		return false, false, parseErr
 	}
-	return parseEthtoolWOL(out)
+	// Some ethtool/netlink versions return a non-zero status after printing
+	// valid Wake-on fields (usually because of a warning on stderr). The fields
+	// are authoritative, so keep the parsed result in that case.
+	return supported, enabled, nil
 }
 
 func parseEthtoolWOL(out []byte) (supported, enabled bool, probeErr error) {
+	var supportsFound, enabledFound bool
 	for line := range strings.Lines(string(out)) {
-		line = strings.TrimSpace(line)
-		if value, ok := strings.CutPrefix(line, "Supports Wake-on:"); ok {
-			supported = strings.Contains(strings.TrimSpace(value), "g")
+		line = strings.ToLower(strings.TrimSpace(line))
+		if value, ok := strings.CutPrefix(line, "supports wake-on:"); ok {
+			supportsFound = true
+			supported = wakeOnToken(value)
 		}
-		if value, ok := strings.CutPrefix(line, "Wake-on:"); ok {
-			enabled = strings.Contains(strings.TrimSpace(value), "g")
+		if value, ok := strings.CutPrefix(line, "wake-on:"); ok {
+			enabledFound = true
+			enabled = wakeOnToken(value)
 		}
 	}
+	if !supportsFound || !enabledFound {
+		return false, false, fmt.Errorf("ethtool output did not contain complete Wake-on fields")
+	}
 	return supported, enabled, nil
+}
+
+func wakeOnToken(value string) bool {
+	for _, token := range strings.FieldsFunc(value, func(r rune) bool {
+		return r == ' ' || r == '\t' || r == ','
+	}) {
+		if token == "g" || (strings.Contains(token, "g") && strings.Trim(token, "pumbg") == "") {
+			return true
+		}
+	}
+	return false
 }
 
 func selectPowerInterface(items []powerentity.InterfaceDiagnostic, explicit string) powerentity.InterfaceDiagnostic {
 	if explicit != "" {
 		for _, item := range items {
 			if item.Interface == explicit {
-				return item
+				// An explicit interface is authoritative when it is a usable WOL
+				// candidate. If an old setting points at a stale/non-WOL interface,
+				// let the readiness score select a working physical Ethernet NIC.
+				if item.Physical && item.Type == "ethernet" && item.Carrier && item.IP != "" && item.WOLProbeError == "" && item.WOLSupported && item.WOLEnabled {
+					return item
+				}
+				break
 			}
 		}
 	}

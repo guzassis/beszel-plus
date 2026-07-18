@@ -37,6 +37,7 @@ type InterfaceDiagnostic struct {
 	WOLSupported  bool   `json:"wol_supported" cbor:"12,keyasint"`
 	WOLEnabled    bool   `json:"wol_enabled" cbor:"13,keyasint"`
 	WOLProbeError string `json:"wol_probe_error,omitempty" cbor:"14,keyasint,omitempty"`
+	WOLProbePath  string `json:"wol_probe_path,omitempty" cbor:"15,keyasint,omitempty"`
 }
 
 type Diagnostics struct {

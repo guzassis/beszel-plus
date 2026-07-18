@@ -948,6 +948,10 @@ msgstr "خطأ"
 #~ msgid "ethtool is not installed"
 #~ msgstr "ethtool is not installed"
 
+#: src/components/systems-table/power-actions.tsx
+msgid "ethtool is unavailable to the Agent service"
+msgstr "ethtool is unavailable to the Agent service"
+
 #: src/components/alerts-history-columns.tsx
 msgid "Event"
 msgstr "Event"
@@ -1438,9 +1442,9 @@ msgstr "لا"
 msgid "No installation command was copied. Please retry."
 msgstr "No installation command was copied. Please retry."
 
-#: src/components/routes/system/power-management.tsx
-#~ msgid "No physical Ethernet interface was found"
-#~ msgstr "No physical Ethernet interface was found"
+#: src/components/systems-table/power-actions.tsx
+msgid "No physical Ethernet interface was found"
+msgstr "No physical Ethernet interface was found"
 
 #: src/components/command-palette.tsx
 #: src/components/systemd-table/systemd-table.tsx
@@ -1683,6 +1687,10 @@ msgstr "المنافذ"
 #: src/components/systems-table/power-actions.tsx
 msgid "Power actions"
 msgstr "Power actions"
+
+#: src/components/systems-table/power-actions.tsx
+msgid "Power diagnostics are disabled"
+msgstr "Power diagnostics are disabled"
 
 #: src/components/add-system.tsx
 msgid "Power management"
@@ -2083,6 +2091,7 @@ msgstr "الترتيب حسب"
 #~ msgstr "Stale"
 
 #: src/components/routes/system/automatic-updates.tsx
+#: src/components/systems-table/power-actions.tsx
 msgid "Stale data"
 msgstr "Stale data"
 
@@ -2220,9 +2229,9 @@ msgstr "تم إرسال إشعار الاختبار"
 msgid "The Agent remains unprivileged. A restricted local helper applies validated APT policies."
 msgstr "The Agent remains unprivileged. A restricted local helper applies validated APT policies."
 
-#: src/components/routes/system/power-management.tsx
-#~ msgid "The Ethernet cable is disconnected"
-#~ msgstr "The Ethernet cable is disconnected"
+#: src/components/systems-table/power-actions.tsx
+msgid "The Ethernet cable is disconnected"
+msgstr "The Ethernet cable is disconnected"
 
 #: src/components/routes/system/power-management.tsx
 #~ msgid "The Hub cannot wake itself. Use another Hub on the same power network."
@@ -2232,13 +2241,13 @@ msgstr "The Agent remains unprivileged. A restricted local helper applies valida
 msgid "The Hub cannot wake this system"
 msgstr "The Hub cannot wake this system"
 
-#: src/components/routes/system/power-management.tsx
-#~ msgid "The interface has no IPv4 address"
-#~ msgstr "The interface has no IPv4 address"
+#: src/components/systems-table/power-actions.tsx
+msgid "The interface has no IPv4 address"
+msgstr "The interface has no IPv4 address"
 
-#: src/components/routes/system/power-management.tsx
-#~ msgid "The network interface has an invalid MAC address"
-#~ msgstr "The network interface has an invalid MAC address"
+#: src/components/systems-table/power-actions.tsx
+msgid "The network interface has an invalid MAC address"
+msgstr "The network interface has an invalid MAC address"
 
 #: src/components/routes/settings/heartbeat.tsx
 msgid "The overall status is <0>ok</0> when all systems are up, <1>warn</1> when alerts are triggered, and <2>error</2> when any system is down."
@@ -2247,6 +2256,10 @@ msgstr "الحالة العامة هي <0>موافق</0> عندما تكون ج�
 #: src/components/routes/system/automatic-updates.tsx
 msgid "The update policy was restored because APT timers could not be updated."
 msgstr "The update policy was restored because APT timers could not be updated."
+
+#: src/components/systems-table/power-actions.tsx
+msgid "The Wake-on-LAN probe failed"
+msgstr "The Wake-on-LAN probe failed"
 
 #: src/components/login/forgot-pass-form.tsx
 msgid "Then log into the backend and reset your user account password in the users table."
@@ -2664,16 +2677,24 @@ msgid "Wake system"
 msgstr "Wake system"
 
 #: src/components/systems-table/power-actions.tsx
-msgid "Wake-on-LAN is not ready"
-msgstr "Wake-on-LAN is not ready"
+msgid "Wake-on-LAN diagnostics are unavailable"
+msgstr "Wake-on-LAN diagnostics are unavailable"
 
-#: src/components/routes/system/power-management.tsx
-#~ msgid "Wake-on-LAN is not supported"
-#~ msgstr "Wake-on-LAN is not supported"
+#: src/components/systems-table/power-actions.tsx
+#~ msgid "Wake-on-LAN is not ready"
+#~ msgstr "Wake-on-LAN is not ready"
 
-#: src/components/routes/system/power-management.tsx
-#~ msgid "Wake-on-LAN is supported but disabled on the interface"
-#~ msgstr "Wake-on-LAN is supported but disabled on the interface"
+#: src/components/systems-table/power-actions.tsx
+msgid "Wake-on-LAN is not supported"
+msgstr "Wake-on-LAN is not supported"
+
+#: src/components/systems-table/power-actions.tsx
+msgid "Wake-on-LAN is ready"
+msgstr "Wake-on-LAN is ready"
+
+#: src/components/systems-table/power-actions.tsx
+msgid "Wake-on-LAN is supported but disabled on the interface"
+msgstr "Wake-on-LAN is supported but disabled on the interface"
 
 #: src/components/routes/system/power-management.tsx
 #~ msgid "Wake-on-LAN MAC address"

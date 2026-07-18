@@ -166,6 +166,11 @@ func (a *Agent) gatherStats(options common.DataRequestOptions) *system.CombinedD
 	cacheTimeMs := options.CacheTimeMs
 	data, isCached := a.cache.Get(cacheTimeMs)
 	if isCached {
+		if options.ForcePowerDiagnostics {
+			data.Info.Power = collectPowerDiagnostics(strings.EqualFold(os.Getenv("POWER_MANAGEMENT"), "true"))
+			a.cache.Set(data, cacheTimeMs)
+			return data
+		}
 		slog.Debug("Cached data", "cacheTimeMs", cacheTimeMs)
 		return data
 	}

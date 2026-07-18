@@ -3,6 +3,8 @@
 package agent
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	powerentity "github.com/henrygd/beszel/internal/entities/power"
@@ -27,8 +29,8 @@ func TestSelectPowerInterfacePrefersReadyWOL(t *testing.T) {
 	if got := selectPowerInterface(items, ""); got.Interface != "enp1s0" {
 		t.Fatalf("selected %q, want enp1s0", got.Interface)
 	}
-	if got := selectPowerInterface(items, "enp0s0"); got.Interface != "enp0s0" {
-		t.Fatalf("explicit selection returned %q", got.Interface)
+	if got := selectPowerInterface(items, "enp0s0"); got.Interface != "enp1s0" {
+		t.Fatalf("stale explicit selection returned %q, want enp1s0", got.Interface)
 	}
 }
 
@@ -46,6 +48,25 @@ func TestParseEthtoolWOLMagicPacket(t *testing.T) {
 	supported, enabled, err := parseEthtoolWOL([]byte("Supports Wake-on: pumbg\nWake-on: g\n"))
 	if err != nil || !supported || !enabled {
 		t.Fatalf("supported=%v enabled=%v err=%v", supported, enabled, err)
+	}
+}
+
+func TestEthtoolWOLKeepsValidFieldsWhenCommandReturnsWarning(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, "ethtool")
+	script := "#!/bin/sh\nprintf '%s\\n' 'Supports Wake-on: pumbg' 'Wake-on: g' >&1\nprintf '%s\\n' 'netlink warning' >&2\nexit 1\n"
+	if err := os.WriteFile(path, []byte(script), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	supported, enabled, err := ethtoolWOL(path, "enp1s0")
+	if err != nil || !supported || !enabled {
+		t.Fatalf("supported=%v enabled=%v err=%v", supported, enabled, err)
+	}
+}
+
+func TestParseEthtoolWOLRejectsIncompleteOutput(t *testing.T) {
+	if _, _, err := parseEthtoolWOL([]byte("netlink error: Operation not permitted\n")); err == nil {
+		t.Fatal("expected incomplete ethtool output to fail")
 	}
 }
 

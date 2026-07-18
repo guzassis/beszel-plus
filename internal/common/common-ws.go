@@ -61,8 +61,9 @@ type FingerprintResponse struct {
 }
 
 type DataRequestOptions struct {
-	CacheTimeMs    uint16 `cbor:"0,keyasint"`
-	IncludeDetails bool   `cbor:"1,keyasint"`
+	CacheTimeMs           uint16 `cbor:"0,keyasint"`
+	IncludeDetails        bool   `cbor:"1,keyasint"`
+	ForcePowerDiagnostics bool   `cbor:"2,keyasint,omitempty"`
 }
 
 type ContainerLogsRequest struct {

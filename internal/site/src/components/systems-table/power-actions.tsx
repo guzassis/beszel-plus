@@ -1,7 +1,7 @@
 import { t } from "@lingui/core/macro"
 import { Trans, useLingui } from "@lingui/react/macro"
 import { Clock3Icon, PowerIcon, PowerOffIcon } from "lucide-react"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import {
 	Dialog,
@@ -14,11 +14,16 @@ import {
 import { Input } from "@/components/ui/input"
 import { isAdmin, pb } from "@/lib/api"
 import { parsePowerDelayMinutes, powerDelayMinutesLabel } from "@/lib/power-actions"
-import type { SystemRecord } from "@/types"
+import { refreshPowerDiagnostics } from "@/lib/systemsManager"
+import type { PowerDiagnostics, SystemRecord } from "@/types"
 import { toast } from "../ui/use-toast"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../ui/dropdown-menu"
 
 type PowerAPIResponse = { state?: string; status?: string }
+
+const diagnosticsRefreshAttempts = new Map<string, number>()
+const diagnosticsRefreshInterval = 30_000
+const diagnosticsMaxAge = 10 * 60_000
 
 function errorMessage(error: unknown) {
 	return error instanceof Error ? error.message : String(error)
@@ -55,10 +60,58 @@ function operationLabel(value?: string) {
 	}
 }
 
-function wakeDisabledReason(status: SystemRecord["status"], wolReady: boolean, hubSystem: boolean) {
+function diagnosticsAreStale(diagnostics?: PowerDiagnostics) {
+	if (!diagnostics?.collected_at) return true
+	const collectedAt = Date.parse(diagnostics.collected_at)
+	return !Number.isFinite(collectedAt) || Date.now() - collectedAt > diagnosticsMaxAge
+}
+
+function powerDiagnosticsLabel(diagnostics: PowerDiagnostics | undefined) {
+	if (!diagnostics) return t`Wake-on-LAN diagnostics are unavailable`
+	switch (diagnostics.state) {
+		case "ready":
+			return t`Wake-on-LAN is ready`
+		case "wol_not_enabled":
+			return t`Wake-on-LAN is supported but disabled on the interface`
+		case "unsupported":
+			return t`Wake-on-LAN is not supported`
+		case "ethtool_missing":
+			return t`ethtool is unavailable to the Agent service`
+		case "no_carrier":
+			return t`The Ethernet cable is disconnected`
+		case "network_unassigned":
+			return t`The interface has no IPv4 address`
+		case "invalid_mac":
+			return t`The network interface has an invalid MAC address`
+		case "no_physical_ethernet":
+			return t`No physical Ethernet interface was found`
+		case "disabled":
+			return t`Power diagnostics are disabled`
+		default:
+			return t`The Wake-on-LAN probe failed`
+	}
+}
+
+function powerDiagnosticsTitle(diagnostics: PowerDiagnostics | undefined) {
+	const label = powerDiagnosticsLabel(diagnostics)
+	if (!diagnostics) return label
+	const details = [
+		diagnostics.selected_interface,
+		diagnostics.reason && !diagnostics.reason.startsWith("wol_") ? diagnostics.reason : undefined,
+		diagnosticsAreStale(diagnostics) ? t`Stale data` : undefined,
+	].filter(Boolean)
+	return details.length ? `${label} · ${details.join(" · ")}` : label
+}
+
+function wakeDisabledReason(
+	status: SystemRecord["status"],
+	wolReady: boolean,
+	hubSystem: boolean,
+	diagnostics: PowerDiagnostics | undefined
+) {
 	if (status !== "down") return t`System is already online`
 	if (hubSystem) return t`The Hub cannot wake this system`
-	if (!wolReady) return t`Wake-on-LAN is not ready`
+	if (!wolReady) return powerDiagnosticsLabel(diagnostics)
 	return undefined
 }
 
@@ -78,9 +131,19 @@ export const PowerActions = ({ system }: { system: SystemRecord }) => {
 	const powerEnabled = Boolean(system.power_management_enabled || diagnostics?.enabled)
 	const wolReady = diagnostics?.state === "ready"
 	const hubSystem = isHubSystem(system)
+	useEffect(() => {
+		if (!isAdmin() || system.status !== "up" || !diagnosticsAreStale(diagnostics)) return
+		const lastAttempt = diagnosticsRefreshAttempts.get(system.id) || 0
+		if (Date.now() - lastAttempt < diagnosticsRefreshInterval) return
+		diagnosticsRefreshAttempts.set(system.id, Date.now())
+		refreshPowerDiagnostics(system.id).catch((error) => {
+			console.debug("Power diagnostics refresh failed", error)
+		})
+	}, [system.id, system.status, diagnostics?.collected_at, diagnostics?.state])
 	const wakeDisabled = busy || system.status !== "down" || !wolReady || hubSystem
 	const shutdownDisabled = busy || system.status !== "up" || !powerEnabled
-	const wakeReason = wakeDisabledReason(system.status, wolReady, hubSystem)
+	const wakeReason = wakeDisabledReason(system.status, wolReady, hubSystem, diagnostics)
+	const diagnosticsLabel = powerDiagnosticsTitle(diagnostics)
 	const shutdownReason = shutdownDisabledReason(system.status, powerEnabled)
 	const parsedSeconds = parsePowerDelayMinutes(minutes)
 	const scheduleDisabled = shutdownDisabled || parsedSeconds === null
@@ -134,6 +197,7 @@ export const PowerActions = ({ system }: { system: SystemRecord }) => {
 						size="icon"
 						data-nolink
 						aria-label={t`Power actions`}
+						title={diagnosticsLabel}
 						onClick={(event) => event.stopPropagation()}
 						onMouseDown={(event) => event.stopPropagation()}
 					>
