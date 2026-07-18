@@ -17,7 +17,7 @@ var (
 	RepositoryName   = "beszel-plus"
 	RepositoryURL    = "https://github.com/guzassis/beszel-plus"
 	DocumentationURL = "https://github.com/guzassis/beszel-plus#readme"
-	Version          = "0.2.8-dev"
+	Version          = "0.2.9-dev"
 	GitCommit        = "unknown"
 	BuildDate        = "unknown"
 )

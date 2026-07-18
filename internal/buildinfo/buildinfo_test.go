@@ -17,7 +17,7 @@ func TestProductMetadata(t *testing.T) {
 	if UpstreamVersion != "0.18.2" {
 		t.Fatalf("unexpected upstream compatibility version %q", UpstreamVersion)
 	}
-	if Version != "0.2.8-dev" {
+	if Version != "0.2.9-dev" {
 		t.Fatalf("unexpected development product version %q", Version)
 	}
 }
@@ -25,16 +25,16 @@ func TestProductMetadata(t *testing.T) {
 func TestVersionFallbacksAndInstallersStayAligned(t *testing.T) {
 	root := filepath.Join("..", "..")
 	for _, check := range []struct{ path, marker string }{
-		{"internal/site/src/lib/build-info.ts", `"0.2.8-dev"`},
-		{"supplemental/scripts/install-agent.sh", `PRODUCT_VERSION="0.2.8"`},
-		{"supplemental/scripts/install-hub.sh", `PRODUCT_VERSION="0.2.8"`},
+		{"internal/site/src/lib/build-info.ts", `"0.2.9-dev"`},
+		{"supplemental/scripts/install-agent.sh", `PRODUCT_VERSION="0.2.9"`},
+		{"supplemental/scripts/install-hub.sh", `PRODUCT_VERSION="0.2.9"`},
 	} {
 		data, err := os.ReadFile(filepath.Join(root, check.path))
 		if err != nil {
 			t.Fatal(err)
 		}
 		if !strings.Contains(string(data), check.marker) {
-			t.Errorf("%s is not aligned with v0.2.8", check.path)
+			t.Errorf("%s is not aligned with v0.2.9", check.path)
 		}
 	}
 }
@@ -103,6 +103,11 @@ func TestReleaseMatrixIsNativeLinuxOnly(t *testing.T) {
 	} {
 		if !strings.Contains(text, mainPackage) {
 			t.Errorf("GoReleaser is missing complete command package %q", mainPackage)
+		}
+	}
+	for _, archiveID := range []string{"id: hub-archive", "id: agent-archive", "id: helper-archive"} {
+		if !strings.Contains(text, archiveID) {
+			t.Errorf("GoReleaser archive is missing distinct ID %q", archiveID)
 		}
 	}
 	for line := range strings.Lines(text) {

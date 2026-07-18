@@ -76,3 +76,20 @@ func TestDisabledPowerDiagnostics(t *testing.T) {
 		t.Fatalf("unexpected diagnostics: %#v", diagnostics)
 	}
 }
+
+func TestMergePrivilegedWOLProbeMakesIncompleteUnprivilegedProbeReady(t *testing.T) {
+	diagnostics := &powerentity.Diagnostics{
+		Enabled: true,
+		Interfaces: []powerentity.InterfaceDiagnostic{{
+			Interface: "eno1", Type: "ethernet", MAC: "3c:7c:3f:79:dd:69", IP: "192.168.1.2",
+			Physical: true, Carrier: true, WOLProbeError: "ethtool output did not contain complete Wake-on fields",
+		}},
+	}
+	got := mergePrivilegedWOL(diagnostics, []powerentity.InterfaceDiagnostic{{
+		Interface: "eno1", Type: "ethernet", Physical: true, WOLSupported: true, WOLEnabled: true,
+		WOLProbePath: "/usr/sbin/ethtool",
+	}})
+	if got.State != powerentity.Ready || got.SelectedInterface != "eno1" || got.Interfaces[0].WOLProbeError != "" {
+		t.Fatalf("privileged probe was not merged: %#v", got)
+	}
+}

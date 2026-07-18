@@ -17,7 +17,13 @@ import { parsePowerDelayMinutes, powerDelayMinutesLabel } from "@/lib/power-acti
 import { refreshPowerDiagnostics } from "@/lib/systemsManager"
 import type { PowerDiagnostics, SystemRecord } from "@/types"
 import { toast } from "../ui/use-toast"
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../ui/dropdown-menu"
+import {
+	DropdownMenu,
+	DropdownMenuContent,
+	DropdownMenuItem,
+	DropdownMenuLabel,
+	DropdownMenuTrigger,
+} from "../ui/dropdown-menu"
 
 type PowerAPIResponse = { state?: string; status?: string }
 
@@ -205,6 +211,7 @@ export const PowerActions = ({ system }: { system: SystemRecord }) => {
 					</Button>
 				</DropdownMenuTrigger>
 				<DropdownMenuContent align="end" onClick={(event) => event.stopPropagation()}>
+					<DropdownMenuLabel>{diagnosticsLabel}</DropdownMenuLabel>
 					<DropdownMenuItem
 						disabled={wakeDisabled}
 						title={wakeReason}

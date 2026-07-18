@@ -3,10 +3,11 @@ package maintenance
 
 import (
 	"errors"
-	powerentity "github.com/henrygd/beszel/internal/entities/power"
 	"regexp"
 	"strings"
 	"time"
+
+	powerentity "github.com/henrygd/beszel/internal/entities/power"
 )
 
 const ProtocolVersion uint8 = 2
@@ -26,6 +27,7 @@ const (
 	RunUnattendedUpgrades     Operation = "run-unattended-upgrades"
 	GetOperationStatus        Operation = "get-operation-status"
 	GetPowerCapabilities      Operation = "get-power-capabilities"
+	ProbeWOL                  Operation = "probe-wol"
 	SchedulePoweroff          Operation = "schedule-poweroff"
 	CancelPoweroff            Operation = "cancel-poweroff"
 	GetPoweroffStatus         Operation = "get-poweroff-status"
@@ -42,6 +44,7 @@ const (
 )
 
 var safeRepositoryValue = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._+:/-]{0,127}$`)
+var safeInterfaceName = regexp.MustCompile(`^[A-Za-z0-9_.:-]{1,15}$`)
 
 type Capabilities struct {
 	UpdateMonitoring   bool                      `json:"update_monitoring" cbor:"0,keyasint"`
@@ -97,16 +100,18 @@ type Request struct {
 	IdempotencyKey string    `json:"idempotency_key,omitempty" cbor:"3,keyasint,omitempty"`
 	Policy         *Policy   `json:"policy,omitempty" cbor:"4,keyasint,omitempty"`
 	DelaySeconds   uint32    `json:"delay_seconds,omitempty" cbor:"5,keyasint,omitempty"`
+	Interfaces     []string  `json:"interfaces,omitempty" cbor:"6,keyasint,omitempty"`
 }
 
 type Result struct {
-	Capabilities      *Capabilities               `json:"capabilities,omitempty" cbor:"0,keyasint,omitempty"`
-	Policy            *Policy                     `json:"policy,omitempty" cbor:"1,keyasint,omitempty"`
-	Repositories      []Repository                `json:"repositories,omitempty" cbor:"2,keyasint,omitempty"`
-	Output            string                      `json:"output,omitempty" cbor:"3,keyasint,omitempty"`
-	Changed           bool                        `json:"changed,omitempty" cbor:"4,keyasint,omitempty"`
-	PowerCapabilities *powerentity.Capabilities   `json:"power_capabilities,omitempty" cbor:"5,keyasint,omitempty"`
-	PoweroffStatus    *powerentity.ShutdownStatus `json:"poweroff_status,omitempty" cbor:"6,keyasint,omitempty"`
+	Capabilities      *Capabilities                     `json:"capabilities,omitempty" cbor:"0,keyasint,omitempty"`
+	Policy            *Policy                           `json:"policy,omitempty" cbor:"1,keyasint,omitempty"`
+	Repositories      []Repository                      `json:"repositories,omitempty" cbor:"2,keyasint,omitempty"`
+	Output            string                            `json:"output,omitempty" cbor:"3,keyasint,omitempty"`
+	Changed           bool                              `json:"changed,omitempty" cbor:"4,keyasint,omitempty"`
+	PowerCapabilities *powerentity.Capabilities         `json:"power_capabilities,omitempty" cbor:"5,keyasint,omitempty"`
+	PoweroffStatus    *powerentity.ShutdownStatus       `json:"poweroff_status,omitempty" cbor:"6,keyasint,omitempty"`
+	PowerInterfaces   []powerentity.InterfaceDiagnostic `json:"power_interfaces,omitempty" cbor:"7,keyasint,omitempty"`
 }
 
 type Response struct {
@@ -139,7 +144,7 @@ type Rollback struct {
 
 func IsOperationAllowed(op Operation) bool {
 	switch op {
-	case GetCapabilities, GetUpdatePolicy, DetectRepositories, ValidateUpdatePolicy, ApplyUpdatePolicy, InstallUpdateDependencies, RunUpdateDryRun, RunUnattendedUpgrades, GetOperationStatus, GetPowerCapabilities, SchedulePoweroff, CancelPoweroff, GetPoweroffStatus:
+	case GetCapabilities, GetUpdatePolicy, DetectRepositories, ValidateUpdatePolicy, ApplyUpdatePolicy, InstallUpdateDependencies, RunUpdateDryRun, RunUnattendedUpgrades, GetOperationStatus, GetPowerCapabilities, ProbeWOL, SchedulePoweroff, CancelPoweroff, GetPoweroffStatus:
 		return true
 	default:
 		return false
@@ -178,6 +183,19 @@ func ValidateRequest(req Request) error {
 	}
 	if req.Policy != nil {
 		return errors.New("policy is not valid for this operation")
+	}
+	if req.Operation == ProbeWOL {
+		if len(req.Interfaces) == 0 || len(req.Interfaces) > 64 {
+			return errors.New("at least one interface is required")
+		}
+		for _, name := range req.Interfaces {
+			if !safeInterfaceName.MatchString(name) {
+				return errors.New("invalid interface name")
+			}
+		}
+	}
+	if req.Operation != ProbeWOL && len(req.Interfaces) > 0 {
+		return errors.New("interfaces are not valid for this operation")
 	}
 	if req.Operation == SchedulePoweroff && req.DelaySeconds > 604800 {
 		return errors.New("poweroff delay out of range")

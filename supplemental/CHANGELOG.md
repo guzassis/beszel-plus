@@ -1,3 +1,10 @@
+## 0.2.9
+
+- Use the restricted root maintenance helper to obtain Wake-on-LAN diagnostics when unprivileged `ethtool` cannot expose them.
+- Keep WOL readiness visible independently from the online/offline state of each system.
+- Give each GoReleaser archive a distinct ID so the complete six-archive Linux matrix is emitted without collisions.
+- Preserve the original `v0.18.2` compatibility baseline while aligning Hub, Agent, helper, installers, frontend, and documentation on v0.2.9.
+
 ## 0.18.7
 
 - Add more disk I/O metrics (utilization, read/write time, await, queue depth) (#1866)

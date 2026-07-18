@@ -10,3 +10,7 @@ import (
 func collectPowerDiagnostics(enabled bool) *powerentity.Diagnostics {
 	return &powerentity.Diagnostics{Enabled: enabled, State: powerentity.Unsupported, Reason: "power management is supported on Linux only", CollectedAt: time.Now().UTC()}
 }
+
+func (a *Agent) collectPowerDiagnostics(enabled bool) *powerentity.Diagnostics {
+	return collectPowerDiagnostics(enabled)
+}

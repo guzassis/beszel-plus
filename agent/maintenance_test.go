@@ -14,6 +14,7 @@ import (
 	"github.com/fxamacker/cbor/v2"
 	"github.com/henrygd/beszel/internal/common"
 	entity "github.com/henrygd/beszel/internal/entities/maintenance"
+	powerentity "github.com/henrygd/beszel/internal/entities/power"
 )
 
 func TestMaintenanceManagerRefusesRequestsDuringUpgradeDrain(t *testing.T) {
@@ -68,6 +69,45 @@ func TestMaintenanceManagerUsesTypedUnixIPC(t *testing.T) {
 	response := m.handle(request)
 	if response.Status != entity.StateCompleted || response.Result == nil || !response.Result.Capabilities.PrivilegedHelper {
 		t.Fatalf("response=%#v", response)
+	}
+}
+
+func TestMaintenanceManagerProbesWOLViaTypedIPC(t *testing.T) {
+	socket := filepath.Join(t.TempDir(), "maintenance.sock")
+	listener, err := net.Listen("unix", socket)
+	if err != nil {
+		t.Skipf("unix sockets unavailable: %v", err)
+	}
+	defer listener.Close()
+	done := make(chan error, 1)
+	go func() {
+		conn, acceptErr := listener.Accept()
+		if acceptErr != nil {
+			done <- acceptErr
+			return
+		}
+		defer conn.Close()
+		var request entity.Request
+		if decodeErr := json.NewDecoder(conn).Decode(&request); decodeErr != nil {
+			done <- decodeErr
+			return
+		}
+		if request.Operation != entity.ProbeWOL || len(request.Interfaces) != 1 || request.Interfaces[0] != "eno1" {
+			done <- fmt.Errorf("unexpected WOL probe request: %#v", request)
+			return
+		}
+		response := entity.Response{Version: entity.ProtocolVersion, RequestID: request.RequestID, Operation: request.Operation, Status: entity.StateCompleted, Result: &entity.Result{PowerInterfaces: []powerentity.InterfaceDiagnostic{{Interface: "eno1", Physical: true, Type: "ethernet", WOLSupported: true, WOLEnabled: true}}}}
+		done <- json.NewEncoder(conn).Encode(response)
+	}()
+	m := &maintenanceManager{socket: socket, enabled: true, agent: &Agent{}}
+	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+	defer cancel()
+	items, err := m.probeWOL(ctx, []string{"eno1"})
+	if err != nil || len(items) != 1 || !items[0].WOLEnabled {
+		t.Fatalf("items=%#v err=%v", items, err)
+	}
+	if err := <-done; err != nil {
+		t.Fatal(err)
 	}
 }
 

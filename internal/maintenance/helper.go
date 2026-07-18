@@ -22,6 +22,7 @@ import (
 	"github.com/henrygd/beszel/internal/aptstatus"
 	entity "github.com/henrygd/beszel/internal/entities/maintenance"
 	powerentity "github.com/henrygd/beszel/internal/entities/power"
+	powerexec "github.com/henrygd/beszel/internal/power"
 )
 
 const maxIPCRequestBytes = 64 * 1024
@@ -46,6 +47,7 @@ func (ExecRunner) Run(ctx context.Context, name string, args ...string) ([]byte,
 type Helper struct {
 	Root              string
 	Runner            Runner
+	EthtoolPath       string
 	Now               func() time.Time
 	RunSystemCommands bool
 	APTLockTimeout    time.Duration
@@ -127,6 +129,16 @@ func (h *Helper) Execute(ctx context.Context, req entity.Request) entity.Respons
 		return failed(req, err.Error())
 	}
 	slog.Info("maintenance operation requested", "operation", req.Operation, "request_id", req.RequestID)
+	// WOL diagnostics are a read-only probe. Keep them independent from the
+	// update-state migration so a stale backup cannot prevent the Agent from
+	// learning the host's actual Wake-on-LAN capability.
+	if req.Operation == entity.ProbeWOL {
+		result, err := h.probeWOL(ctx, req.Interfaces)
+		if err != nil {
+			return failureFor(req, err)
+		}
+		return h.complete(req, result, false)
+	}
 	if err := h.migrateLegacyBackups(); err != nil {
 		return failureFor(req, &operationError{code: "filesystem_write_failed", stage: "legacy_backup_migration", message: err.Error()})
 	}
@@ -285,6 +297,61 @@ func (h *Helper) capabilities() *entity.Capabilities {
 
 func (h *Helper) powerCapabilities() *powerentity.Capabilities {
 	return &powerentity.Capabilities{PowerManagement: true, Shutdown: true, CancelShutdown: true, MaxDelaySeconds: 604800}
+}
+
+func (h *Helper) probeWOL(ctx context.Context, names []string) (*entity.Result, error) {
+	path := h.ethtoolPath()
+	items := make([]powerentity.InterfaceDiagnostic, 0, len(names))
+	for _, name := range names {
+		item := powerentity.InterfaceDiagnostic{Interface: name, Type: "ethernet", Physical: true, WOLProbePath: path}
+		if !h.physicalEthernetInterface(name) {
+			item.Physical = false
+			item.WOLProbeError = "interface is not a physical Ethernet interface"
+			items = append(items, item)
+			continue
+		}
+		output, commandErr := h.Runner.Run(ctx, path, name)
+		supported, enabled, parseErr := powerexec.ParseEthtoolWOL(output)
+		if parseErr != nil {
+			message := sanitize(parseErr.Error(), 256)
+			if commandErr != nil {
+				detail := sanitize(string(output), 256)
+				if detail == "" {
+					detail = sanitize(commandErr.Error(), 256)
+				}
+				message = "ethtool probe failed: " + detail
+			}
+			item.WOLProbeError = message
+		} else {
+			item.WOLSupported = supported
+			item.WOLEnabled = enabled
+		}
+		items = append(items, item)
+	}
+	return &entity.Result{PowerInterfaces: items}, nil
+}
+
+func (h *Helper) ethtoolPath() string {
+	if strings.TrimSpace(h.EthtoolPath) != "" {
+		return h.EthtoolPath
+	}
+	for _, candidate := range []string{"/usr/sbin/ethtool", "/sbin/ethtool", "/usr/bin/ethtool"} {
+		if _, err := os.Stat(h.path(candidate)); err == nil {
+			return candidate
+		}
+	}
+	return "/usr/sbin/ethtool"
+}
+
+func (h *Helper) physicalEthernetInterface(name string) bool {
+	base := h.path(filepath.Join("/sys/class/net", name))
+	if _, err := os.Stat(filepath.Join(base, "device")); err != nil {
+		return false
+	}
+	if _, err := os.Stat(filepath.Join(base, "wireless")); err == nil {
+		return false
+	}
+	return true
 }
 
 func (h *Helper) schedulePoweroff(ctx context.Context, delay uint32) (*entity.Result, bool, error) {

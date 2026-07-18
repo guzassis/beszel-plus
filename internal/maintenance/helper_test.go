@@ -185,6 +185,31 @@ func TestPoweroffDelayIsBounded(t *testing.T) {
 	}
 }
 
+func TestProbeWOLUsesRootEttoolOnlyForPhysicalInterfaces(t *testing.T) {
+	h := testHelper(t)
+	for _, path := range []string{"/sys/class/net/eno1/device", "/sys/class/net/wlan0/device", "/sys/class/net/wlan0/wireless"} {
+		if err := os.MkdirAll(h.path(path), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	h.EthtoolPath = "/usr/sbin/ethtool"
+	runner := h.Runner.(*fakeRunner)
+	runner.output = []byte("Supports Wake-on: pumbg\nWake-on: g\n")
+	result, err := h.probeWOL(context.Background(), []string{"eno1", "wlan0"})
+	if err != nil || len(result.PowerInterfaces) != 2 {
+		t.Fatalf("result=%#v err=%v", result, err)
+	}
+	if !result.PowerInterfaces[0].WOLSupported || !result.PowerInterfaces[0].WOLEnabled || result.PowerInterfaces[0].WOLProbePath != h.EthtoolPath {
+		t.Fatalf("physical interface was not probed: %#v", result.PowerInterfaces[0])
+	}
+	if result.PowerInterfaces[1].Physical || result.PowerInterfaces[1].WOLProbeError == "" {
+		t.Fatalf("wireless interface was not rejected: %#v", result.PowerInterfaces[1])
+	}
+	if len(runner.calls) != 1 || strings.Join(runner.calls[0], " ") != "/usr/sbin/ethtool eno1" {
+		t.Fatalf("unexpected helper calls: %#v", runner.calls)
+	}
+}
+
 func TestPendingPolicyUsesBoundedMetadataSchema(t *testing.T) {
 	h := testHelper(t)
 	policy := entity.DefaultPolicy()

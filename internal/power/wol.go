@@ -16,6 +16,39 @@ import (
 	powerentity "github.com/henrygd/beszel/internal/entities/power"
 )
 
+// ParseEthtoolWOL extracts the magic-packet capability and current setting
+// from ethtool output. Both fields are required; incomplete output is usually
+// a permission or netlink failure and must not be interpreted as unsupported.
+func ParseEthtoolWOL(out []byte) (supported, enabled bool, probeErr error) {
+	var supportsFound, enabledFound bool
+	for line := range strings.Lines(string(out)) {
+		line = strings.ToLower(strings.TrimSpace(line))
+		if value, ok := strings.CutPrefix(line, "supports wake-on:"); ok {
+			supportsFound = true
+			supported = wakeOnToken(value)
+		}
+		if value, ok := strings.CutPrefix(line, "wake-on:"); ok {
+			enabledFound = true
+			enabled = wakeOnToken(value)
+		}
+	}
+	if !supportsFound || !enabledFound {
+		return false, false, errors.New("ethtool output did not contain complete Wake-on fields")
+	}
+	return supported, enabled, nil
+}
+
+func wakeOnToken(value string) bool {
+	for _, token := range strings.FieldsFunc(value, func(r rune) bool {
+		return r == ' ' || r == '\t' || r == ','
+	}) {
+		if token == "g" || (strings.Contains(token, "g") && strings.Trim(token, "pumbg") == "") {
+			return true
+		}
+	}
+	return false
+}
+
 type Network struct {
 	ID        string `json:"id"`
 	Name      string `json:"name"`

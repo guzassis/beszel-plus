@@ -167,7 +167,7 @@ func (a *Agent) gatherStats(options common.DataRequestOptions) *system.CombinedD
 	data, isCached := a.cache.Get(cacheTimeMs)
 	if isCached {
 		if options.ForcePowerDiagnostics {
-			data.Info.Power = collectPowerDiagnostics(strings.EqualFold(os.Getenv("POWER_MANAGEMENT"), "true"))
+			data.Info.Power = a.collectPowerDiagnostics(strings.EqualFold(os.Getenv("POWER_MANAGEMENT"), "true"))
 			a.cache.Set(data, cacheTimeMs)
 			return data
 		}
@@ -185,7 +185,7 @@ func (a *Agent) gatherStats(options common.DataRequestOptions) *system.CombinedD
 			data.Updates.Capabilities = a.maintenanceManager.capabilities()
 		}
 	}
-	data.Info.Power = collectPowerDiagnostics(strings.EqualFold(os.Getenv("POWER_MANAGEMENT"), "true"))
+	data.Info.Power = a.collectPowerDiagnostics(strings.EqualFold(os.Getenv("POWER_MANAGEMENT"), "true"))
 
 	// slog.Info("System data", "data", data, "cacheTimeMs", cacheTimeMs)
 

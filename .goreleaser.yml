@@ -44,15 +44,15 @@ builds:
     ldflags: *build_ldflags
 
 archives:
-  - id: beszel
+  - id: hub-archive
     ids: [beszel]
     formats: [tar.gz]
     name_template: "{{ .Binary }}_{{ .Os }}_{{ .Arch }}"
-  - id: beszel-agent
+  - id: agent-archive
     ids: [beszel-agent]
     formats: [tar.gz]
     name_template: "{{ .Binary }}_{{ .Os }}_{{ .Arch }}"
-  - id: beszel-maintenance-helper
+  - id: helper-archive
     ids: [beszel-maintenance-helper]
     formats: [tar.gz]
     name_template: "{{ .Binary }}_{{ .Os }}_{{ .Arch }}"

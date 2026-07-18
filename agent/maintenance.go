@@ -14,6 +14,7 @@ import (
 	"github.com/henrygd/beszel"
 	"github.com/henrygd/beszel/agent/utils"
 	entity "github.com/henrygd/beszel/internal/entities/maintenance"
+	powerentity "github.com/henrygd/beszel/internal/entities/power"
 )
 
 const maintenanceSocket = "/run/beszel-maintenance.sock"
@@ -122,6 +123,24 @@ func (m *maintenanceManager) refreshCapabilities() {
 	m.caps = response.Result.Capabilities
 	m.mu.Unlock()
 	go m.retryPersistedPolicy()
+}
+
+func (m *maintenanceManager) probeWOL(ctx context.Context, interfaces []string) ([]powerentity.InterfaceDiagnostic, error) {
+	if !m.enabled {
+		return nil, errors.New("privileged helper unavailable")
+	}
+	requestID := "wol-probe-" + time.Now().UTC().Format("20060102T150405.000000000")
+	response, err := m.call(ctx, entity.Request{Version: entity.ProtocolVersion, RequestID: requestID, Operation: entity.ProbeWOL, Interfaces: interfaces})
+	if err != nil {
+		return nil, err
+	}
+	if response.Status != entity.StateCompleted || response.Result == nil {
+		if response.Error != "" {
+			return nil, errors.New(response.Error)
+		}
+		return nil, errors.New("privileged WOL probe failed")
+	}
+	return response.Result.PowerInterfaces, nil
 }
 
 func (m *maintenanceManager) retryPersistedPolicy() {

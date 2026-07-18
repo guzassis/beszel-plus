@@ -13,6 +13,7 @@ import (
 	"time"
 
 	powerentity "github.com/henrygd/beszel/internal/entities/power"
+	powerexec "github.com/henrygd/beszel/internal/power"
 )
 
 func collectPowerDiagnostics(enabled bool) *powerentity.Diagnostics {
@@ -64,13 +65,16 @@ func collectPowerDiagnostics(enabled bool) *powerentity.Diagnostics {
 			break
 		}
 		if ethtoolErr != nil {
-			err = ethtoolErr
+			// Keep this classification stable; the raw LookPath error varies by
+			// libc and must not turn a missing tool into an opaque probe failure.
+			item.WOLProbeError = "ethtool is unavailable"
 		} else {
 			item.WOLProbePath = ethtoolPath
-			item.WOLSupported, item.WOLEnabled, err = ethtoolWOL(ethtoolPath, iface.Name)
-		}
-		if err != nil {
-			item.WOLProbeError = sanitizeUpdateText(err.Error(), 256)
+			if supported, enabled, probeErr := ethtoolWOL(ethtoolPath, iface.Name); probeErr != nil {
+				item.WOLProbeError = sanitizeUpdateText(probeErr.Error(), 256)
+			} else {
+				item.WOLSupported, item.WOLEnabled = supported, enabled
+			}
 		}
 		d.Interfaces = append(d.Interfaces, item)
 	}
@@ -79,6 +83,61 @@ func collectPowerDiagnostics(enabled bool) *powerentity.Diagnostics {
 		d.Reason = "no physical ethernet interface"
 		return d
 	}
+	return setPowerReadiness(d, explicitInterface)
+}
+
+// collectPowerDiagnostics enriches the unprivileged topology probe with a
+// narrowly scoped root ethtool probe when the kernel hides WOL fields from the
+// Agent user. The Agent itself remains unprivileged.
+func (a *Agent) collectPowerDiagnostics(enabled bool) *powerentity.Diagnostics {
+	d := collectPowerDiagnostics(enabled)
+	if !enabled || a.maintenanceManager == nil || !needsPrivilegedWOL(d) {
+		return d
+	}
+	names := make([]string, 0, len(d.Interfaces))
+	for _, item := range d.Interfaces {
+		names = append(names, item.Interface)
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
+	defer cancel()
+	privileged, err := a.maintenanceManager.probeWOL(ctx, names)
+	if err != nil {
+		return d
+	}
+	return mergePrivilegedWOL(d, privileged)
+}
+
+func mergePrivilegedWOL(d *powerentity.Diagnostics, privileged []powerentity.InterfaceDiagnostic) *powerentity.Diagnostics {
+	byName := make(map[string]powerentity.InterfaceDiagnostic, len(privileged))
+	for _, item := range privileged {
+		byName[item.Interface] = item
+	}
+	for i := range d.Interfaces {
+		item, ok := byName[d.Interfaces[i].Interface]
+		if !ok {
+			continue
+		}
+		d.Interfaces[i].WOLSupported = item.WOLSupported
+		d.Interfaces[i].WOLEnabled = item.WOLEnabled
+		d.Interfaces[i].WOLProbeError = item.WOLProbeError
+		d.Interfaces[i].WOLProbePath = item.WOLProbePath
+	}
+	return setPowerReadiness(d, strings.TrimSpace(os.Getenv("POWER_INTERFACE")))
+}
+
+func needsPrivilegedWOL(d *powerentity.Diagnostics) bool {
+	if d == nil || !d.Enabled {
+		return false
+	}
+	for _, item := range d.Interfaces {
+		if item.WOLProbeError != "" {
+			return true
+		}
+	}
+	return false
+}
+
+func setPowerReadiness(d *powerentity.Diagnostics, explicitInterface string) *powerentity.Diagnostics {
 	selected := selectPowerInterface(d.Interfaces, explicitInterface)
 	d.SelectedInterface = selected.Interface
 	item := selected
@@ -91,7 +150,7 @@ func collectPowerDiagnostics(enabled bool) *powerentity.Diagnostics {
 	} else if item.IP == "" {
 		d.State = powerentity.NetworkUnassigned
 		d.Reason = "interface has no IPv4 address"
-	} else if ethtoolErr != nil {
+	} else if strings.Contains(item.WOLProbeError, "ethtool is unavailable") {
 		d.State = powerentity.EthtoolMissing
 		d.Reason = "ethtool is unavailable to the Agent service"
 	} else if item.WOLProbeError != "" {
@@ -119,7 +178,7 @@ func ethtoolWOL(path, name string) (supported, enabled bool, probeErr error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
 	out, commandErr := exec.CommandContext(ctx, path, name).CombinedOutput()
-	supported, enabled, parseErr := parseEthtoolWOL(out)
+	supported, enabled, parseErr := powerexec.ParseEthtoolWOL(out)
 	if parseErr != nil {
 		if commandErr != nil {
 			detail := sanitizeUpdateText(string(out), 256)
@@ -137,33 +196,7 @@ func ethtoolWOL(path, name string) (supported, enabled bool, probeErr error) {
 }
 
 func parseEthtoolWOL(out []byte) (supported, enabled bool, probeErr error) {
-	var supportsFound, enabledFound bool
-	for line := range strings.Lines(string(out)) {
-		line = strings.ToLower(strings.TrimSpace(line))
-		if value, ok := strings.CutPrefix(line, "supports wake-on:"); ok {
-			supportsFound = true
-			supported = wakeOnToken(value)
-		}
-		if value, ok := strings.CutPrefix(line, "wake-on:"); ok {
-			enabledFound = true
-			enabled = wakeOnToken(value)
-		}
-	}
-	if !supportsFound || !enabledFound {
-		return false, false, fmt.Errorf("ethtool output did not contain complete Wake-on fields")
-	}
-	return supported, enabled, nil
-}
-
-func wakeOnToken(value string) bool {
-	for _, token := range strings.FieldsFunc(value, func(r rune) bool {
-		return r == ' ' || r == '\t' || r == ','
-	}) {
-		if token == "g" || (strings.Contains(token, "g") && strings.Trim(token, "pumbg") == "") {
-			return true
-		}
-	}
-	return false
+	return powerexec.ParseEthtoolWOL(out)
 }
 
 func selectPowerInterface(items []powerentity.InterfaceDiagnostic, explicit string) powerentity.InterfaceDiagnostic {
