@@ -25,7 +25,8 @@ const maxAPTInventoryOutputBytes = maxStructuredCommandOutputBytes
 const aptInventoryScript = `import apt, apt_pkg, json
 cache = apt.Cache()
 items = []
-for name, package in cache.items():
+for package in cache:
+    name = package.name
     if not package.is_installed:
         continue
     installed = package.installed.version if package.installed is not None else ""

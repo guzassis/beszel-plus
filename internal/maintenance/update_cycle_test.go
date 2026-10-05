@@ -40,20 +40,24 @@ class Internal:
     def __init__(self, selected_state): self.selected_state = selected_state
 class Package:
     def __init__(self, name, held=False, priority=500, versions=None, installed="1.0", candidate="2.0"):
+        self.name = name
         self.is_installed = True
         self.installed = Version(installed)
         self.candidate = Candidate(candidate, priority)
         self.versions = [Version(v) for v in (versions or [installed, candidate])]
         self._pkg = Internal(2 if held else 1)
-class _Cache(dict):
+class _Cache:
     def __init__(self):
-        super().__init__((f"candidate-{i:03d}", Package(f"candidate-{i:03d}")) for i in range(500))
-        self["held-package"] = Package("held-package", held=True)
-        self["pinned-package"] = Package("pinned-package", priority=-1)
-        self["downgrade-only"] = Package("downgrade-only", versions=["0.9"])
-        self["epoch-tilde-upgrade"] = Package("epoch-tilde-upgrade", installed="1:2.0~rc1-1", candidate="1:2.0-1")
-        self["revision-upgrade"] = Package("revision-upgrade", installed="1.0-1", candidate="1.0-2")
-        self["pinned-downgrade"] = Package("pinned-downgrade", installed="2.0", candidate="1.9", versions=["1.9", "2.1"])
+        self.packages = [Package(f"candidate-{i:03d}") for i in range(500)]
+        self.packages.extend([
+            Package("held-package", held=True),
+            Package("pinned-package", priority=-1),
+            Package("downgrade-only", versions=["0.9"]),
+            Package("epoch-tilde-upgrade", installed="1:2.0~rc1-1", candidate="1:2.0-1"),
+            Package("revision-upgrade", installed="1.0-1", candidate="1.0-2"),
+            Package("pinned-downgrade", installed="2.0", candidate="1.9", versions=["1.9", "2.1"]),
+        ])
+    def __iter__(self): return iter(self.packages)
 def Cache(): return _Cache()
 `
 	aptPkgModule := `
