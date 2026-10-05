@@ -700,9 +700,9 @@ func processIsAlive(process *cycleProcess) bool {
 	}
 	if process.StartTicks != 0 {
 		ticks, err := processStartTicks(process.PID)
-		if err != nil || ticks != process.StartTicks {
-			return false
-		}
+		// The root-owned store binds PID to its start time. cmdline can be
+		// temporarily empty during exec and is not needed for that identity.
+		return err == nil && ticks == process.StartTicks
 	}
 	command, err := os.ReadFile(fmt.Sprintf("/proc/%d/cmdline", process.PID))
 	if err != nil {

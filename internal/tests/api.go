@@ -163,6 +163,17 @@ func (scenario *ApiScenario) normalizedName() string {
 	return name
 }
 
+// Router creation registers its own OnServe hooks in PocketBase 0.37+.
+// Keep those hooks local so scenarios can safely reuse the same test app.
+type scenarioRouterApp struct {
+	core.App
+	serveHook hook.Hook[*core.ServeEvent]
+}
+
+func (app *scenarioRouterApp) OnServe() *hook.Hook[*core.ServeEvent] {
+	return &app.serveHook
+}
+
 func (scenario *ApiScenario) test(t testing.TB) {
 	var testApp *pbtests.TestApp
 	if scenario.TestAppFactory != nil {
@@ -179,7 +190,8 @@ func (scenario *ApiScenario) test(t testing.TB) {
 	}
 	// defer testApp.Cleanup()
 
-	baseRouter, err := apis.NewRouter(testApp)
+	routerApp := &scenarioRouterApp{App: testApp}
+	baseRouter, err := apis.NewRouter(routerApp)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -189,7 +201,7 @@ func (scenario *ApiScenario) test(t testing.TB) {
 	serveEvent.App = testApp
 	serveEvent.Router = baseRouter
 
-	serveErr := testApp.OnServe().Trigger(serveEvent, func(e *core.ServeEvent) error {
+	runScenario := func(e *core.ServeEvent) error {
 		if scenario.BeforeTestFunc != nil {
 			scenario.BeforeTestFunc(t, testApp, e)
 		}
@@ -302,6 +314,9 @@ func (scenario *ApiScenario) test(t testing.TB) {
 		}
 
 		return nil
+	}
+	serveErr := testApp.OnServe().Trigger(serveEvent, func(e *core.ServeEvent) error {
+		return routerApp.serveHook.Trigger(e, runScenario)
 	})
 	if serveErr != nil {
 		t.Fatalf("Failed to trigger app serve hook: %v", serveErr)

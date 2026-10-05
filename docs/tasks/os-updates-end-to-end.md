@@ -44,3 +44,13 @@ Implementação revisada e integrada pelo principal sob AGENTS.md/config.toml at
 Checks inicialmente interrompidos por quota de /tmp e caminho de socket longo foram repetidos em condições válidas. Nenhum APT real, host de produção, reboot ou publicação de release foi executado. O rollout requer atualizar Agent e helper pareados nas máquinas e manter OS_UPDATE_MANAGEMENT habilitado.
 
 Entrega GitHub: commit funcional `7479c093`, branch `codex/os-updates-end-to-end` enviada e [PR #1](https://github.com/guzassis/beszel-plus/pull/1) aberto. O PR dispara validação/snapshot; acompanhar o resultado em [checks](https://github.com/guzassis/beszel-plus/pull/1/checks). Release estável 0.3.0 depende de merge/tag posteriores.
+
+## Ajuste após CI
+
+O primeiro pipeline de testes/empacotamento passou no GitHub. VulnCheck apontou 12 vulnerabilidades alcançáveis nas dependências existentes. Atualizados Go para 1.26.8, PocketBase para 0.37.4, x/crypto para 0.56.0, x/image para 0.45.0, compress para 1.18.7 e dependências transitivas compatíveis. Pins de Go dos workflows acompanham go.mod.
+
+Referências: [correções Go 1.26](https://go.dev/doc/devel/release#go1.26.6), [correção PocketBase](https://pkg.go.dev/vuln/GO-2026-5548), [mudanças PocketBase 0.37](https://github.com/pocketbase/pocketbase/releases/tag/v0.37.0). O dashboard administrativo interno do PocketBase foi renovado nessa versão; testes do Hub e migrações passaram.
+
+Isolados hooks de router nos cenários que reutilizam o app de teste, com regressão para PocketBase 0.37. Retomada identifica subprocessos pelo PID e horário de início persistidos; evita falso encerramento durante exec e rejeita PID reutilizado.
+
+Após as correções, com Go 1.26.8: `make test`, race focado em ciclos/maintenance, snapshot dos seis assets e verificação de hashes/metadados passaram. Govulncheck 1.8.0: zero vulnerabilidades alcançáveis, zero em pacotes importados; um aviso em módulo requerido sem chamada no código. O patch será validado novamente pelos checks do PR.

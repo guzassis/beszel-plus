@@ -202,7 +202,7 @@ func TestCycleRestartReconcilesEveryStageWithoutReinstalling(t *testing.T) {
 func TestCycleLiveSubprocessBlocksReplayAndRevocationWaitsForExit(t *testing.T) {
 	policy := entity.DefaultPolicy()
 	h, runner := cycleScenario(t, policy)
-	child := exec.Command("/bin/bash", "-c", "exec -a apt-get sleep 30")
+	child := exec.Command("/bin/bash", "-c", "exec -a apt-get /bin/sleep 30")
 	if err := child.Start(); err != nil {
 		t.Fatal(err)
 	}
@@ -215,6 +215,11 @@ func TestCycleLiveSubprocessBlocksReplayAndRevocationWaitsForExit(t *testing.T) 
 	}
 	if !processIsAlive(process) {
 		t.Fatal("test subprocess did not initialize")
+	}
+	reusedPID := *process
+	reusedPID.StartTicks++
+	if processIsAlive(&reusedPID) {
+		t.Fatal("PID with a different start time was accepted")
 	}
 	request := cycleRequest(policy)
 	if err := h.writeCycleStore(cycleStore{Watermark: 1, Process: process, Current: &entity.CycleStatus{CycleID: request.CycleID, Source: request.Source, PolicyRevision: request.PolicyRevision, State: entity.CycleRunning, Stage: entity.CycleStageInstall, Attempt: 1}}); err != nil {
