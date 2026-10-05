@@ -5,7 +5,7 @@ import (
 	entity "github.com/henrygd/beszel/internal/entities/maintenance"
 )
 
-const MinAgentVersion = "0.2.0"
+const MinAgentVersion = "0.3.0"
 
 // BuildCommit is populated by GoReleaser and remains descriptive in local builds.
 var BuildCommit = buildinfo.GitCommit

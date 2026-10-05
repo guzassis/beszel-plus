@@ -16,6 +16,7 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -27,21 +28,132 @@ import (
 
 const maxIPCRequestBytes = 64 * 1024
 const maxCommandOutputBytes = 64 * 1024
+const maxStructuredCommandOutputBytes = 16 * 1024 * 1024
+const maxAPTCommandOutputBytes = 2 * 1024 * 1024
 
 type Runner interface {
 	Run(context.Context, string, ...string) ([]byte, error)
 }
+
+type limitedRunner interface {
+	RunLimited(context.Context, int, string, ...string) ([]byte, error)
+}
+
+type limitedSupervisedRunner interface {
+	RunSupervisedLimited(context.Context, int, string, func(int), func(), ...string) ([]byte, error, bool)
+}
+
 type ExecRunner struct{}
 
 func (ExecRunner) Run(ctx context.Context, name string, args ...string) ([]byte, error) {
+	return (ExecRunner{}).RunLimited(ctx, maxCommandOutputBytes, name, args...)
+}
+
+func (ExecRunner) RunLimited(ctx context.Context, limit int, name string, args ...string) ([]byte, error) {
 	cmd := exec.CommandContext(ctx, name, args...)
 	// Privileged commands must not inherit a caller's deleted or untrusted CWD.
 	cmd.Dir = "/"
-	output, err := cmd.CombinedOutput()
-	if len(output) > maxCommandOutputBytes {
-		output = output[len(output)-maxCommandOutputBytes:]
+	cmd.Env = commandEnvironment()
+	if limit < 1 {
+		limit = maxCommandOutputBytes
 	}
-	return output, err
+	output := &limitedOutputBuffer{limit: limit}
+	cmd.Stdout, cmd.Stderr = output, output
+	err := cmd.Run()
+	if outputErr := output.outputError(name); outputErr != nil {
+		return output.Bytes(), outputErr
+	}
+	return output.Bytes(), err
+}
+
+func (ExecRunner) RunSupervised(ctx context.Context, name string, onStart func(int), onTimeout func(), args ...string) ([]byte, error, bool) {
+	return (ExecRunner{}).RunSupervisedLimited(ctx, maxCommandOutputBytes, name, onStart, onTimeout, args...)
+}
+
+func (ExecRunner) RunSupervisedLimited(ctx context.Context, limit int, name string, onStart func(int), onTimeout func(), args ...string) ([]byte, error, bool) {
+	if err := ctx.Err(); err != nil {
+		return nil, err, false
+	}
+	cmd := exec.Command(name, args...)
+	cmd.Dir = "/"
+	cmd.Env = commandEnvironment()
+	if limit < 1 {
+		limit = maxCommandOutputBytes
+	}
+	output := &limitedOutputBuffer{limit: limit}
+	cmd.Stdout, cmd.Stderr = output, output
+	if err := cmd.Start(); err != nil {
+		return nil, err, false
+	}
+	if onStart != nil {
+		onStart(cmd.Process.Pid)
+	}
+	done := make(chan error, 1)
+	go func() { done <- cmd.Wait() }()
+	select {
+	case err := <-done:
+		if outputErr := output.outputError(name); outputErr != nil {
+			err = outputErr
+		}
+		return output.Bytes(), err, false
+	case <-ctx.Done():
+		if onTimeout != nil {
+			onTimeout()
+		}
+		// Keep the helper's APT lock and systemd service alive until the child
+		// exits. The observed deadline is recorded, but the child is never killed.
+		err := <-done
+		if outputErr := output.outputError(name); outputErr != nil {
+			err = outputErr
+		}
+		return output.Bytes(), err, true
+	}
+}
+
+func commandEnvironment() []string {
+	env := os.Environ()
+	filtered := env[:0]
+	for _, value := range env {
+		if !strings.HasPrefix(value, "LC_ALL=") && !strings.HasPrefix(value, "LANG=") {
+			filtered = append(filtered, value)
+		}
+	}
+	return append(filtered, "LC_ALL=C", "LANG=C")
+}
+
+type limitedOutputBuffer struct {
+	mu       sync.Mutex
+	data     []byte
+	limit    int
+	exceeded bool
+}
+
+func (b *limitedOutputBuffer) Write(value []byte) (int, error) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	available := b.limit - len(b.data)
+	if available > 0 {
+		b.data = append(b.data, value[:min(available, len(value))]...)
+	}
+	if len(value) > available {
+		b.exceeded = true
+	}
+	return len(value), nil
+}
+
+func (b *limitedOutputBuffer) Bytes() []byte {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	return append([]byte(nil), b.data...)
+}
+
+func (b *limitedOutputBuffer) outputError(name string) error {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if !b.exceeded {
+		return nil
+	}
+	return fmt.Errorf("%s output exceeded %d byte limit", name, b.limit)
 }
 
 type Helper struct {
@@ -142,11 +254,13 @@ func (h *Helper) Execute(ctx context.Context, req entity.Request) entity.Respons
 	if err := h.migrateLegacyBackups(); err != nil {
 		return failureFor(req, &operationError{code: "filesystem_write_failed", stage: "legacy_backup_migration", message: err.Error()})
 	}
-	if cached, ok := h.cachedResponse(req.IdempotencyKey); ok {
-		if cached.Operation != req.Operation {
-			return failed(req, "idempotency key reused for another operation")
+	if req.Operation != entity.RunUnattendedUpgrades {
+		if cached, ok := h.cachedResponse(req.IdempotencyKey); ok {
+			if cached.Operation != req.Operation {
+				return failed(req, "idempotency key reused for another operation")
+			}
+			return cached
 		}
-		return cached
 	}
 	if req.Operation == entity.GetCapabilities {
 		return h.complete(req, &entity.Result{Capabilities: h.capabilities()}, false)
@@ -159,13 +273,23 @@ func (h *Helper) Execute(ctx context.Context, req entity.Request) entity.Respons
 		return h.complete(req, &entity.Result{PoweroffStatus: &status}, false)
 	}
 	if req.Operation == entity.GetOperationStatus {
-		if pending, err := h.readPendingPolicy(); err == nil {
-			return pending
+		pendingPath := filepath.Join(h.stateDir(), "pending-policy.json")
+		if _, statErr := os.Stat(pendingPath); statErr == nil {
+			if pending, err := h.readPendingPolicy(); err == nil {
+				return pending
+			} else {
+				return failureFor(req, &operationError{code: "pending_policy_superseded", stage: "pending_policy_validation", message: err.Error()})
+			}
+		} else if !os.IsNotExist(statErr) {
+			return failureFor(req, &operationError{code: "pending_policy_unavailable", stage: "pending_policy_read", message: statErr.Error()})
 		}
 		if status, err := h.readStatus(); err == nil {
 			return status
 		}
 		return failed(req, "operation status unavailable")
+	}
+	if req.Operation == entity.GetUpdateCycleStatus {
+		return h.updateCycleStatus(req)
 	}
 	if caps := h.capabilities(); !caps.UpdateManagement {
 		return failed(req, "unsupported platform")
@@ -175,6 +299,11 @@ func (h *Helper) Execute(ctx context.Context, req entity.Request) entity.Respons
 		return failed(req, "another maintenance operation is running")
 	}
 	defer func() { _ = syscall.Flock(int(lock.Fd()), syscall.LOCK_UN); _ = lock.Close() }()
+	if req.Operation == entity.RunUnattendedUpgrades {
+		response := h.executeUpdateCycle(ctx, req)
+		_ = h.saveStatus(response)
+		return response
+	}
 	start := h.Now()
 	running := entity.Response{Version: entity.ProtocolVersion, RequestID: req.RequestID, Operation: req.Operation, Status: entity.StateRunning, Progress: 5, IdempotencyKey: req.IdempotencyKey, StartedAt: &start}
 	_ = h.saveStatus(running)
@@ -184,7 +313,7 @@ func (h *Helper) Execute(ctx context.Context, req entity.Request) entity.Respons
 		response = failureFor(req, runErr)
 		response.StartedAt = &start
 		if req.Operation == entity.ApplyUpdatePolicy && response.Retryable {
-			response.Result = &entity.Result{Policy: req.Policy}
+			response.Result = &entity.Result{Policy: req.Policy, PolicyRevision: policyRevision(*req.Policy), ExpectedPolicyRevision: req.ExpectedPolicyRevision}
 		}
 	} else {
 		response = h.complete(req, result, changed)
@@ -208,12 +337,14 @@ func (h *Helper) Execute(ctx context.Context, req entity.Request) entity.Respons
 }
 
 type pendingPolicy struct {
-	Policy        entity.Policy `json:"policy"`
-	CreatedAt     time.Time     `json:"created_at"`
-	LastAttemptAt time.Time     `json:"last_attempt_at"`
-	AttemptCount  uint32        `json:"attempt_count"`
-	LastErrorCode string        `json:"last_error_code"`
-	NextAttemptAt time.Time     `json:"next_attempt_at"`
+	Policy             entity.Policy `json:"policy"`
+	PolicyRevision     string        `json:"policy_revision"`
+	BasePolicyRevision string        `json:"base_policy_revision"`
+	CreatedAt          time.Time     `json:"created_at"`
+	LastAttemptAt      time.Time     `json:"last_attempt_at"`
+	AttemptCount       uint32        `json:"attempt_count"`
+	LastErrorCode      string        `json:"last_error_code"`
+	NextAttemptAt      time.Time     `json:"next_attempt_at"`
 }
 
 var pendingBackoff = []time.Duration{time.Minute, 5 * time.Minute, 15 * time.Minute, 30 * time.Minute, time.Hour}
@@ -223,7 +354,11 @@ func (h *Helper) savePendingPolicy(response entity.Response) error {
 		return errors.New("pending policy is missing")
 	}
 	now := h.Now()
-	pending := pendingPolicy{Policy: *response.Result.Policy, CreatedAt: now, LastAttemptAt: now, AttemptCount: 1, LastErrorCode: response.ErrorCode}
+	current, err := h.readPolicy()
+	if err != nil {
+		return err
+	}
+	pending := pendingPolicy{Policy: *response.Result.Policy, PolicyRevision: policyRevision(*response.Result.Policy), BasePolicyRevision: policyRevision(current), CreatedAt: now, LastAttemptAt: now, AttemptCount: 1, LastErrorCode: response.ErrorCode}
 	if previous, err := h.readPendingPolicyData(); err == nil {
 		pending.CreatedAt = previous.CreatedAt
 		pending.AttemptCount = previous.AttemptCount + 1
@@ -242,7 +377,25 @@ func (h *Helper) readPendingPolicy() (entity.Response, error) {
 	if err != nil {
 		return entity.Response{}, err
 	}
-	return entity.Response{Version: entity.ProtocolVersion, RequestID: "pending-policy", Operation: entity.ApplyUpdatePolicy, Status: entity.StateFailed, Error: "policy application is pending", ErrorCode: pending.LastErrorCode, Retryable: true, Result: &entity.Result{Policy: &pending.Policy}, FinishedAt: &pending.LastAttemptAt, NextAttemptAt: &pending.NextAttemptAt}, nil
+	current, err := h.readPolicy()
+	if err != nil {
+		return entity.Response{}, err
+	}
+	baseRevision := pending.BasePolicyRevision
+	targetRevision := pending.PolicyRevision
+	if targetRevision == "" {
+		targetRevision = policyRevision(pending.Policy)
+	}
+	if baseRevision == "" {
+		if policyRevision(current) != targetRevision {
+			return entity.Response{}, errors.New("legacy pending policy cannot be resumed after the current policy changed")
+		}
+		baseRevision = policyRevision(current)
+	}
+	if policyRevision(current) != baseRevision {
+		return entity.Response{}, errors.New("pending policy was superseded by a newer policy revision")
+	}
+	return entity.Response{Version: entity.ProtocolVersion, RequestID: "pending-policy", Operation: entity.ApplyUpdatePolicy, Status: entity.StateFailed, Error: "policy application is pending", ErrorCode: pending.LastErrorCode, Retryable: true, Result: &entity.Result{Policy: &pending.Policy, PolicyRevision: targetRevision, ExpectedPolicyRevision: baseRevision}, FinishedAt: &pending.LastAttemptAt, NextAttemptAt: &pending.NextAttemptAt}, nil
 }
 
 func (h *Helper) readPendingPolicyData() (pendingPolicy, error) {
@@ -259,7 +412,7 @@ func (h *Helper) run(ctx context.Context, req entity.Request) (*entity.Result, b
 	switch req.Operation {
 	case entity.GetUpdatePolicy:
 		policy, err := h.readPolicy()
-		return &entity.Result{Policy: &policy}, false, err
+		return &entity.Result{Policy: &policy, PolicyRevision: policyRevision(policy)}, false, err
 	case entity.DetectRepositories:
 		repos, err := h.detectRepositories()
 		return &entity.Result{Repositories: repos}, false, err
@@ -269,18 +422,27 @@ func (h *Helper) run(ctx context.Context, req entity.Request) (*entity.Result, b
 		}
 		return &entity.Result{Policy: req.Policy, Output: "policy valid"}, false, nil
 	case entity.ApplyUpdatePolicy:
+		if req.ExpectedPolicyRevision != "" {
+			current, err := h.readPolicy()
+			if err != nil {
+				return nil, false, err
+			}
+			if policyRevision(current) != req.ExpectedPolicyRevision {
+				return nil, false, &operationError{code: "policy_revision_conflict", stage: "policy_validation", message: "pending policy was superseded by a newer policy revision"}
+			}
+		}
 		return h.applyPolicy(ctx, req)
+	case entity.AdoptUpdatePolicy:
+		return h.adoptLegacyPolicy(ctx, req)
 	case entity.InstallUpdateDependencies:
 		return h.installDependencies(ctx)
 	case entity.RunUpdateDryRun:
 		out, err := h.unattendedDryRun(ctx)
 		return &entity.Result{Output: sanitize(string(out), maxCommandOutputBytes)}, false, err
 	case entity.RunUnattendedUpgrades:
-		if err := h.waitForAPT(ctx); err != nil {
-			return nil, false, err
-		}
-		out, err := h.command(ctx, 2*time.Hour, "unattended-upgrade", "--verbose")
-		return &entity.Result{Output: sanitize(string(out), maxCommandOutputBytes)}, false, err
+		return nil, false, errors.New("cycle execution must be dispatched under the maintenance lock")
+	case entity.GetUpdateCycleStatus:
+		return nil, false, errors.New("cycle status queries are read through Execute")
 	case entity.SchedulePoweroff:
 		return h.schedulePoweroff(ctx, req.DelaySeconds)
 	case entity.CancelPoweroff:
@@ -292,7 +454,7 @@ func (h *Helper) run(ctx context.Context, req entity.Request) (*entity.Result, b
 func (h *Helper) capabilities() *entity.Capabilities {
 	platform := platformID(h.path("/etc/os-release"))
 	supported := platform == "debian" || platform == "ubuntu" || platform == "raspbian"
-	return &entity.Capabilities{UpdateMonitoring: true, UpdateManagement: supported, PrivilegedHelper: true, PolicyRead: supported, PolicyWrite: supported, DryRun: supported, RunUpgrade: supported, AutomaticReboot: supported, SupportedPlatform: platform, HelperVersion: HelperVersion(), ProtocolVersion: entity.ProtocolVersion, MinAgentVersion: MinAgentVersion, MaxProtocolVersion: entity.ProtocolVersion, BuildCommit: BuildCommit, Power: h.powerCapabilities()}
+	return &entity.Capabilities{UpdateMonitoring: true, UpdateManagement: supported, PrivilegedHelper: true, PolicyRead: supported, PolicyWrite: supported, DryRun: supported, RunUpgrade: supported, AutomaticReboot: supported, SupportedPlatform: platform, HelperVersion: HelperVersion(), ProtocolVersion: entity.ProtocolVersion, MinAgentVersion: MinAgentVersion, MaxProtocolVersion: entity.ProtocolVersion, BuildCommit: BuildCommit, Power: h.powerCapabilities(), UpdateCycle: supported}
 }
 
 func (h *Helper) powerCapabilities() *powerentity.Capabilities {
@@ -423,6 +585,11 @@ func (h *Helper) validatePolicy(policy entity.Policy) error {
 		if !repo.Official && !policy.ConfirmThirdParty {
 			return errors.New("third-party repository requires explicit confirmation")
 		}
+		for _, other := range repos {
+			if other.ID != repo.ID && other.Origin == repo.Origin && other.Label == repo.Label && other.Codename == repo.Codename && other.Archive == repo.Archive && other.Site == repo.Site {
+				return errors.New("selected repository cannot be isolated from another repository with identical APT metadata")
+			}
+		}
 	}
 	return nil
 }
@@ -536,7 +703,38 @@ func (h *Helper) applyPolicy(ctx context.Context, req entity.Request) (*entity.R
 		rollback()
 		return nil, false, err
 	}
-	return &entity.Result{Policy: &policy, Changed: true, Output: "policy applied"}, true, nil
+	return &entity.Result{Policy: &policy, PolicyRevision: policyRevision(policy), Changed: true, Output: "policy applied"}, true, nil
+}
+
+func (h *Helper) adoptLegacyPolicy(ctx context.Context, req entity.Request) (*entity.Result, bool, error) {
+	policy, metadata, exists, err := h.readPolicyDocument()
+	if err != nil {
+		return nil, false, err
+	}
+	if !exists {
+		return &entity.Result{Policy: &policy, PolicyRevision: policyRevision(policy), Output: "no legacy policy to adopt"}, false, nil
+	}
+	if metadata.AdoptionVersion >= 1 {
+		return &entity.Result{Policy: &policy, PolicyRevision: policyRevision(policy), Output: "policy already adopted"}, false, nil
+	}
+	if policy.Enabled && policy.Mode == entity.ModeSecurity {
+		policy.Mode = entity.ModeOfficialAll
+		apply := req
+		apply.Operation = entity.ApplyUpdatePolicy
+		apply.Policy = &policy
+		result, changed, err := h.applyPolicy(ctx, apply)
+		if err != nil {
+			return result, changed, err
+		}
+		if result != nil {
+			result.Output = "legacy security policy adopted as official_all"
+		}
+		return result, true, nil
+	}
+	if err := h.writePolicy(policy); err != nil {
+		return nil, false, err
+	}
+	return &entity.Result{Policy: &policy, PolicyRevision: policyRevision(policy), Changed: true, Output: "legacy policy adopted without changing its mode"}, true, nil
 }
 
 func (h *Helper) unitEnabled(ctx context.Context, name string) *bool {
@@ -589,16 +787,76 @@ func (h *Helper) installDependencies(ctx context.Context) (*entity.Result, bool,
 }
 
 func (h *Helper) command(ctx context.Context, timeout time.Duration, name string, args ...string) ([]byte, error) {
+	return h.commandWithOutputLimit(ctx, timeout, commandOutputLimit(name, args...), name, args...)
+}
+
+func (h *Helper) commandWithOutputLimit(ctx context.Context, timeout time.Duration, outputLimit int, name string, args ...string) ([]byte, error) {
 	stepCtx, cancel := context.WithTimeout(ctx, timeout)
 	defer cancel()
-	output, err := h.Runner.Run(stepCtx, name, args...)
+	var output []byte
+	var err error
+	var timedOut bool
+	if runner, ok := h.Runner.(limitedRunner); ok && !isAPTSubprocess(name) {
+		output, err = runner.RunLimited(stepCtx, outputLimit, name, args...)
+		timedOut = stepCtx.Err() != nil
+	} else {
+		output, err, timedOut = h.runCommandWithOutputLimit(stepCtx, outputLimit, name, args...)
+	}
+	if timedOut {
+		return output, fmt.Errorf("%s timed out", name)
+	}
 	if stepCtx.Err() != nil {
 		return output, fmt.Errorf("%s timed out", name)
 	}
 	if err != nil {
-		return output, fmt.Errorf("%s failed: %s", name, sanitize(string(output), 1024))
+		return output, fmt.Errorf("%s failed (%s): %s", name, sanitize(err.Error(), 160), sanitize(string(output), 1024))
 	}
 	return output, nil
+}
+
+func (h *Helper) runCommand(ctx context.Context, name string, args ...string) ([]byte, error, bool) {
+	return h.runCommandWithOutputLimit(ctx, commandOutputLimit(name, args...), name, args...)
+}
+
+func commandOutputLimit(name string, args ...string) int {
+	if filepath.Base(name) == "apt-config" {
+		for _, arg := range args {
+			if arg == "dump" {
+				return maxStructuredCommandOutputBytes
+			}
+		}
+	}
+	if isAPTSubprocess(name) {
+		for _, arg := range args {
+			if arg == "--dry-run" {
+				return maxStructuredCommandOutputBytes
+			}
+		}
+		return maxAPTCommandOutputBytes
+	}
+	return maxCommandOutputBytes
+}
+
+func (h *Helper) runCommandWithOutputLimit(ctx context.Context, outputLimit int, name string, args ...string) ([]byte, error, bool) {
+	if isAPTSubprocess(name) {
+		if runner, ok := h.Runner.(limitedSupervisedRunner); ok {
+			return runner.RunSupervisedLimited(ctx, outputLimit, name, nil, func() { slog.Warn("APT command deadline observed; waiting for subprocess exit", "command", name) }, args...)
+		}
+		if runner, ok := h.Runner.(supervisedRunner); ok {
+			return runner.RunSupervised(ctx, name, nil, func() { slog.Warn("APT command deadline observed; waiting for subprocess exit", "command", name) }, args...)
+		}
+	}
+	if runner, ok := h.Runner.(limitedRunner); ok {
+		output, err := runner.RunLimited(ctx, outputLimit, name, args...)
+		return output, err, ctx.Err() != nil
+	}
+	output, err := h.Runner.Run(ctx, name, args...)
+	return output, err, ctx.Err() != nil
+}
+
+func isAPTSubprocess(name string) bool {
+	base := filepath.Base(name)
+	return base == "apt-get" || base == "unattended-upgrade" || base == "dpkg"
 }
 
 func (h *Helper) unattendedDryRun(ctx context.Context) ([]byte, error) {
@@ -624,13 +882,13 @@ func (h *Helper) unattendedDryRun(ctx context.Context) ([]byte, error) {
 			return nil, &operationError{code: "timeout", stage: "unattended_upgrade_dry_run", retryable: true, message: "unattended-upgrade dry-run timed out"}
 		}
 		stepCtx, cancel := context.WithTimeout(ctx, remaining)
-		output, err := h.Runner.Run(stepCtx, "unattended-upgrade", "--dry-run", "--debug")
+		output, err, timedOut := h.runCommand(stepCtx, "unattended-upgrade", "--dry-run", "--debug")
 		stepErr := stepCtx.Err()
 		cancel()
 		if err == nil {
 			return output, nil
 		}
-		if stepErr != nil {
+		if stepErr != nil || timedOut {
 			return output, &operationError{code: "timeout", stage: "unattended_upgrade_dry_run", retryable: true, message: "unattended-upgrade dry-run timed out"}
 		}
 		if !aptLockBusy(output) {
@@ -786,11 +1044,24 @@ func (h *Helper) renderUnattendedConfig(policy entity.Policy) ([]byte, error) {
 			"origin=Debian,codename=${distro_codename}-security,label=Debian-Security",
 			"origin=Debian,codename=${distro_codename},label=Debian-Security",
 			"origin=Ubuntu,codename=${distro_codename}-security",
+			"origin=Ubuntu,codename=${distro_codename},archive=${distro_codename}-security",
+			"origin=UbuntuESMApps,codename=${distro_codename},archive=${distro_codename}-apps-security",
+			"origin=UbuntuESMInfra,codename=${distro_codename},archive=${distro_codename}-infra-security",
 			"origin=Raspbian,codename=${distro_codename}-security,label=Raspbian-Security",
 			"origin=Raspbian,codename=${distro_codename},label=Raspbian-Security",
 		}
 	case entity.ModeOfficialAll:
-		patterns = []string{"origin=Debian,codename=${distro_codename}", "origin=Ubuntu,codename=${distro_codename}", "origin=Raspbian,codename=${distro_codename}", "origin=Raspberry Pi Foundation,codename=${distro_codename}"}
+		patterns = officialDefaultPatterns()
+		repos, err := h.detectRepositories()
+		if err != nil {
+			return nil, err
+		}
+		for _, repo := range repos {
+			if !repo.Official || !repo.Trusted || !isCurrentReleaseOrigin(inventoryOrigin{Origin: repo.Origin, Label: repo.Label, Codename: repo.Codename, Archive: repo.Archive, Site: repositorySiteHost(repo.Site), Trusted: repo.Trusted}, h.currentCodename()) {
+				continue
+			}
+			patterns = append(patterns, patternForRepository(repo, true))
+		}
 	case entity.ModeCustom:
 		repos, err := h.detectRepositories()
 		if err != nil {
@@ -805,11 +1076,12 @@ func (h *Helper) renderUnattendedConfig(policy entity.Policy) ([]byte, error) {
 			if !ok {
 				return nil, errors.New("repository not found")
 			}
-			patterns = append(patterns, fmt.Sprintf("origin=%s,codename=%s,label=%s", repo.Origin, repo.Codename, repo.Label))
+			patterns = append(patterns, patternForRepository(repo, true))
 		}
 	}
+	patterns = uniqueStrings(patterns)
 	var b strings.Builder
-	b.WriteString("// Managed by Beszel Plus. Do not edit.\nUnattended-Upgrade::Origins-Pattern {\n")
+	b.WriteString("// Managed by Beszel Plus. Do not edit.\n#clear Unattended-Upgrade::Allowed-Origins;\n#clear Unattended-Upgrade::Origins-Pattern;\nUnattended-Upgrade::Allowed-Origins { };\nUnattended-Upgrade::Origins-Pattern {\n")
 	for _, pattern := range patterns {
 		if !safePattern(pattern) {
 			return nil, errors.New("unsafe repository metadata")
@@ -818,6 +1090,43 @@ func (h *Helper) renderUnattendedConfig(policy entity.Policy) ([]byte, error) {
 	}
 	fmt.Fprintf(&b, "};\nUnattended-Upgrade::Automatic-Reboot \"%t\";\nUnattended-Upgrade::Automatic-Reboot-Time \"%s\";\nUnattended-Upgrade::Remove-Unused-Dependencies \"%t\";\n", policy.AutomaticReboot, policy.AutomaticRebootTime, policy.RemoveUnusedDependencies)
 	return []byte(b.String()), nil
+}
+
+func officialDefaultPatterns() []string {
+	patterns := []string{}
+	for _, origin := range []string{"Debian", "Ubuntu", "Raspbian", "Raspberry Pi Foundation", "UbuntuESM", "UbuntuESMApps", "UbuntuESMInfra"} {
+		for _, suffix := range []string{"", "-security", "-updates", "-backports", "-proposed", "-esm", "-esm-infra", "-esm-apps"} {
+			patterns = append(patterns, fmt.Sprintf("origin=%s,codename=${distro_codename}%s", origin, suffix))
+		}
+	}
+	return patterns
+}
+
+func patternForRepository(repo entity.Repository, includeSite bool) string {
+	parts := []string{"origin=" + repo.Origin, "codename=" + repo.Codename}
+	if repo.Label != "" {
+		parts = append(parts, "label="+repo.Label)
+	}
+	if repo.Archive != "" {
+		parts = append(parts, "archive="+repo.Archive)
+	}
+	if includeSite && repo.Site != "" {
+		parts = append(parts, "site="+repositorySiteHost(repo.Site))
+	}
+	return strings.Join(parts, ",")
+}
+
+func uniqueStrings(values []string) []string {
+	seen := make(map[string]bool, len(values))
+	result := make([]string, 0, len(values))
+	for _, value := range values {
+		if !seen[value] {
+			seen[value] = true
+			result = append(result, value)
+		}
+	}
+	sort.Strings(result)
+	return result
 }
 
 func safePattern(value string) bool {
@@ -844,7 +1153,8 @@ func (h *Helper) detectRepositories() ([]entity.Repository, error) {
 		// Files in /var/lib/apt/lists were accepted by APT; official/vendor
 		// classification remains a separate policy decision.
 		repo.Trusted = true
-		sum := sha256.Sum256([]byte(repo.Origin + "\x00" + repo.Label + "\x00" + repo.Codename + "\x00" + repo.Site))
+		legacySite := legacySiteFromListName(filepath.Base(path))
+		sum := sha256.Sum256([]byte(repo.Origin + "\x00" + repo.Label + "\x00" + repo.Codename + "\x00" + legacySite))
 		repo.ID = hex.EncodeToString(sum[:8])
 		repos = append(repos, repo)
 	}
@@ -856,15 +1166,37 @@ func parseInRelease(data []byte) entity.Repository {
 	repo := entity.Repository{}
 	scanner := bufio.NewScanner(strings.NewReader(string(data)))
 	scanner.Buffer(make([]byte, 4096), 64*1024)
+	firstLine := true
+	signedEnvelope := false
+	headerComplete := true
+	fieldsStarted := false
 	for scanner.Scan() {
-		line := scanner.Text()
-		if line == "" {
+		line := strings.TrimSpace(scanner.Text())
+		if firstLine {
+			signedEnvelope = line == "-----BEGIN PGP SIGNED MESSAGE-----"
+			headerComplete = !signedEnvelope
+			firstLine = false
+		}
+		if signedEnvelope && !headerComplete {
+			if line == "" {
+				headerComplete = true
+			}
+			continue
+		}
+		if strings.HasPrefix(line, "-----BEGIN PGP SIGNATURE-----") {
 			break
+		}
+		if line == "" {
+			if fieldsStarted {
+				break
+			}
+			continue
 		}
 		key, value, ok := strings.Cut(line, ":")
 		if !ok {
 			continue
 		}
+		fieldsStarted = true
 		value = strings.TrimSpace(value)
 		switch key {
 		case "Origin":
@@ -886,12 +1218,34 @@ func parseInRelease(data []byte) entity.Repository {
 
 func isOfficial(repo entity.Repository) bool {
 	switch strings.ToLower(repo.Origin) {
-	case "debian", "ubuntu", "canonical", "raspbian", "raspberry pi foundation":
+	case "debian", "ubuntu", "canonical", "raspbian", "raspberry pi foundation", "ubuntu esm", "ubuntu esm apps", "ubuntu esm infra", "ubuntu esm infra updates", "ubuntu esm apps updates", "ubuntuesm", "ubuntuesm apps", "ubuntuesm infra", "ubuntuesminfra", "ubuntuesmapps":
 		return true
 	}
 	return false
 }
 func siteFromListName(name string) string {
+	if before, _, ok := strings.Cut(name, "_dists_"); ok {
+		if strings.Contains(before, ".") {
+			if host, _, hasPath := strings.Cut(before, "_"); hasPath {
+				return host
+			}
+			return before
+		}
+		parts := strings.Split(before, "_")
+		for i, part := range parts {
+			switch strings.ToLower(part) {
+			case "com", "org", "net", "io", "dev", "info", "biz", "uk", "de", "fr", "ca", "au", "jp":
+				if i >= 2 {
+					return strings.Join(parts[:i+1], ".")
+				}
+			}
+		}
+		return strings.ReplaceAll(before, "_", ".")
+	}
+	return ""
+}
+
+func legacySiteFromListName(name string) string {
 	if before, _, ok := strings.Cut(name, "_dists_"); ok {
 		return strings.ReplaceAll(before, "_", ".")
 	}
@@ -899,28 +1253,69 @@ func siteFromListName(name string) string {
 }
 
 func (h *Helper) stateDir() string { return h.path("/var/lib/beszel-maintenance") }
+
+type policyMetadata struct {
+	AdoptionVersion uint8     `json:"adoption_version"`
+	Revision        string    `json:"revision"`
+	AdoptedAt       time.Time `json:"adopted_at"`
+}
+
 func (h *Helper) writePolicy(policy entity.Policy) error {
-	data, err := json.MarshalIndent(policy, "", "  ")
+	data, err := json.Marshal(policy)
+	if err != nil {
+		return err
+	}
+	var document map[string]json.RawMessage
+	if err := json.Unmarshal(data, &document); err != nil {
+		return err
+	}
+	metadata, err := json.Marshal(policyMetadata{AdoptionVersion: 1, Revision: policyRevision(policy), AdoptedAt: h.Now().UTC()})
+	if err != nil {
+		return err
+	}
+	document["_beszel"] = metadata
+	data, err = json.MarshalIndent(document, "", "  ")
 	if err != nil {
 		return err
 	}
 	return atomicWrite(filepath.Join(h.stateDir(), "policy.json"), append(data, '\n'), 0o600)
 }
-func (h *Helper) readPolicy() (entity.Policy, error) {
+
+func (h *Helper) readPolicyDocument() (entity.Policy, policyMetadata, bool, error) {
 	data, err := readLimited(filepath.Join(h.stateDir(), "policy.json"), 64*1024)
 	if os.IsNotExist(err) {
 		policy := entity.DefaultPolicy()
-		// Existing/manual installations are represented as monitor-only until an
-		// administrator explicitly validates and applies a Beszel policy.
 		policy.Enabled = false
 		policy.Mode = entity.ModeMonitorOnly
-		return policy, nil
+		return policy, policyMetadata{}, false, nil
 	}
 	if err != nil {
-		return entity.Policy{}, err
+		return entity.Policy{}, policyMetadata{}, false, err
+	}
+	var document map[string]json.RawMessage
+	if err := json.Unmarshal(data, &document); err != nil {
+		return entity.Policy{}, policyMetadata{}, true, err
+	}
+	var metadata policyMetadata
+	if raw := document["_beszel"]; raw != nil {
+		if err := json.Unmarshal(raw, &metadata); err != nil {
+			return entity.Policy{}, policyMetadata{}, true, err
+		}
+		delete(document, "_beszel")
+	}
+	policyData, err := json.Marshal(document)
+	if err != nil {
+		return entity.Policy{}, policyMetadata{}, true, err
 	}
 	var policy entity.Policy
-	err = json.Unmarshal(data, &policy)
+	if err := json.Unmarshal(policyData, &policy); err != nil {
+		return entity.Policy{}, policyMetadata{}, true, err
+	}
+	return policy, metadata, true, nil
+}
+
+func (h *Helper) readPolicy() (entity.Policy, error) {
+	policy, _, _, err := h.readPolicyDocument()
 	return policy, err
 }
 func (h *Helper) saveStatus(status entity.Response) error {

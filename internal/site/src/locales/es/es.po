@@ -61,6 +61,10 @@ msgstr "{count, plural, one {{countString} minuto} other {{countString} minutos}
 msgid "{eligible, plural, one {# update} other {# updates}}"
 msgstr "{eligible, plural, one {# update} other {# updates}}"
 
+#: src/components/routes/system/automatic-updates.tsx
+#~ msgid "{pending, plural, one {# update} other {# updates}}"
+#~ msgstr ""
+
 #: src/components/routes/system/info-bar.tsx
 msgid "{threads, plural, one {# thread} other {# threads}}"
 msgstr "{threads, plural, one {# hilo} other {# hilos}}"
@@ -169,10 +173,6 @@ msgid "After"
 msgstr "Después"
 
 #: src/components/routes/settings/heartbeat.tsx
-#~ msgid "After setting the environment variables, restart your Beszel hub for changes to take effect."
-#~ msgstr "Después de configurar las variables de entorno, reinicie su hub Beszel para que los cambios surtan efecto."
-
-#: src/components/routes/settings/heartbeat.tsx
 msgid "After setting the environment variables, restart your Beszel Plus Hub for changes to take effect."
 msgstr ""
 
@@ -220,6 +220,10 @@ msgstr "All official updates"
 msgid "All Systems"
 msgstr "Todos los sistemas"
 
+#: src/components/routes/system/automatic-updates.tsx
+msgid "An update cycle is already active. Following its status."
+msgstr "An update cycle is already active. Following its status."
+
 #: src/components/alerts-history-columns.tsx
 msgid "Apply update policy"
 msgstr "Apply update policy"
@@ -244,6 +248,11 @@ msgstr "¿Estás seguro de que deseas eliminar {name}?"
 msgid "Are you sure?"
 msgstr "¿Estás seguro?"
 
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Attempt"
+msgstr "Attempt"
+
+#: src/components/routes/system/automatic-updates.tsx
 #: src/components/routes/system/automatic-updates.tsx
 msgid "Automatic"
 msgstr "Automatic"
@@ -383,14 +392,6 @@ msgstr ""
 msgid "Beszel Plus uses <0>Shoutrrr</0> to integrate with popular notification services."
 msgstr ""
 
-#: src/components/login/auth-form.tsx
-#~ msgid "Beszel supports OpenID Connect and many OAuth2 authentication providers."
-#~ msgstr "Beszel admite OpenID Connect y muchos proveedores de autenticación OAuth2."
-
-#: src/components/routes/settings/notifications.tsx
-#~ msgid "Beszel uses <0>Shoutrrr</0> to integrate with popular notification services."
-#~ msgstr "Beszel utiliza <0>Shoutrrr</0> para integrarse con servicios populares de notificación."
-
 #: src/components/add-system.tsx
 msgid "Binary"
 msgstr "Binario"
@@ -400,17 +401,13 @@ msgstr "Binario"
 msgid "Bits (Kbps, Mbps, Gbps)"
 msgstr "Bits (kbps, Mbps, Gbps)"
 
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Blocked packages"
+msgstr "Blocked packages"
+
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Boot state"
 msgstr "Estado de arranque"
-
-#: src/components/routes/system/power-management.tsx
-#~ msgid "Broadcast address"
-#~ msgstr "Broadcast address"
-
-#: src/components/routes/system/power-management.tsx
-#~ msgid "Broadcast override"
-#~ msgstr "Broadcast override"
 
 #: src/components/routes/settings/general.tsx
 #: src/components/routes/settings/general.tsx
@@ -440,9 +437,9 @@ msgstr "Puede detenerse"
 msgid "Cancel"
 msgstr "Cancelar"
 
-#: src/components/routes/system/power-management.tsx
-#~ msgid "Cancel shutdown"
-#~ msgstr "Cancel shutdown"
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Canceled"
+msgstr "Canceled"
 
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Capabilities"
@@ -505,6 +502,10 @@ msgstr "Compruebe su servicio de monitorización"
 msgid "Check your notification service"
 msgstr "Verifica tu servicio de notificaciones"
 
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Checking update cycle status"
+msgstr "Checking update cycle status"
+
 #. placeholder {0}: system.name
 #: src/components/systems-table/power-actions.tsx
 msgid "Choose how many minutes until {0} shuts down."
@@ -533,6 +534,10 @@ msgid "Click to copy"
 msgstr "Haz clic para copiar"
 
 #: src/components/routes/system/automatic-updates.tsx
+msgid "Client wait timed out"
+msgstr "Client wait timed out"
+
+#: src/components/routes/system/automatic-updates.tsx
 msgid "Collected"
 msgstr "Collected"
 
@@ -550,9 +555,14 @@ msgid "Command line instructions"
 msgstr "Instrucciones de línea de comandos"
 
 #: src/components/alerts-history-columns.tsx
+#: src/components/routes/system/automatic-updates.tsx
 #: src/components/systems-table/power-actions.tsx
 msgid "Completed"
 msgstr "Completed"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Completed with justified pending updates"
+msgstr "Completed with justified pending updates"
 
 #: src/components/routes/system/automatic-updates.tsx
 msgid "Configuration"
@@ -604,18 +614,6 @@ msgstr "Continuar"
 msgid "Copied to clipboard"
 msgstr "Copiado al portapapeles"
 
-#: src/components/add-system.tsx
-#: src/components/routes/settings/tokens-fingerprints.tsx
-#~ msgctxt "Button to copy docker compose file content"
-#~ msgid "Copy docker compose"
-#~ msgstr "Copiar docker compose"
-
-#: src/components/add-system.tsx
-#: src/components/routes/settings/tokens-fingerprints.tsx
-#~ msgctxt "Button to copy docker run command"
-#~ msgid "Copy docker run"
-#~ msgstr "Copiar docker run"
-
 #: src/components/routes/settings/tokens-fingerprints.tsx
 msgctxt "Environment variables"
 msgid "Copy env"
@@ -646,10 +644,6 @@ msgstr "Copiar texto"
 #: src/components/add-system.tsx
 msgid "Copy the installation command for the agent below, or register agents automatically with a <0>universal token</0>."
 msgstr "Copia el comando de instalación del agente a continuación, o registra agentes automáticamente con un <0>token universal</0>."
-
-#: src/components/add-system.tsx
-#~ msgid "Copy the<0>docker-compose.yml</0> content for the agent below, or register agents automatically with a <1>universal token</1>."
-#~ msgstr "Copia el contenido del<0>docker-compose.yml</0> para el agente a continuación, o registra agentes automáticamente con un <1>token universal</1>."
 
 #: src/components/routes/settings/tokens-fingerprints.tsx
 msgid "Copy YAML"
@@ -714,6 +708,10 @@ msgstr "Descarga acumulada"
 msgid "Cumulative Upload"
 msgstr "Carga acumulada"
 
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Current phase"
+msgstr "Current phase"
+
 #. Context: Battery state
 #: src/components/routes/system/charts/sensor-charts.tsx
 msgid "Current state"
@@ -723,9 +721,21 @@ msgstr "Estado actual"
 msgid "Custom repositories"
 msgstr "Custom repositories"
 
-#: src/components/routes/system/power-management.tsx
-#~ msgid "Custom shutdown delay in minutes"
-#~ msgstr "Custom shutdown delay in minutes"
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Cycle candidates"
+msgstr "Cycle candidates"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Cycle error"
+msgstr "Cycle error"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Cycle ID"
+msgstr "Cycle ID"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Cycle source"
+msgstr "Cycle source"
 
 #. Power Cycles
 #: src/components/routes/system/smart-table.tsx
@@ -876,6 +886,10 @@ msgid "Eligibility status"
 msgstr "Eligibility status"
 
 #: src/components/routes/system/automatic-updates.tsx
+msgid "Eligible to install"
+msgstr "Eligible to install"
+
+#: src/components/routes/system/automatic-updates.tsx
 msgid "Eligible updates"
 msgstr "Eligible updates"
 
@@ -944,10 +958,6 @@ msgstr "Efímero"
 msgid "Error"
 msgstr ""
 
-#: src/components/routes/system/power-management.tsx
-#~ msgid "ethtool is not installed"
-#~ msgstr "ethtool is not installed"
-
 #: src/components/systems-table/power-actions.tsx
 msgid "ethtool is unavailable to the Agent service"
 msgstr "ethtool is unavailable to the Agent service"
@@ -966,6 +976,10 @@ msgstr "Ejemplo:"
 #: src/components/active-alerts.tsx
 msgid "Exceeds {0}{1} in last {2, plural, one {# minute} other {# minutes}}"
 msgstr "Excede {0}{1} en el último {2, plural, one {# minuto} other {# minutos}}"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Excluded packages"
+msgstr "Excluded packages"
 
 #: src/components/routes/system/automatic-updates.tsx
 msgid "Excluded repositories"
@@ -1004,6 +1018,7 @@ msgid "Fahrenheit (°F)"
 msgstr ""
 
 #: src/components/alerts-history-columns.tsx
+#: src/components/routes/system/automatic-updates.tsx
 #: src/components/routes/system/automatic-updates.tsx
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "Failed"
@@ -1069,12 +1084,6 @@ msgstr "Por <0>{min}</0> {min, plural, one {minuto} other {minutos}}"
 msgid "Forgot password?"
 msgstr "¿Olvidaste tu contraseña?"
 
-#: src/components/add-system.tsx
-#: src/components/routes/settings/tokens-fingerprints.tsx
-#~ msgctxt "Button to copy install command"
-#~ msgid "FreeBSD command"
-#~ msgstr "Comando FreeBSD"
-
 #. Context: Battery state
 #: src/components/routes/system/info-bar.tsx
 #: src/lib/i18n.ts
@@ -1128,11 +1137,9 @@ msgstr "Monitorización de Heartbeat"
 msgid "Heartbeat sent successfully"
 msgstr "Latido enviado con éxito"
 
-#: src/components/add-system.tsx
-#: src/components/routes/settings/tokens-fingerprints.tsx
-#~ msgctxt "Button to copy install command"
-#~ msgid "Homebrew command"
-#~ msgstr "Comando Homebrew"
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Held packages"
+msgstr "Held packages"
 
 #: src/components/add-system.tsx
 msgid "Host / IP"
@@ -1189,6 +1196,10 @@ msgid "Initial update policy"
 msgstr "Initial update policy"
 
 #: src/components/routes/system/automatic-updates.tsx
+msgid "Initially eligible to install"
+msgstr "Initially eligible to install"
+
+#: src/components/routes/system/automatic-updates.tsx
 msgid "Install required dependencies"
 msgstr "Install required dependencies"
 
@@ -1204,6 +1215,10 @@ msgstr "Installed"
 msgid "Installed, not configured"
 msgstr "Installed, not configured"
 
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Installing eligible updates"
+msgstr "Installing eligible updates"
+
 #: src/components/routes/settings/heartbeat.tsx
 msgid "Interval"
 msgstr "Intervalo"
@@ -1218,12 +1233,20 @@ msgid "Language"
 msgstr "Idioma"
 
 #: src/components/routes/system/automatic-updates.tsx
+msgid "Last attempt"
+msgstr "Last attempt"
+
+#: src/components/routes/system/automatic-updates.tsx
 msgid "Last check"
 msgstr "Last check"
 
 #: src/components/routes/system/automatic-updates.tsx
 msgid "Last result"
 msgstr "Last result"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Last successful cycle"
+msgstr "Last successful cycle"
 
 #: src/lib/alerts.ts
 msgid "Last update failed"
@@ -1336,6 +1359,7 @@ msgid "Manage display and notification preferences."
 msgstr "Administrar preferencias de visualización y notificaciones."
 
 #: src/components/routes/system/automatic-updates.tsx
+#: src/components/routes/system/automatic-updates.tsx
 msgid "Manual"
 msgstr "Manual"
 
@@ -1430,6 +1454,14 @@ msgstr "Unidad de red"
 #: src/components/routes/system/automatic-updates.tsx
 msgid "Never run"
 msgstr "Never run"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Next retry"
+msgstr "Next retry"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Next scheduled cycle"
+msgstr "Next scheduled cycle"
 
 #: src/components/routes/system/automatic-updates.tsx
 #: src/components/systemd-table/systemd-table.tsx
@@ -1535,7 +1567,6 @@ msgid "Operation in progress: {0}%"
 msgstr "Operation in progress: {0}%"
 
 #: src/components/routes/system/automatic-updates.tsx
-#: src/components/routes/system/automatic-updates.tsx
 #: src/components/systems-table/power-actions.tsx
 msgid "Operation queued"
 msgstr "Operation queued"
@@ -1555,6 +1586,10 @@ msgstr "Otro"
 #: src/components/alerts/alerts-sheet.tsx
 msgid "Overwrite existing alerts"
 msgstr "Sobrescribir alertas existentes"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Package details"
+msgstr "Package details"
 
 #: src/components/routes/system/automatic-updates.tsx
 msgid "Package list frequency (days)"
@@ -1620,6 +1655,10 @@ msgstr "Pausado ({pausedSystemsLength})"
 #: src/components/routes/settings/heartbeat.tsx
 msgid "Payload format"
 msgstr "Formato de carga útil (payload)"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Pending packages"
+msgstr "Pending packages"
 
 #: src/components/routes/system/cpu-sheet.tsx
 #: src/components/routes/system/cpu-sheet.tsx
@@ -1700,14 +1739,6 @@ msgstr "Power management"
 msgid "Power management is disabled"
 msgstr "Power management is disabled"
 
-#: src/components/routes/system/power-management.tsx
-#~ msgid "Power management is unavailable. The current controls are read-only."
-#~ msgstr "Power management is unavailable. The current controls are read-only."
-
-#: src/components/routes/system/power-management.tsx
-#~ msgid "Power network"
-#~ msgstr "Power network"
-
 #. Power On Time
 #: src/components/routes/system/smart-table.tsx
 msgid "Power On"
@@ -1720,10 +1751,6 @@ msgstr "Power operation"
 #: src/components/systems-table/power-actions.tsx
 msgid "Power operation failed"
 msgstr "Power operation failed"
-
-#: src/components/routes/system/power-management.tsx
-#~ msgid "Power settings saved"
-#~ msgstr "Power settings saved"
 
 #: src/components/routes/system/charts/gpu-charts.tsx
 #: src/components/routes/system/charts/memory-charts.tsx
@@ -1753,6 +1780,7 @@ msgid "Queue Depth"
 msgstr "Profundidad de cola"
 
 #: src/components/alerts-history-columns.tsx
+#: src/components/routes/system/automatic-updates.tsx
 #: src/components/systems-table/power-actions.tsx
 msgid "Queued"
 msgstr "Queued"
@@ -1777,14 +1805,6 @@ msgstr "Read operation status"
 msgid "Read update policy"
 msgstr "Read update policy"
 
-#: src/components/routes/system/power-management.tsx
-#~ msgid "Readiness"
-#~ msgstr "Readiness"
-
-#: src/components/routes/system/power-management.tsx
-#~ msgid "Ready"
-#~ msgstr "Ready"
-
 #: src/components/alerts-history-columns.tsx
 #: src/components/routes/system/automatic-updates.tsx
 #: src/components/routes/system/automatic-updates.tsx
@@ -1808,11 +1828,19 @@ msgstr "Recibido"
 msgid "Recently updated"
 msgstr "Recently updated"
 
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Reconciling update cycle"
+msgstr "Reconciling update cycle"
+
 #: src/components/containers-table/containers-table.tsx
 #: src/components/containers-table/containers-table.tsx
 #: src/components/routes/system/smart-table.tsx
 msgid "Refresh"
 msgstr "Actualizar"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Refreshing package indexes"
+msgstr "Refreshing package indexes"
 
 #: src/components/systemd-table/systemd-table.tsx
 msgid "Relationships"
@@ -1892,6 +1920,7 @@ msgstr "Run updates now"
 
 #: src/components/alerts-history-columns.tsx
 #: src/components/routes/system/automatic-updates.tsx
+#: src/components/routes/system/automatic-updates.tsx
 msgid "Running"
 msgstr "Running"
 
@@ -1919,10 +1948,6 @@ msgstr "Guarda la dirección usando la tecla enter o coma. Deja en blanco para d
 msgid "Save and apply"
 msgstr "Save and apply"
 
-#: src/components/routes/system/power-management.tsx
-#~ msgid "Save configuration"
-#~ msgstr "Save configuration"
-
 #: src/components/routes/settings/general.tsx
 #: src/components/routes/settings/notifications.tsx
 msgid "Save Settings"
@@ -1935,10 +1960,6 @@ msgstr "Guardado en la base de datos y no expira hasta que lo desactives."
 #: src/components/routes/settings/quiet-hours.tsx
 msgid "Schedule"
 msgstr "Programar"
-
-#: src/components/routes/system/power-management.tsx
-#~ msgid "Schedule custom shutdown"
-#~ msgstr "Schedule custom shutdown"
 
 #: src/components/routes/settings/quiet-hours.tsx
 msgid "Schedule quiet hours where notifications will not be sent, such as during maintenance periods."
@@ -1996,10 +2017,6 @@ msgid "Send periodic outbound pings to an external monitoring service so you can
 msgstr ""
 
 #: src/components/routes/settings/heartbeat.tsx
-#~ msgid "Send periodic outbound pings to an external monitoring service so you can monitor Beszel without exposing it to the internet."
-#~ msgstr "Envíe pings salientes periódicos a un servicio de monitorización externo para que pueda supervisar Beszel sin exponerlo a internet."
-
-#: src/components/routes/settings/heartbeat.tsx
 msgid "Send test heartbeat"
 msgstr "Enviar latido de prueba"
 
@@ -2029,10 +2046,6 @@ msgid "Set percentage thresholds for meter colors."
 msgstr "Establecer umbrales de porcentaje para los colores de los medidores."
 
 #: src/components/routes/settings/heartbeat.tsx
-#~ msgid "Set the following environment variables on your Beszel hub to enable heartbeat monitoring:"
-#~ msgstr "Configure las siguientes variables de entorno en su hub Beszel para habilitar la monitorización de latidos:"
-
-#: src/components/routes/settings/heartbeat.tsx
 msgid "Set the following environment variables on your Beszel Plus Hub to enable heartbeat monitoring:"
 msgstr ""
 
@@ -2058,18 +2071,6 @@ msgstr "Showing the last successful eligibility result."
 msgid "Shut down immediately"
 msgstr "Shut down immediately"
 
-#: src/components/routes/system/power-management.tsx
-#~ msgid "Shut down in {minutes} minutes"
-#~ msgstr "Shut down in {minutes} minutes"
-
-#: src/components/routes/system/power-management.tsx
-#~ msgid "Shut down in 15 minutes"
-#~ msgstr "Shut down in 15 minutes"
-
-#: src/components/routes/system/power-management.tsx
-#~ msgid "Shut down now"
-#~ msgstr "Shut down now"
-
 #: src/components/login/auth-form.tsx
 msgid "Sign in"
 msgstr "Iniciar sesión"
@@ -2081,14 +2082,6 @@ msgstr "Configuración SMTP"
 #: src/components/systems-table/systems-table.tsx
 msgid "Sort By"
 msgstr "Ordenar por"
-
-#: src/components/routes/system/power-management.tsx
-#~ msgid "stale"
-#~ msgstr ""
-
-#: src/components/routes/system/power-management.tsx
-#~ msgid "Stale"
-#~ msgstr "Stale"
 
 #: src/components/routes/system/automatic-updates.tsx
 #: src/components/systems-table/power-actions.tsx
@@ -2229,13 +2222,21 @@ msgstr "Notificación de prueba enviada"
 msgid "The Agent remains unprivileged. A restricted local helper applies validated APT policies."
 msgstr "The Agent remains unprivileged. A restricted local helper applies validated APT policies."
 
+#: src/components/routes/system/automatic-updates.tsx
+msgid "The current update policy does not allow a manual cycle."
+msgstr "The current update policy does not allow a manual cycle."
+
 #: src/components/systems-table/power-actions.tsx
 msgid "The Ethernet cable is disconnected"
 msgstr "The Ethernet cable is disconnected"
 
-#: src/components/routes/system/power-management.tsx
-#~ msgid "The Hub cannot wake itself. Use another Hub on the same power network."
-#~ msgstr "The Hub cannot wake itself. Use another Hub on the same power network."
+#: src/components/routes/system/automatic-updates.tsx
+msgid "The helper did not provide a cycle ID and policy revision."
+msgstr "The helper did not provide a cycle ID and policy revision."
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "The helper is still supervising the package process."
+msgstr "The helper is still supervising the package process."
 
 #: src/components/systems-table/power-actions.tsx
 msgid "The Hub cannot wake this system"
@@ -2252,6 +2253,26 @@ msgstr "The network interface has an invalid MAC address"
 #: src/components/routes/settings/heartbeat.tsx
 msgid "The overall status is <0>ok</0> when all systems are up, <1>warn</1> when alerts are triggered, and <2>error</2> when any system is down."
 msgstr "El estado general es <0>ok</0> cuando todos los sistemas están activos, <1>warn</1> cuando se activan alertas y <2>error</2> cuando algún sistema está caído."
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "The update cycle failed"
+msgstr "The update cycle failed"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "The update cycle is still active. Its status will remain visible here."
+msgstr "The update cycle is still active. Its status will remain visible here."
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "The update cycle request failed"
+msgstr "The update cycle request failed"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "The update cycle status is unavailable. The Agent may still be working."
+msgstr "The update cycle status is unavailable. The Agent may still be working."
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "The update cycle was canceled because its policy changed"
+msgstr "The update cycle was canceled because its policy changed"
 
 #: src/components/routes/system/automatic-updates.tsx
 msgid "The update policy was restored because APT timers could not be updated."
@@ -2272,10 +2293,6 @@ msgstr "Third-party repository"
 #: src/components/systems-table/systems-table-columns.tsx
 msgid "This action cannot be undone. This will permanently delete all current records for {name} from the database."
 msgstr "Esta acción no se puede deshacer. Esto eliminará permanentemente todos los registros actuales de {name} de la base de datos."
-
-#: src/components/routes/system/power-management.tsx
-#~ msgid "This Agent is older than v0.2.0 or does not expose power diagnostics."
-#~ msgstr "This Agent is older than v0.2.0 or does not expose power diagnostics."
 
 #: src/components/systems-table/power-actions.tsx
 msgid "This system hosts Beszel Plus. Shutting it down will make the dashboard unavailable, and this Hub cannot wake itself. Continue?"
@@ -2305,11 +2322,6 @@ msgstr "Formato de hora"
 #: src/components/routes/settings/notifications.tsx
 msgid "To email(s)"
 msgstr "A correo(s)"
-
-#: src/components/mode-toggle.tsx
-#: src/components/mode-toggle.tsx
-#~ msgid "Toggle theme"
-#~ msgstr "Alternar tema"
 
 #: src/components/add-system.tsx
 #: src/components/routes/settings/tokens-fingerprints.tsx
@@ -2374,10 +2386,6 @@ msgid "Triggers when 5 minute load average exceeds a threshold"
 msgstr "Se activa cuando la carga media de 5 minutos supera un umbral"
 
 #: src/lib/alerts.ts
-#~ msgid "Triggers when a reboot is required"
-#~ msgstr ""
-
-#: src/lib/alerts.ts
 msgid "Triggers when a reboot remains required longer than the threshold"
 msgstr "Triggers when a reboot remains required longer than the threshold"
 
@@ -2408,10 +2416,6 @@ msgstr "Se activa cuando el uso de GPU supera un umbral"
 #: src/lib/alerts.ts
 msgid "Triggers when memory usage exceeds a threshold"
 msgstr "Se activa cuando el uso de memoria supera un umbral"
-
-#: src/lib/alerts.ts
-#~ msgid "Triggers when security updates are pending"
-#~ msgstr ""
 
 #: src/lib/alerts.ts
 msgid "Triggers when security updates remain pending longer than the threshold"
@@ -2447,14 +2451,6 @@ msgstr "Tipo"
 msgid "Unable to load update policy"
 msgstr "Unable to load update policy"
 
-#: src/components/routes/system/power-management.tsx
-#~ msgid "Unable to query Wake-on-LAN support"
-#~ msgstr "Unable to query Wake-on-LAN support"
-
-#: src/components/routes/system/power-management.tsx
-#~ msgid "Unable to save power settings"
-#~ msgstr "Unable to save power settings"
-
 #: src/lib/alerts.ts
 msgid "Unattended upgrades package missing"
 msgstr "Unattended upgrades package missing"
@@ -2488,9 +2484,22 @@ msgstr "Token universal"
 #: src/components/routes/system/automatic-updates.tsx
 #: src/components/routes/system/automatic-updates.tsx
 #: src/components/routes/system/automatic-updates.tsx
+#: src/components/routes/system/automatic-updates.tsx
+#: src/components/routes/system/automatic-updates.tsx
+#: src/components/routes/system/automatic-updates.tsx
+#: src/components/routes/system/automatic-updates.tsx
+#: src/components/routes/system/automatic-updates.tsx
 #: src/lib/i18n.ts
 msgid "Unknown"
 msgstr "Desconocida"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Unknown error"
+msgstr "Unknown error"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Unknown packages"
+msgstr "Unknown packages"
 
 #: src/components/systemd-table/systemd-table.tsx
 #: src/components/systemd-table/systemd-table.tsx
@@ -2520,8 +2529,16 @@ msgid "Update"
 msgstr "Actualizar"
 
 #: src/components/routes/system/automatic-updates.tsx
-msgid "Update failed"
-msgstr "Update failed"
+msgid "Update cycle"
+msgstr "Update cycle"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Update cycle is running"
+msgstr "Update cycle is running"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Update cycle support is unavailable. Upgrade the Agent and maintenance helper."
+msgstr "Update cycle support is unavailable. Upgrade the Agent and maintenance helper."
 
 #: src/lib/alerts.ts
 msgid "Update information stale"
@@ -2531,6 +2548,10 @@ msgstr "Update information stale"
 #: src/components/routes/system/automatic-updates.tsx
 msgid "Update management is unavailable. The current controls are read-only."
 msgstr "Update management is unavailable. The current controls are read-only."
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Update management requires a protocol 3 Agent and maintenance helper. Upgrade both components."
+msgstr "Update management requires a protocol 3 Agent and maintenance helper. Upgrade both components."
 
 #: src/components/alerts-history-columns.tsx
 msgid "Update monitoring error"
@@ -2563,8 +2584,12 @@ msgid "Updates available"
 msgstr "Updates available"
 
 #: src/components/routes/system/automatic-updates.tsx
-msgid "Updates completed successfully"
-msgstr "Updates completed successfully"
+msgid "Updates completed and verified successfully"
+msgstr "Updates completed and verified successfully"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Updates completed; justified pending updates remain"
+msgstr "Updates completed; justified pending updates remain"
 
 #: src/components/routes/system/automatic-updates.tsx
 msgid "Updates pending"
@@ -2642,6 +2667,18 @@ msgstr "Validate update policy"
 msgid "Value"
 msgstr "Valor"
 
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Verification"
+msgstr "Verification"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Verified"
+msgstr "Verified"
+
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Verifying installed updates"
+msgstr "Verifying installed updates"
+
 #: src/components/systems-table/systems-table.tsx
 msgid "View"
 msgstr "Vista"
@@ -2668,6 +2705,10 @@ msgstr "Esperando suficientes registros para mostrar"
 msgid "Waiting for the first collection"
 msgstr "Waiting for the first collection"
 
+#: src/components/routes/system/automatic-updates.tsx
+msgid "Waiting to retry"
+msgstr "Waiting to retry"
+
 #: src/components/systems-table/power-actions.tsx
 msgid "Wake packet sent"
 msgstr "Wake packet sent"
@@ -2681,10 +2722,6 @@ msgid "Wake-on-LAN diagnostics are unavailable"
 msgstr "Wake-on-LAN diagnostics are unavailable"
 
 #: src/components/systems-table/power-actions.tsx
-#~ msgid "Wake-on-LAN is not ready"
-#~ msgstr "Wake-on-LAN is not ready"
-
-#: src/components/systems-table/power-actions.tsx
 msgid "Wake-on-LAN is not supported"
 msgstr "Wake-on-LAN is not supported"
 
@@ -2695,10 +2732,6 @@ msgstr "Wake-on-LAN is ready"
 #: src/components/systems-table/power-actions.tsx
 msgid "Wake-on-LAN is supported but disabled on the interface"
 msgstr "Wake-on-LAN is supported but disabled on the interface"
-
-#: src/components/routes/system/power-management.tsx
-#~ msgid "Wake-on-LAN MAC address"
-#~ msgstr "Wake-on-LAN MAC address"
 
 #: src/components/routes/settings/general.tsx
 msgid "Want to help improve our translations? Check <0>Crowdin</0> for details."
@@ -2727,12 +2760,6 @@ msgstr "Cuando está habilitado, este token permite a los agentes registrarse au
 #: src/components/routes/settings/heartbeat.tsx
 msgid "When using POST, each heartbeat includes a JSON payload with system status summary, list of down systems, and triggered alerts."
 msgstr "Al usar POST, cada latido incluye una carga útil JSON con un resumen del estado del sistema, una lista de sistemas caídos y alertas activadas."
-
-#: src/components/add-system.tsx
-#: src/components/routes/settings/tokens-fingerprints.tsx
-#~ msgctxt "Button to copy install command"
-#~ msgid "Windows command"
-#~ msgstr "Comando Windows"
 
 #. Disk write
 #: src/components/routes/system/charts/disk-charts.tsx

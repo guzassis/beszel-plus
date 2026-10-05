@@ -64,16 +64,30 @@ func (h *Hub) handleMaintenance(e *core.RequestEvent) error {
 	defer cancel()
 	response, err := sys.RequestMaintenance(ctx, body.Request)
 	if err != nil {
-		h.auditMaintenance(e.Auth, body.SystemID, "operation_timeout", 0)
+		if !isCycleOperation(body.Request.Operation) {
+			h.auditMaintenance(e.Auth, body.SystemID, "operation_timeout", 0)
+		}
 		return e.InternalServerError("Maintenance request failed.", err)
 	}
-	event := "operation_" + string(response.Operation) + "_" + string(response.Status)
-	h.auditMaintenance(e.Auth, body.SystemID, event, float64(response.Progress))
+	// Cycle status is polled frequently and may be replayed after a reconnect. Its
+	// durable, de-duplicated events are emitted from the cycle snapshot instead.
+	if !isCycleOperation(body.Request.Operation) {
+		event := "operation_" + string(response.Operation) + "_" + string(response.Status)
+		h.auditMaintenance(e.Auth, body.SystemID, event, float64(response.Progress))
+	}
 	return e.JSON(http.StatusOK, response)
 }
 
+func isCycleOperation(operation maintenanceentity.Operation) bool {
+	return operation == maintenanceentity.RunUnattendedUpgrades || operation == maintenanceentity.GetUpdateCycleStatus
+}
+
+func supportsUpdateCycle(caps *maintenanceentity.Capabilities) bool {
+	return caps != nil && caps.UpdateManagement && caps.UpdateCycle && caps.ProtocolVersion >= maintenanceentity.ProtocolVersion
+}
+
 func maintenanceCapabilityAvailable(caps *maintenanceentity.Capabilities, operation maintenanceentity.Operation) bool {
-	if caps == nil || !caps.UpdateManagement {
+	if caps == nil || !caps.PrivilegedHelper || !caps.UpdateManagement {
 		return false
 	}
 	switch operation {
@@ -84,7 +98,9 @@ func maintenanceCapabilityAvailable(caps *maintenanceentity.Capabilities, operat
 	case maintenanceentity.RunUpdateDryRun:
 		return caps.DryRun
 	case maintenanceentity.RunUnattendedUpgrades:
-		return caps.RunUpgrade
+		return caps.RunUpgrade && supportsUpdateCycle(caps)
+	case maintenanceentity.GetUpdateCycleStatus:
+		return supportsUpdateCycle(caps)
 	case maintenanceentity.InstallUpdateDependencies, maintenanceentity.GetOperationStatus:
 		return true
 	default:

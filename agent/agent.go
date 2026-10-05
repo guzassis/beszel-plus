@@ -17,6 +17,7 @@ import (
 	"github.com/henrygd/beszel/agent/utils"
 	"github.com/henrygd/beszel/internal/common"
 	"github.com/henrygd/beszel/internal/entities/system"
+	updateentity "github.com/henrygd/beszel/internal/entities/update"
 	gossh "golang.org/x/crypto/ssh"
 )
 
@@ -181,8 +182,16 @@ func (a *Agent) gatherStats(options common.DataRequestOptions) *system.CombinedD
 	}
 	if a.updateManager != nil {
 		data.Updates = a.updateManager.snapshot()
-		if a.maintenanceManager != nil && data.Updates != nil {
-			data.Updates.Capabilities = a.maintenanceManager.capabilities()
+	}
+	if a.maintenanceManager != nil {
+		if data.Updates == nil && a.maintenanceManager.manageUpdatesEnabled {
+			caps := a.maintenanceManager.capabilities()
+			supported := caps == nil || !caps.PrivilegedHelper || caps.UpdateManagement
+			data.Updates = &updateentity.Status{Supported: supported, PackageManager: "apt", InstallationState: updateentity.InstallationUnknown, ConfigurationState: updateentity.ConfigurationUnknown, TimerState: updateentity.TimerUnknown, ServiceState: updateentity.ServiceUnknown, LastResult: updateentity.ResultUnknown}
+		}
+		if data.Updates != nil {
+			a.maintenanceManager.attachCycleSnapshot(data.Updates)
+			data.Updates.OverallState = updateentity.DeriveOverallState(data.Updates)
 		}
 	}
 	data.Info.Power = a.collectPowerDiagnostics(strings.EqualFold(os.Getenv("POWER_MANAGEMENT"), "true"))

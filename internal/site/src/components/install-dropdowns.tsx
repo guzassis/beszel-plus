@@ -30,7 +30,7 @@ export type LinuxInstallOptions = {
 
 const defaultLinuxInstallOptions: LinuxInstallOptions = {
 	osUpdateManagement: true,
-	osUpdatePolicy: "security",
+	osUpdatePolicy: "official-all",
 	powerManagement: true,
 	agentAutoUpdate: true,
 }

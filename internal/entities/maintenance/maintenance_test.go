@@ -93,3 +93,24 @@ func TestProbeWOLRequestValidatesInterfaceNames(t *testing.T) {
 		t.Fatal("accepted interface list on another operation")
 	}
 }
+
+func TestCycleFieldsAreScopedToCycleOperations(t *testing.T) {
+	revision := strings.Repeat("a", 64)
+	cycle := Request{Version: ProtocolVersion, RequestID: "cycle-request", Operation: RunUnattendedUpgrades, IdempotencyKey: "cycle-attempt", CycleID: "cycle-00000000000000000001", Source: CycleSourceManual, PolicyRevision: revision}
+	if err := ValidateRequest(cycle); err != nil {
+		t.Fatalf("valid protocol 3 cycle request rejected: %v", err)
+	}
+	status := Request{Version: ProtocolVersion, RequestID: "cycle-status", Operation: GetUpdateCycleStatus, CycleID: cycle.CycleID}
+	if err := ValidateRequest(status); err != nil {
+		t.Fatalf("valid correlated cycle query rejected: %v", err)
+	}
+	policy := DefaultPolicy()
+	apply := Request{Version: ProtocolVersion, RequestID: "policy-apply", Operation: ApplyUpdatePolicy, IdempotencyKey: "policy-apply", Policy: &policy, CycleID: cycle.CycleID}
+	if err := ValidateRequest(apply); err == nil {
+		t.Fatal("cycle fields were accepted on a policy operation")
+	}
+	status.Source = CycleSourceManual
+	if err := ValidateRequest(status); err == nil {
+		t.Fatal("cycle source was accepted on a status query")
+	}
+}

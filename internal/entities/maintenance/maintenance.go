@@ -10,11 +10,14 @@ import (
 	powerentity "github.com/henrygd/beszel/internal/entities/power"
 )
 
-const ProtocolVersion uint8 = 2
+const ProtocolVersion uint8 = 3
 
 type Operation string
 type OperationState string
 type PolicyMode string
+type CycleSource string
+type CycleState string
+type CycleStage string
 
 const (
 	GetCapabilities           Operation = "get-capabilities"
@@ -31,6 +34,8 @@ const (
 	SchedulePoweroff          Operation = "schedule-poweroff"
 	CancelPoweroff            Operation = "cancel-poweroff"
 	GetPoweroffStatus         Operation = "get-poweroff-status"
+	GetUpdateCycleStatus      Operation = "get-update-cycle-status"
+	AdoptUpdatePolicy         Operation = "adopt-update-policy"
 
 	StateQueued    OperationState = "queued"
 	StateRunning   OperationState = "running"
@@ -41,6 +46,22 @@ const (
 	ModeSecurity    PolicyMode = "security"
 	ModeOfficialAll PolicyMode = "official_all"
 	ModeCustom      PolicyMode = "custom"
+
+	CycleSourceManual    CycleSource = "manual"
+	CycleSourceAutomatic CycleSource = "automatic"
+
+	CycleQueued               CycleState = "queued"
+	CycleRunning              CycleState = "running"
+	CycleRetryWait            CycleState = "retry_wait"
+	CycleCompleted            CycleState = "completed"
+	CycleCompletedWithPending CycleState = "completed_with_pending"
+	CycleFailed               CycleState = "failed"
+	CycleCanceled             CycleState = "canceled"
+
+	CycleStageRefresh   CycleStage = "refresh"
+	CycleStageInstall   CycleStage = "install"
+	CycleStageVerify    CycleStage = "verify"
+	CycleStageReconcile CycleStage = "reconcile"
 )
 
 var safeRepositoryValue = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._+:/-]{0,127}$`)
@@ -62,6 +83,7 @@ type Capabilities struct {
 	MaxProtocolVersion uint8                     `json:"max_protocol_version,omitempty" cbor:"12,keyasint,omitempty"`
 	BuildCommit        string                    `json:"build_commit,omitempty" cbor:"13,keyasint,omitempty"`
 	Power              *powerentity.Capabilities `json:"power,omitempty" cbor:"14,keyasint,omitempty"`
+	UpdateCycle        bool                      `json:"update_cycle,omitempty" cbor:"15,keyasint,omitempty"`
 }
 
 type Policy struct {
@@ -77,7 +99,47 @@ type Policy struct {
 }
 
 func DefaultPolicy() Policy {
-	return Policy{Enabled: true, Mode: ModeSecurity, UpdatePackageListsDays: 1, UnattendedUpgradeDays: 1, AutomaticReboot: false, AutomaticRebootTime: "04:00"}
+	return Policy{Enabled: true, Mode: ModeOfficialAll, UpdatePackageListsDays: 1, UnattendedUpgradeDays: 1, AutomaticReboot: false, AutomaticRebootTime: "04:00"}
+}
+
+type CycleCounts struct {
+	Candidates uint32         `json:"candidates" cbor:"0,keyasint"`
+	Eligible   uint32         `json:"eligible" cbor:"1,keyasint"`
+	Held       uint32         `json:"held" cbor:"2,keyasint"`
+	Excluded   uint32         `json:"excluded" cbor:"3,keyasint"`
+	Blocked    uint32         `json:"blocked" cbor:"4,keyasint"`
+	Unknown    uint32         `json:"unknown" cbor:"5,keyasint"`
+	Pending    uint32         `json:"pending" cbor:"6,keyasint"`
+	Packages   []CyclePackage `json:"packages,omitempty" cbor:"7,keyasint,omitempty"`
+}
+
+type CyclePackage struct {
+	Name   string `json:"name" cbor:"0,keyasint"`
+	State  string `json:"state" cbor:"1,keyasint"`
+	Reason string `json:"reason,omitempty" cbor:"2,keyasint,omitempty"`
+}
+
+type CycleStatus struct {
+	CycleID             string       `json:"cycle_id" cbor:"0,keyasint"`
+	Source              CycleSource  `json:"source" cbor:"1,keyasint"`
+	PolicyRevision      string       `json:"policy_revision" cbor:"2,keyasint"`
+	State               CycleState   `json:"state" cbor:"3,keyasint"`
+	Stage               CycleStage   `json:"stage,omitempty" cbor:"4,keyasint,omitempty"`
+	Attempt             uint32       `json:"attempt" cbor:"5,keyasint"`
+	LastAttemptAt       *time.Time   `json:"last_attempt_at,omitempty" cbor:"6,keyasint,omitempty"`
+	StartedAt           *time.Time   `json:"started_at,omitempty" cbor:"7,keyasint,omitempty"`
+	FinishedAt          *time.Time   `json:"finished_at,omitempty" cbor:"8,keyasint,omitempty"`
+	LastSuccessAt       *time.Time   `json:"last_success_at,omitempty" cbor:"9,keyasint,omitempty"`
+	NextRunAt           *time.Time   `json:"next_run_at,omitempty" cbor:"10,keyasint,omitempty"`
+	NextAttemptAt       *time.Time   `json:"next_attempt_at,omitempty" cbor:"11,keyasint,omitempty"`
+	Error               string       `json:"error,omitempty" cbor:"12,keyasint,omitempty"`
+	ErrorCode           string       `json:"error_code,omitempty" cbor:"13,keyasint,omitempty"`
+	Counts              *CycleCounts `json:"counts,omitempty" cbor:"14,keyasint,omitempty"`
+	Verified            bool         `json:"verified" cbor:"15,keyasint"`
+	VerificationMessage string       `json:"verification_message,omitempty" cbor:"16,keyasint,omitempty"`
+	UpdatedAt           *time.Time   `json:"updated_at,omitempty" cbor:"17,keyasint,omitempty"`
+	TimeoutObserved     bool         `json:"timeout_observed,omitempty" cbor:"18,keyasint,omitempty"`
+	InitialCounts       *CycleCounts `json:"initial_counts,omitempty" cbor:"19,keyasint,omitempty"`
 }
 
 type Repository struct {
@@ -94,24 +156,32 @@ type Repository struct {
 }
 
 type Request struct {
-	Version        uint8     `json:"version" cbor:"0,keyasint"`
-	RequestID      string    `json:"request_id" cbor:"1,keyasint"`
-	Operation      Operation `json:"operation" cbor:"2,keyasint"`
-	IdempotencyKey string    `json:"idempotency_key,omitempty" cbor:"3,keyasint,omitempty"`
-	Policy         *Policy   `json:"policy,omitempty" cbor:"4,keyasint,omitempty"`
-	DelaySeconds   uint32    `json:"delay_seconds,omitempty" cbor:"5,keyasint,omitempty"`
-	Interfaces     []string  `json:"interfaces,omitempty" cbor:"6,keyasint,omitempty"`
+	Version                uint8       `json:"version" cbor:"0,keyasint"`
+	RequestID              string      `json:"request_id" cbor:"1,keyasint"`
+	Operation              Operation   `json:"operation" cbor:"2,keyasint"`
+	IdempotencyKey         string      `json:"idempotency_key,omitempty" cbor:"3,keyasint,omitempty"`
+	Policy                 *Policy     `json:"policy,omitempty" cbor:"4,keyasint,omitempty"`
+	DelaySeconds           uint32      `json:"delay_seconds,omitempty" cbor:"5,keyasint,omitempty"`
+	Interfaces             []string    `json:"interfaces,omitempty" cbor:"6,keyasint,omitempty"`
+	CycleID                string      `json:"cycle_id,omitempty" cbor:"7,keyasint,omitempty"`
+	Source                 CycleSource `json:"source,omitempty" cbor:"8,keyasint,omitempty"`
+	PolicyRevision         string      `json:"policy_revision,omitempty" cbor:"9,keyasint,omitempty"`
+	ExpectedPolicyRevision string      `json:"expected_policy_revision,omitempty" cbor:"11,keyasint,omitempty"`
 }
 
 type Result struct {
-	Capabilities      *Capabilities                     `json:"capabilities,omitempty" cbor:"0,keyasint,omitempty"`
-	Policy            *Policy                           `json:"policy,omitempty" cbor:"1,keyasint,omitempty"`
-	Repositories      []Repository                      `json:"repositories,omitempty" cbor:"2,keyasint,omitempty"`
-	Output            string                            `json:"output,omitempty" cbor:"3,keyasint,omitempty"`
-	Changed           bool                              `json:"changed,omitempty" cbor:"4,keyasint,omitempty"`
-	PowerCapabilities *powerentity.Capabilities         `json:"power_capabilities,omitempty" cbor:"5,keyasint,omitempty"`
-	PoweroffStatus    *powerentity.ShutdownStatus       `json:"poweroff_status,omitempty" cbor:"6,keyasint,omitempty"`
-	PowerInterfaces   []powerentity.InterfaceDiagnostic `json:"power_interfaces,omitempty" cbor:"7,keyasint,omitempty"`
+	Capabilities           *Capabilities                     `json:"capabilities,omitempty" cbor:"0,keyasint,omitempty"`
+	Policy                 *Policy                           `json:"policy,omitempty" cbor:"1,keyasint,omitempty"`
+	Repositories           []Repository                      `json:"repositories,omitempty" cbor:"2,keyasint,omitempty"`
+	Output                 string                            `json:"output,omitempty" cbor:"3,keyasint,omitempty"`
+	Changed                bool                              `json:"changed,omitempty" cbor:"4,keyasint,omitempty"`
+	PowerCapabilities      *powerentity.Capabilities         `json:"power_capabilities,omitempty" cbor:"5,keyasint,omitempty"`
+	PoweroffStatus         *powerentity.ShutdownStatus       `json:"poweroff_status,omitempty" cbor:"6,keyasint,omitempty"`
+	PowerInterfaces        []powerentity.InterfaceDiagnostic `json:"power_interfaces,omitempty" cbor:"7,keyasint,omitempty"`
+	UpdateCycle            *CycleStatus                      `json:"update_cycle,omitempty" cbor:"8,keyasint,omitempty"`
+	NextCycleID            string                            `json:"next_cycle_id,omitempty" cbor:"9,keyasint,omitempty"`
+	PolicyRevision         string                            `json:"policy_revision,omitempty" cbor:"10,keyasint,omitempty"`
+	ExpectedPolicyRevision string                            `json:"expected_policy_revision,omitempty" cbor:"11,keyasint,omitempty"`
 }
 
 type Response struct {
@@ -144,7 +214,7 @@ type Rollback struct {
 
 func IsOperationAllowed(op Operation) bool {
 	switch op {
-	case GetCapabilities, GetUpdatePolicy, DetectRepositories, ValidateUpdatePolicy, ApplyUpdatePolicy, InstallUpdateDependencies, RunUpdateDryRun, RunUnattendedUpgrades, GetOperationStatus, GetPowerCapabilities, ProbeWOL, SchedulePoweroff, CancelPoweroff, GetPoweroffStatus:
+	case GetCapabilities, GetUpdatePolicy, DetectRepositories, ValidateUpdatePolicy, ApplyUpdatePolicy, AdoptUpdatePolicy, InstallUpdateDependencies, RunUpdateDryRun, RunUnattendedUpgrades, GetOperationStatus, GetPowerCapabilities, ProbeWOL, SchedulePoweroff, CancelPoweroff, GetPoweroffStatus, GetUpdateCycleStatus:
 		return true
 	default:
 		return false
@@ -153,7 +223,7 @@ func IsOperationAllowed(op Operation) bool {
 
 func IsLongOperation(op Operation) bool {
 	switch op {
-	case ApplyUpdatePolicy, InstallUpdateDependencies, RunUpdateDryRun, RunUnattendedUpgrades, SchedulePoweroff:
+	case ApplyUpdatePolicy, AdoptUpdatePolicy, InstallUpdateDependencies, RunUpdateDryRun, RunUnattendedUpgrades, SchedulePoweroff:
 		return true
 	}
 	return false
@@ -179,10 +249,27 @@ func ValidateRequest(req Request) error {
 		if req.Policy == nil {
 			return errors.New("policy is required")
 		}
-		return ValidatePolicy(*req.Policy)
-	}
-	if req.Policy != nil {
+		if err := ValidatePolicy(*req.Policy); err != nil {
+			return err
+		}
+	} else if req.Policy != nil {
 		return errors.New("policy is not valid for this operation")
+	}
+	if req.Operation == RunUnattendedUpgrades {
+		if !validCycleID(req.CycleID) || (req.Source != CycleSourceManual && req.Source != CycleSourceAutomatic) || !validPolicyRevision(req.PolicyRevision) {
+			return errors.New("cycle ID, source and policy revision are required")
+		}
+	} else if req.Operation == GetUpdateCycleStatus {
+		if req.Source != "" || req.PolicyRevision != "" || (req.CycleID != "" && !validCycleID(req.CycleID)) {
+			return errors.New("invalid cycle status query")
+		}
+	} else if req.CycleID != "" || req.Source != "" || req.PolicyRevision != "" {
+		return errors.New("cycle fields are not valid for this operation")
+	}
+	if req.ExpectedPolicyRevision != "" {
+		if req.Operation != ApplyUpdatePolicy || !validPolicyRevision(req.ExpectedPolicyRevision) {
+			return errors.New("expected policy revision is not valid for this operation")
+		}
 	}
 	if req.Operation == ProbeWOL {
 		if len(req.Interfaces) == 0 || len(req.Interfaces) > 64 {
@@ -204,6 +291,30 @@ func ValidateRequest(req Request) error {
 		return errors.New("delay is not valid for this operation")
 	}
 	return nil
+}
+
+func validCycleID(value string) bool {
+	if len(value) != 26 || !strings.HasPrefix(value, "cycle-") {
+		return false
+	}
+	for _, r := range value[len("cycle-"):] {
+		if r < '0' || r > '9' {
+			return false
+		}
+	}
+	return true
+}
+
+func validPolicyRevision(value string) bool {
+	if len(value) != 64 {
+		return false
+	}
+	for _, r := range value {
+		if (r < '0' || r > '9') && (r < 'a' || r > 'f') {
+			return false
+		}
+	}
+	return true
 }
 
 func ValidatePolicy(policy Policy) error {

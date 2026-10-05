@@ -3,15 +3,18 @@ package agent
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net"
 	"os"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
 	"github.com/fxamacker/cbor/v2"
+	"github.com/henrygd/beszel"
 	"github.com/henrygd/beszel/internal/common"
 	entity "github.com/henrygd/beszel/internal/entities/maintenance"
 	powerentity "github.com/henrygd/beszel/internal/entities/power"
@@ -38,6 +41,77 @@ func TestMaintenanceManagerRefusesRequestsDuringUpgradeDrain(t *testing.T) {
 		if response.Status != entity.StateFailed || response.ErrorCode != "upgrade_in_progress" || !response.Retryable || response.Stage != "agent_drain" {
 			t.Fatalf("operation %s was not drained: %#v", operation, response)
 		}
+	}
+}
+
+func TestHelperCompatibilityMatchesBuiltAgentVersion(t *testing.T) {
+	version := beszel.PlusVersion
+	switch {
+	case version == "0.3.0-dev", version == "0.3.0":
+	case strings.HasPrefix(version, "0.3.0-snapshot.") && len(strings.TrimPrefix(version, "0.3.0-snapshot.")) == 40:
+	default:
+		t.Fatalf("unexpected Agent build version %q; run this test with the dev, snapshot or release build version", version)
+	}
+	caps := &entity.Capabilities{
+		HelperVersion:      version,
+		MinAgentVersion:    "0.3.0",
+		ProtocolVersion:    entity.ProtocolVersion,
+		MaxProtocolVersion: entity.ProtocolVersion,
+		UpdateManagement:   true,
+		UpdateCycle:        true,
+	}
+	if !helperCompatible(caps) {
+		t.Fatalf("matching Agent/helper pair %q was rejected", version)
+	}
+
+	wrongHelper := *caps
+	wrongHelper.HelperVersion = "0.3.0"
+	if version == "0.3.0" {
+		wrongHelper.HelperVersion = "0.3.0-dev"
+	}
+	if helperCompatible(&wrongHelper) {
+		t.Fatal("helper with a different product version was accepted")
+	}
+
+	wrongProtocol := *caps
+	wrongProtocol.ProtocolVersion = entity.ProtocolVersion - 1
+	if helperCompatible(&wrongProtocol) {
+		t.Fatal("helper with an older protocol was accepted")
+	}
+	wrongMaximum := *caps
+	wrongMaximum.MaxProtocolVersion = entity.ProtocolVersion - 1
+	if helperCompatible(&wrongMaximum) {
+		t.Fatal("helper with an incompatible maximum protocol was accepted")
+	}
+}
+
+func TestCycleOperationsStillRequireTheDedicatedCapability(t *testing.T) {
+	caps := &entity.Capabilities{
+		HelperVersion:      beszel.PlusVersion,
+		MinAgentVersion:    "0.3.0",
+		ProtocolVersion:    entity.ProtocolVersion,
+		MaxProtocolVersion: entity.ProtocolVersion,
+		UpdateManagement:   true,
+		UpdateCycle:        false,
+	}
+	called := false
+	m := &maintenanceManager{enabled: true, manageUpdatesEnabled: true, caps: caps, agent: &Agent{}, replays: map[string]entity.Response{}}
+	m.callFunc = func(context.Context, entity.Request) (entity.Response, error) {
+		called = true
+		return entity.Response{}, nil
+	}
+	req := entity.Request{
+		Version:        entity.ProtocolVersion,
+		RequestID:      "cycle-request-123",
+		Operation:      entity.RunUnattendedUpgrades,
+		IdempotencyKey: "cycle-attempt-123",
+		CycleID:        "cycle-00000000000000000001",
+		Source:         entity.CycleSourceManual,
+		PolicyRevision: strings.Repeat("a", 64),
+	}
+	response := m.handle(req)
+	if response.Status != entity.StateFailed || response.ErrorCode != "update_cycle_unsupported" || called {
+		t.Fatalf("cycle without dedicated capability was not refused before IPC: response=%#v called=%v", response, called)
 	}
 }
 
@@ -153,10 +227,130 @@ func TestMaintenanceHandlerRejectsUnverifiedHub(t *testing.T) {
 func TestMaintenanceManagerReturnsIdempotentReplay(t *testing.T) {
 	request := entity.Request{Version: entity.ProtocolVersion, RequestID: "request-replay", Operation: entity.RunUpdateDryRun, IdempotencyKey: "replay-key"}
 	cached := entity.Response{Version: entity.ProtocolVersion, RequestID: request.RequestID, Operation: request.Operation, Status: entity.StateQueued, IdempotencyKey: request.IdempotencyKey}
-	m := &maintenanceManager{enabled: true, replays: map[string]entity.Response{request.IdempotencyKey: cached}, agent: &Agent{}}
+	m := &maintenanceManager{enabled: true, manageUpdatesEnabled: true, replays: map[string]entity.Response{request.IdempotencyKey: cached}, agent: &Agent{}}
 	if got := m.handle(request); got.Status != cached.Status || got.RequestID != cached.RequestID {
 		t.Fatalf("replay was not idempotent: %#v", got)
 	}
+}
+
+func TestCycleSchedulerRetriesDueCycleAndPersistsSnapshotWithoutUpdateMonitor(t *testing.T) {
+	statePath := filepath.Join(t.TempDir(), "update-cycle-state.json")
+	policy := entity.DefaultPolicy()
+	revision := strings.Repeat("a", 64)
+	due := time.Now().Add(-time.Minute).UTC()
+	current := &entity.CycleStatus{CycleID: "cycle-00000000000000000003", Source: entity.CycleSourceAutomatic, PolicyRevision: revision, State: entity.CycleRetryWait, Attempt: 1, NextAttemptAt: &due}
+	caps := &entity.Capabilities{HelperVersion: beszel.PlusVersion, ProtocolVersion: entity.ProtocolVersion, MaxProtocolVersion: entity.ProtocolVersion, UpdateManagement: true, UpdateCycle: true}
+	runRequest := make(chan entity.Request, 1)
+	m := &maintenanceManager{enabled: true, manageUpdatesEnabled: true, replays: map[string]entity.Response{}, caps: caps, cycleStatePath: statePath, cycleAdoptionChecked: true, agent: &Agent{updateManager: nil}}
+	m.callFunc = func(_ context.Context, req entity.Request) (entity.Response, error) {
+		switch req.Operation {
+		case entity.GetUpdateCycleStatus:
+			return entity.Response{Version: entity.ProtocolVersion, RequestID: req.RequestID, Operation: req.Operation, Status: entity.StateCompleted, Result: &entity.Result{UpdateCycle: cloneAgentCycleStatus(current), Policy: &policy, NextCycleID: "cycle-00000000000000000004", PolicyRevision: revision}}, nil
+		case entity.GetPoweroffStatus:
+			return entity.Response{Version: entity.ProtocolVersion, RequestID: req.RequestID, Operation: req.Operation, Status: entity.StateCompleted, Result: &entity.Result{PoweroffStatus: &powerentity.ShutdownStatus{}}}, nil
+		case entity.RunUnattendedUpgrades:
+			runRequest <- req
+			completed := cloneAgentCycleStatus(current)
+			completed.State = entity.CycleCompleted
+			completed.Attempt = 2
+			return entity.Response{Version: entity.ProtocolVersion, RequestID: req.RequestID, Operation: req.Operation, Status: entity.StateCompleted, Result: &entity.Result{UpdateCycle: completed}}, nil
+		case entity.GetCapabilities:
+			return entity.Response{Version: entity.ProtocolVersion, RequestID: req.RequestID, Operation: req.Operation, Status: entity.StateCompleted, Result: &entity.Result{Capabilities: caps}}, nil
+		case entity.GetOperationStatus:
+			return entity.Response{Version: entity.ProtocolVersion, RequestID: req.RequestID, Operation: req.Operation, Status: entity.StateCompleted}, nil
+		default:
+			return entity.Response{Version: entity.ProtocolVersion, RequestID: req.RequestID, Operation: req.Operation, Status: entity.StateCompleted}, nil
+		}
+	}
+	m.cycleScheduleStep()
+	select {
+	case got := <-runRequest:
+		if got.CycleID != current.CycleID || got.Source != entity.CycleSourceAutomatic || got.PolicyRevision != revision || got.IdempotencyKey == got.CycleID {
+			t.Fatalf("scheduler did not retry the due cycle with a fresh attempt key: %#v", got)
+		}
+	case <-time.After(2 * time.Second):
+		t.Fatal("scheduler did not launch the due retry")
+	}
+	waitForMaintenance(t, func() bool {
+		m.mu.Lock()
+		defer m.mu.Unlock()
+		return !m.running && m.cycleStatus != nil && m.cycleStatus.State == entity.CycleCompleted
+	})
+	reloaded := &maintenanceManager{cycleStatePath: statePath}
+	reloaded.loadCycleState()
+	cycle, _, _, _ := reloaded.cycleSnapshot()
+	if cycle == nil || cycle.CycleID != current.CycleID || cycle.State != entity.CycleCompleted || reloaded.agent != nil {
+		t.Fatalf("Agent restart did not reload the last cycle snapshot: %#v", cycle)
+	}
+}
+
+func TestCycleReconciliationRetainsGateAcrossIPCFailureAndRunningState(t *testing.T) {
+	previous := cycleReconcileInterval
+	cycleReconcileInterval = time.Millisecond
+	t.Cleanup(func() { cycleReconcileInterval = previous })
+	policyRevision := strings.Repeat("b", 64)
+	var mu sync.Mutex
+	statusCalls, runCalls := 0, 0
+	firstError := make(chan struct{}, 1)
+	m := &maintenanceManager{agent: &Agent{}, replays: map[string]entity.Response{}}
+	m.callFunc = func(_ context.Context, req entity.Request) (entity.Response, error) {
+		mu.Lock()
+		defer mu.Unlock()
+		switch req.Operation {
+		case entity.GetUpdateCycleStatus:
+			statusCalls++
+			if statusCalls == 1 {
+				firstError <- struct{}{}
+				return entity.Response{}, errors.New("helper unavailable")
+			}
+			state := entity.CycleRunning
+			if statusCalls >= 3 {
+				state = entity.CycleCompleted
+			}
+			return entity.Response{Version: entity.ProtocolVersion, RequestID: req.RequestID, Operation: req.Operation, Status: entity.StateCompleted, Result: &entity.Result{UpdateCycle: &entity.CycleStatus{CycleID: req.CycleID, Source: entity.CycleSourceAutomatic, PolicyRevision: policyRevision, State: state}}}, nil
+		case entity.RunUnattendedUpgrades:
+			runCalls++
+			return entity.Response{Version: entity.ProtocolVersion, RequestID: req.RequestID, Operation: req.Operation, Status: entity.StateRunning, Result: &entity.Result{UpdateCycle: &entity.CycleStatus{CycleID: req.CycleID, Source: req.Source, PolicyRevision: req.PolicyRevision, State: entity.CycleRunning}}}, nil
+		case entity.GetPoweroffStatus:
+			return entity.Response{Version: entity.ProtocolVersion, RequestID: req.RequestID, Operation: req.Operation, Status: entity.StateCompleted, Result: &entity.Result{PoweroffStatus: &powerentity.ShutdownStatus{}}}, nil
+		default:
+			return entity.Response{}, errors.New("unexpected reconciliation request")
+		}
+	}
+	m.retainCycleGate(false, "cycle-00000000000000000009", entity.CycleSourceAutomatic, policyRevision)
+	select {
+	case <-firstError:
+	case <-time.After(time.Second):
+		t.Fatal("reconciliation did not query helper status")
+	}
+	m.mu.Lock()
+	heldAfterIPCError := m.cycleGateHeld
+	m.mu.Unlock()
+	if !heldAfterIPCError {
+		t.Fatal("collector gate was released after helper IPC failure")
+	}
+	waitForMaintenance(t, func() bool {
+		m.mu.Lock()
+		defer m.mu.Unlock()
+		return !m.cycleGateHeld && !m.cycleReconciliation
+	})
+	mu.Lock()
+	defer mu.Unlock()
+	if statusCalls < 3 || runCalls != 1 {
+		t.Fatalf("running orphan was not reconciled before gate release: status calls=%d run calls=%d", statusCalls, runCalls)
+	}
+}
+
+func waitForMaintenance(t *testing.T, predicate func() bool) {
+	t.Helper()
+	deadline := time.Now().Add(2 * time.Second)
+	for time.Now().Before(deadline) {
+		if predicate() {
+			return
+		}
+		time.Sleep(time.Millisecond)
+	}
+	t.Fatal("maintenance state did not converge before deadline")
 }
 
 func TestMaintenanceIPCContextTimeout(t *testing.T) {

@@ -2,6 +2,9 @@ package systems
 
 import (
 	"context"
+	"crypto/sha256"
+	"database/sql"
+	"encoding/hex"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -278,7 +281,12 @@ func createUpdateEvents(app core.App, systemRecord *core.Record, previous, curre
 	if previous.ConfigurationState != current.ConfigurationState && current.ConfigurationState == updateentity.ConfigurationDisabled {
 		types = append(types, "automatic_updates_disabled")
 	}
-	if previous.LastResult != current.LastResult {
+	cycleManaged := current.CycleManagementEnabled || previous.CycleManagementEnabled
+	cycleEvent, cycleIdentity, cycleAttempt := updateCycleEvent(previous, current)
+	if cycleEvent != "" {
+		types = append(types, cycleEvent)
+	}
+	if !cycleManaged && previous.LastResult != current.LastResult {
 		switch current.LastResult {
 		case updateentity.ResultRunning:
 			types = append(types, "upgrade_started")
@@ -328,6 +336,18 @@ func createUpdateEvents(app core.App, systemRecord *core.Record, previous, curre
 	for _, userID := range systemRecord.GetStringSlice("users") {
 		for _, eventType := range types {
 			record := core.NewRecord(collection)
+			if cycleIdentity != "" && eventType == cycleEvent {
+				// The ID is a stable event key derived from cycle ID, attempt,
+				// outcome, system and recipient. Replayed snapshots therefore
+				// cannot create a duplicate alert-history event.
+				eventID := cycleEventRecordID(systemRecord.Id, userID, cycleIdentity, cycleAttempt, eventType)
+				record.Set("id", eventID)
+				if _, err := app.FindRecordById(collection, eventID); err == nil {
+					continue
+				} else if !errors.Is(err, sql.ErrNoRows) {
+					return err
+				}
+			}
 			record.Set("user", userID)
 			record.Set("system", systemRecord.Id)
 			record.Set("name", "maintenance:"+eventType)
@@ -337,12 +357,47 @@ func createUpdateEvents(app core.App, systemRecord *core.Record, previous, curre
 			if eventType == "security_updates_available" {
 				record.Set("value", currentSecurity)
 			}
+			if cycleIdentity != "" && eventType == cycleEvent {
+				record.Set("value", cycleAttempt)
+			}
 			if err := app.SaveNoValidate(record); err != nil {
 				return err
 			}
 		}
 	}
 	return nil
+}
+
+func updateCycleEvent(previous, current *updateentity.Status) (event, cycleID string, attempt uint32) {
+	if current == nil || current.Cycle == nil {
+		return "", "", 0
+	}
+	cycle := current.Cycle
+	if previous != nil && previous.Cycle != nil && previous.Cycle.CycleID == cycle.CycleID && previous.Cycle.Attempt == cycle.Attempt && previous.Cycle.State == cycle.State {
+		return "", "", 0
+	}
+	switch cycle.State {
+	case maintenanceentity.CycleRunning:
+		return "upgrade_started", cycle.CycleID, cycle.Attempt
+	case maintenanceentity.CycleRetryWait:
+		return "upgrade_retrying", cycle.CycleID, cycle.Attempt
+	case maintenanceentity.CycleCompleted:
+		return "upgrade_succeeded", cycle.CycleID, cycle.Attempt
+	case maintenanceentity.CycleCompletedWithPending:
+		return "upgrade_completed_with_pending", cycle.CycleID, cycle.Attempt
+	case maintenanceentity.CycleFailed:
+		return "upgrade_failed", cycle.CycleID, cycle.Attempt
+	case maintenanceentity.CycleCanceled:
+		return "upgrade_canceled", cycle.CycleID, cycle.Attempt
+	default:
+		return "", "", 0
+	}
+}
+
+func cycleEventRecordID(systemID, userID, cycleID string, attempt uint32, result string) string {
+	key := fmt.Sprintf("%s\x00%s\x00%s\x00%d\x00%s", systemID, userID, cycleID, attempt, result)
+	sum := sha256.Sum256([]byte(key))
+	return hex.EncodeToString(sum[:])[:15]
 }
 
 func createSystemDetailsRecord(app core.App, data *system.Details, systemId string) error {

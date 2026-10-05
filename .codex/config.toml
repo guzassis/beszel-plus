@@ -1,0 +1,14 @@
+model = "gpt-6.1-sol"
+model_reasoning_effort = "medium"
+model_verbosity = "low"
+developer_instructions = """
+Siga AGENTS.md. Execute o trabalho como principal.
+Use somente workers quando os critérios de paralelismo forem atendidos.
+Respeite o modelo e esforço selecionados pelo usuário na UI.
+"""
+
+[agents]
+enabled = true
+max_concurrent_threads_per_session = 2
+default_subagent_model = "gpt-6-luna"
+default_subagent_reasoning_effort = "xhigh"

@@ -17,7 +17,7 @@ func TestProductMetadata(t *testing.T) {
 	if UpstreamVersion != "0.18.2" {
 		t.Fatalf("unexpected upstream compatibility version %q", UpstreamVersion)
 	}
-	if Version != "0.2.9-dev" {
+	if Version != "0.3.0-dev" {
 		t.Fatalf("unexpected development product version %q", Version)
 	}
 }
@@ -25,16 +25,18 @@ func TestProductMetadata(t *testing.T) {
 func TestVersionFallbacksAndInstallersStayAligned(t *testing.T) {
 	root := filepath.Join("..", "..")
 	for _, check := range []struct{ path, marker string }{
-		{"internal/site/src/lib/build-info.ts", `"0.2.9-dev"`},
-		{"supplemental/scripts/install-agent.sh", `PRODUCT_VERSION="0.2.9"`},
-		{"supplemental/scripts/install-hub.sh", `PRODUCT_VERSION="0.2.9"`},
+		{"internal/site/package.json", `"version": "0.3.0"`},
+		{"internal/site/src/lib/build-info.ts", `"0.3.0-dev"`},
+		{"supplemental/scripts/install-agent.sh", `PRODUCT_VERSION="0.3.0"`},
+		{"supplemental/scripts/install-hub.sh", `PRODUCT_VERSION="0.3.0"`},
+		{"README.md", "The current Beszel Plus release is `v0.3.0`."},
 	} {
 		data, err := os.ReadFile(filepath.Join(root, check.path))
 		if err != nil {
 			t.Fatal(err)
 		}
 		if !strings.Contains(string(data), check.marker) {
-			t.Errorf("%s is not aligned with v0.2.9", check.path)
+			t.Errorf("%s is not aligned with v0.3.0", check.path)
 		}
 	}
 }
@@ -127,6 +129,11 @@ func TestReleaseMatrixIsNativeLinuxOnly(t *testing.T) {
 		"version: v2.17.0",
 		"release --snapshot --clean",
 		"beszel-maintenance-helper_linux_arm64.tar.gz",
+		"actions/upload-artifact@v7",
+		"pull_request:",
+		"contents: read",
+		"contents: write",
+		"release-publish:",
 	} {
 		if !strings.Contains(workflow, marker) {
 			t.Errorf("release workflow is missing %q", marker)

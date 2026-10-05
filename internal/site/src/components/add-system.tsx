@@ -69,7 +69,7 @@ export const SystemDialog = ({ setOpen, system }: { setOpen: (open: boolean) => 
 	const [token, setToken] = useState(system?.token ?? "")
 	const [installOptions, setInstallOptions] = useState<LinuxInstallOptions>({
 		osUpdateManagement: true,
-		osUpdatePolicy: "security",
+		osUpdatePolicy: "official-all",
 		powerManagement: true,
 		agentAutoUpdate: true,
 	})

@@ -1,7 +1,7 @@
 #!/bin/sh
 
 PRODUCT_NAME="Beszel Plus"
-PRODUCT_VERSION="0.2.9"
+PRODUCT_VERSION="0.3.0"
 REPOSITORY="guzassis/beszel-plus"
 
 is_alpine() {
@@ -248,7 +248,7 @@ HUB_URL_PROVIDED=false
 AUTO_UPDATE_FLAG="" # empty string means prompt, "true" means auto-enable, "false" means skip
 OS_UPDATE_MANAGEMENT_FLAG=""
 POWER_MANAGEMENT_FLAG=""
-OS_UPDATE_POLICY="security"
+OS_UPDATE_POLICY="official-all"
 VERSION="latest"
 ENROLLMENT_FAILURE=false
 ENROLLMENT_FAILURE_REASON=""
@@ -319,11 +319,20 @@ detect_existing_helper_version() {
     OLD_HELPER_VERSION_OUTPUT=$(run_with_portable_timeout 3 "$helper_path" --version 2>/dev/null || true)
   fi
   DETECTED_HELPER_VERSION=$(printf '%s\n' "$OLD_HELPER_VERSION_OUTPUT" | sed -n -e 's/^Beszel Plus Maintenance Helper v//p' -e 's/^beszel-maintenance-helper v//p' | head -n 1)
+  OLD_HELPER_PROTOCOL=$(printf '%s\n' "$OLD_HELPER_VERSION_OUTPUT" | sed -n 's/^protocol //p' | head -n 1)
+  [ -n "$OLD_HELPER_PROTOCOL" ] || OLD_HELPER_PROTOCOL="unknown"
   if [ -n "$DETECTED_HELPER_VERSION" ]; then
     OLD_HELPER_VERSION="$DETECTED_HELPER_VERSION"
   else
     echo "Existing helper does not support version reporting; treating as legacy."
   fi
+}
+
+maintenance_protocol_supported() {
+  case "$1" in
+    2|3) return 0 ;;
+    *) return 1 ;;
+  esac
 }
 
 # Check if running as root and re-execute with sudo if needed
@@ -478,7 +487,9 @@ fi
 MAINTENANCE_HELPER_PATH="/usr/local/libexec/beszel/maintenance-helper"
 AGENT_ENV_PATH="/etc/beszel-agent/agent.env"
 MAINTENANCE_POLICY_PATH="/var/lib/beszel-maintenance/policy.json"
-MAINTENANCE_STATUS_PATH="/var/lib/beszel-maintenance/status.json"
+MAINTENANCE_STATUS_PATH="/var/lib/beszel-maintenance/operation.json"
+MAINTENANCE_CYCLE_PATH="/var/lib/beszel-maintenance/update-cycles.json"
+MAINTENANCE_LEGACY_STATUS_PATH="/var/lib/beszel-maintenance/status.json"
 DRAIN_PATH="/run/beszel-agent/upgrade-in-progress"
 INSTALL_LOCK_PATH="/run/lock/beszel-plus-agent-install.lock"
 ROLLBACK_REPORT_PATH="/var/lib/beszel-maintenance/last-install-rollback.json"
@@ -520,6 +531,23 @@ json_string_value() {
   json_key="$2"
   [ -r "$json_file" ] || return 1
   sed -n "s/.*\"${json_key}\":\"\([^\"]*\)\".*/\1/p" "$json_file" | head -n 1
+}
+
+json_current_cycle_value() {
+  json_file="$1"
+  json_key="$2"
+  [ -r "$json_file" ] || return 1
+  sed -n "s/.*\"current\":{[^}]*\"${json_key}\":\"\([^\"]*\)\".*/\1/p" "$json_file" | head -n 1
+}
+
+maintenance_apt_lock_holders() {
+  command -v fuser >/dev/null 2>&1 || { printf 'unavailable'; return; }
+  lock_holders=$(fuser /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock /var/lib/apt/lists/lock /var/cache/apt/archives/lock /run/unattended-upgrades.lock 2>/dev/null | tr '\n' ' ' || true)
+  [ -n "$lock_holders" ] && printf '%s' "$lock_holders" || printf 'none'
+}
+
+maintenance_unit_active() {
+  case "$1" in active|activating|deactivating) return 0 ;; *) return 1 ;; esac
 }
 
 service_state() {
@@ -594,12 +622,14 @@ wait_unit_inactive() {
   wait_limit="$2"
   waited=0
   while [ "$waited" -lt "$wait_limit" ]; do
-    [ "$(systemctl show "$wait_unit" -p ActiveState --value 2>/dev/null)" = "active" ] || return 0
+    wait_active_state=$(systemctl show "$wait_unit" -p ActiveState --value 2>/dev/null || true)
+    maintenance_unit_active "$wait_active_state" || return 0
     sleep 1
     waited=$((waited + 1))
     if [ "$VERBOSE" = "true" ]; then echo "Maintenance preflight: $wait_unit still active after ${waited}s."; fi
   done
-  [ "$(systemctl show "$wait_unit" -p ActiveState --value 2>/dev/null)" != "active" ]
+  wait_active_state=$(systemctl show "$wait_unit" -p ActiveState --value 2>/dev/null || true)
+  ! maintenance_unit_active "$wait_active_state"
 }
 
 maintenance_preflight() {
@@ -609,6 +639,26 @@ maintenance_preflight() {
   status_request_id=$(json_string_value "$MAINTENANCE_STATUS_PATH" request_id 2>/dev/null || true)
   status_started_at=$(json_string_value "$MAINTENANCE_STATUS_PATH" started_at 2>/dev/null || true)
   status_state=$(json_string_value "$MAINTENANCE_STATUS_PATH" status 2>/dev/null || true)
+  if [ "$status_state" != "running" ]; then
+    legacy_status_state=$(json_string_value "$MAINTENANCE_LEGACY_STATUS_PATH" status 2>/dev/null || true)
+    if [ "$legacy_status_state" = "running" ]; then
+      status_operation=$(json_string_value "$MAINTENANCE_LEGACY_STATUS_PATH" operation 2>/dev/null || true)
+      status_request_id=$(json_string_value "$MAINTENANCE_LEGACY_STATUS_PATH" request_id 2>/dev/null || true)
+      status_started_at=$(json_string_value "$MAINTENANCE_LEGACY_STATUS_PATH" started_at 2>/dev/null || true)
+      status_state="$legacy_status_state"
+    fi
+  fi
+  cycle_state=$(json_current_cycle_value "$MAINTENANCE_CYCLE_PATH" state 2>/dev/null || true)
+  cycle_id=$(json_current_cycle_value "$MAINTENANCE_CYCLE_PATH" cycle_id 2>/dev/null || true)
+  cycle_source=$(json_current_cycle_value "$MAINTENANCE_CYCLE_PATH" source 2>/dev/null || true)
+  cycle_stage=$(json_current_cycle_value "$MAINTENANCE_CYCLE_PATH" stage 2>/dev/null || true)
+  case "$cycle_state" in
+    queued|running)
+      status_operation="run-unattended-upgrades"
+      status_state="running"
+      status_request_id="$cycle_id"
+      ;;
+  esac
   while IFS=' ' read -r unit _rest; do
     case "$unit" in beszel-maintenance@*.service) ;; *) continue ;; esac
     active_state=$(systemctl show "$unit" -p ActiveState --value 2>/dev/null || true)
@@ -620,7 +670,7 @@ maintenance_preflight() {
     children="none"
     held_locks="none"
     cmdline="unknown"
-    [ "$active_state" = "active" ] || continue
+    maintenance_unit_active "$active_state" || continue
     case "$pid" in ''|0|*[!0-9]*) operation="unknown" ;; *)
       exe=$(readlink "/proc/$pid/exe" 2>/dev/null || true)
       cmdline=$(tr '\000' ' ' <"/proc/$pid/cmdline" 2>/dev/null || true)
@@ -643,15 +693,12 @@ maintenance_preflight() {
       echo "Maintenance unit: $unit MainPID=$pid ExecMainPID=$exec_pid state=$active_state/$sub_state operation=$operation request_id=${status_request_id:-unknown} started=${status_started_at:-$started} elapsed=$elapsed executable=${exe:-unknown} cmdline=$cmdline children=$children apt_lock_pids=$held_locks"
     fi
     case "$operation" in
-      get-capabilities|get-update-policy|detect-repositories|get-operation-status|get-power-capabilities|get-poweroff-status)
+      get-capabilities|get-update-policy|detect-repositories|get-operation-status|get-update-cycle-status|get-power-capabilities|get-poweroff-status)
         echo "Waiting briefly for the active maintenance operation to finish..."
         if wait_unit_inactive "$unit" "$WAIT_FOR_MAINTENANCE"; then continue; fi
         ;;
       validate-update-policy|run-update-dry-run)
-        echo "A short maintenance validation is active."
-        echo "Waiting up to $WAIT_FOR_MAINTENANCE seconds for it to finish..."
-        systemctl stop "$unit" >/dev/null 2>&1 || true
-        if wait_unit_inactive "$unit" "$WAIT_FOR_MAINTENANCE"; then continue; fi
+        echo "An APT validation or simulation is active and will not be stopped."
         ;;
     esac
     BLOCKING_OPERATION="$operation"
@@ -669,7 +716,8 @@ maintenance_preflight() {
     echo "  Unit: $BLOCKING_UNIT" >&2
     echo "  PID: ${BLOCKING_PID:-unknown}" >&2
     echo "  ExecMainPID: ${exec_pid:-unknown}" >&2
-    echo "  Request ID: ${BLOCKING_REQUEST_ID:-unknown}" >&2
+    echo "  Request ID / cycle ID: ${BLOCKING_REQUEST_ID:-unknown}" >&2
+    [ -z "$cycle_state" ] || echo "  Update cycle: $cycle_state / ${cycle_source:-unknown} / ${cycle_stage:-unknown}" >&2
     echo "  Started: ${BLOCKING_STARTED_AT:-unknown}" >&2
     echo "  Elapsed: ${BLOCKING_ELAPSED:-unknown}" >&2
     echo "  Child PIDs: ${BLOCKING_CHILDREN:-none}" >&2
@@ -680,6 +728,21 @@ maintenance_preflight() {
     return 75
   done <"$PREFLIGHT_UNITS_FILE"
   rm -f "$PREFLIGHT_UNITS_FILE"
+  lock_holders=$(maintenance_apt_lock_holders)
+  if [ "$lock_holders" != "none" ]; then
+    echo "Beszel Plus Agent upgrade postponed." >&2
+    echo "An APT/dpkg process still holds a package-manager lock: $lock_holders" >&2
+    echo "No binaries or configuration files were changed." >&2
+    echo "Run the installer again after the package operation finishes." >&2
+    return 75
+  fi
+  if [ "$cycle_state" = "queued" ] || [ "$cycle_state" = "running" ]; then
+    echo "Beszel Plus Agent upgrade postponed." >&2
+    echo "Update cycle $cycle_id remains $cycle_state (${cycle_source:-unknown}, ${cycle_stage:-unknown})." >&2
+    echo "No binaries or configuration files were changed." >&2
+    echo "Run the installer again after the cycle is reconciled." >&2
+    return 75
+  fi
   return 0
 }
 
@@ -889,7 +952,7 @@ if [ -x "$MAINTENANCE_HELPER_PATH" ]; then
   [ -n "$EXISTING_HELPER_VERSION" ] || EXISTING_HELPER_VERSION="legacy"
   [ -n "$EXISTING_HELPER_PROTOCOL" ] || EXISTING_HELPER_PROTOCOL="unknown"
 fi
-if [ "$EXISTING_INSTALLATION" = "true" ] && [ "$EXISTING_HELPER_VERSION" != "none" ] && { [ "$OLD_AGENT_VERSION" != "$EXISTING_HELPER_VERSION" ] || [ "$EXISTING_HELPER_PROTOCOL" != "2" ]; }; then
+if [ "$EXISTING_INSTALLATION" = "true" ] && [ "$EXISTING_HELPER_VERSION" != "none" ] && { [ "$OLD_AGENT_VERSION" != "$EXISTING_HELPER_VERSION" ] || ! maintenance_protocol_supported "$EXISTING_HELPER_PROTOCOL"; }; then
   echo "Existing installation is inconsistent:"
   echo "Agent: v$OLD_AGENT_VERSION"
   echo "Maintenance Helper: v$EXISTING_HELPER_VERSION (protocol $EXISTING_HELPER_PROTOCOL)"
@@ -1038,12 +1101,29 @@ diagnose_install() {
   diagnose_operation=$(json_string_value "$MAINTENANCE_STATUS_PATH" operation 2>/dev/null || true)
   diagnose_request=$(json_string_value "$MAINTENANCE_STATUS_PATH" request_id 2>/dev/null || true)
   diagnose_status=$(json_string_value "$MAINTENANCE_STATUS_PATH" status 2>/dev/null || true)
+  if [ "$diagnose_status" != "running" ]; then
+    legacy_status_state=$(json_string_value "$MAINTENANCE_LEGACY_STATUS_PATH" status 2>/dev/null || true)
+    if [ "$legacy_status_state" = "running" ]; then
+      diagnose_operation=$(json_string_value "$MAINTENANCE_LEGACY_STATUS_PATH" operation 2>/dev/null || true)
+      diagnose_request=$(json_string_value "$MAINTENANCE_LEGACY_STATUS_PATH" request_id 2>/dev/null || true)
+      diagnose_status="$legacy_status_state"
+    fi
+  fi
+  diagnose_cycle_state=$(json_current_cycle_value "$MAINTENANCE_CYCLE_PATH" state 2>/dev/null || true)
+  diagnose_cycle_id=$(json_current_cycle_value "$MAINTENANCE_CYCLE_PATH" cycle_id 2>/dev/null || true)
+  diagnose_cycle_stage=$(json_current_cycle_value "$MAINTENANCE_CYCLE_PATH" stage 2>/dev/null || true)
   if [ "$diagnose_status" != "running" ]; then diagnose_operation=""; diagnose_request=""; fi
+  case "$diagnose_cycle_state" in queued|running) diagnose_operation="run-unattended-upgrades"; diagnose_request="$diagnose_cycle_id" ;; esac
   diagnose_pending="no"; [ -f /var/lib/beszel-maintenance/pending-policy.json ] && diagnose_pending="yes"
   diagnose_apt_required=false
   if [ "$POWER_MANAGEMENT_FLAG" = "true" ] && ! command -v ethtool >/dev/null 2>&1; then diagnose_apt_required=true; fi
   if [ "$OS_UPDATE_MANAGEMENT_FLAG" = "true" ] && ! dpkg-query -W -f='${db:Status-Status}' unattended-upgrades 2>/dev/null | grep -qx installed; then diagnose_apt_required=true; fi
-  diagnose_apt="none"; if command -v fuser >/dev/null 2>&1; then diagnose_apt=$(fuser /var/lib/dpkg/lock-frontend /var/lib/dpkg/lock /var/lib/apt/lists/lock /var/cache/apt/archives/lock /run/unattended-upgrades.lock 2>/dev/null | tr ' ' '\n' | sed '/^$/d' | sort -u | tr '\n' ' '); [ -n "$diagnose_apt" ] || diagnose_apt="none"; fi
+  diagnose_python3_apt="available"
+  if [ "$OS_UPDATE_MANAGEMENT_FLAG" = "true" ] && { [ ! -x /usr/bin/python3 ] || ! /usr/bin/python3 -c 'import apt, apt_pkg' >/dev/null 2>&1; }; then
+    diagnose_python3_apt="missing"
+    diagnose_apt_required=true
+  fi
+  diagnose_apt=$(maintenance_apt_lock_holders)
   diagnose_units_file=$(mktemp)
   systemctl list-units --all --no-legend 'beszel-maintenance@*.service' 2>/dev/null >"$diagnose_units_file" || true
   diagnose_unit=$(awk '$3 == "active" { print $1; exit }' "$diagnose_units_file")
@@ -1052,6 +1132,7 @@ diagnose_install() {
   echo "Installed Agent version: $OLD_AGENT_VERSION"
   echo "Installed Helper version: ${diagnose_helper_version:-legacy}"
   echo "Maintenance protocol: $diagnose_helper_protocol"
+  echo "Update cycle: ${diagnose_cycle_state:-unknown} ${diagnose_cycle_id:-} ${diagnose_cycle_stage:-}"
   echo "Agent service state: $(service_state beszel-agent.service)"
   echo "Maintenance socket state: $(service_state beszel-maintenance.socket)"
   echo "Active maintenance operation: ${diagnose_operation:-none}"
@@ -1059,10 +1140,11 @@ diagnose_install() {
   echo "Operation request ID: ${diagnose_request:-none}"
   echo "APT lock holder PID: $diagnose_apt"
   echo "APT package changes required: $diagnose_apt_required"
+  echo "python3-apt import: $diagnose_python3_apt"
   echo "Pending policy: $diagnose_pending"
   echo "OS update management: $OS_UPDATE_MANAGEMENT_FLAG"
   echo "Power management: $POWER_MANAGEMENT_FLAG"
-  if [ -n "$diagnose_operation" ] || { [ "$diagnose_apt_required" = "true" ] && [ "$diagnose_apt" != "none" ]; }; then echo "Upgrade can proceed: no"; else echo "Upgrade can proceed: yes"; fi
+  if [ -n "$diagnose_operation" ] || [ "$diagnose_cycle_state" = "queued" ] || [ "$diagnose_cycle_state" = "running" ] || [ "$diagnose_apt" != "none" ]; then echo "Upgrade can proceed: no"; else echo "Upgrade can proceed: yes"; fi
 }
 if [ "$DIAGNOSE" = "true" ]; then diagnose_install; exit 0; fi
 
@@ -1419,6 +1501,7 @@ AGENT_INSTALLED=false
 APT_REQUIRED=false
 NEED_ETHTOOL=false
 NEED_UNATTENDED_UPGRADES=false
+NEED_PYTHON3_APT=false
 if [ "$POWER_MANAGEMENT_FLAG" = "true" ] && ! command -v ethtool >/dev/null 2>&1; then
   APT_REQUIRED=true
   NEED_ETHTOOL=true
@@ -1426,6 +1509,10 @@ fi
 if [ "$OS_UPDATE_MANAGEMENT_FLAG" = "true" ] && ! dpkg-query -W -f='${db:Status-Status}' unattended-upgrades 2>/dev/null | grep -qx installed; then
   APT_REQUIRED=true
   NEED_UNATTENDED_UPGRADES=true
+fi
+if [ "$OS_UPDATE_MANAGEMENT_FLAG" = "true" ] && { [ ! -x /usr/bin/python3 ] || ! /usr/bin/python3 -c 'import apt, apt_pkg' >/dev/null 2>&1; }; then
+  APT_REQUIRED=true
+  NEED_PYTHON3_APT=true
 fi
 
 # Install the privileged one-shot helper only on supported Linux systems when requested.
@@ -1443,7 +1530,7 @@ if { [ "$OS_UPDATE_MANAGEMENT_FLAG" = "true" ] || [ "$POWER_MANAGEMENT_FLAG" = "
   if ! tar -xzf "$HELPER_ARCHIVE" -C "$TEMP_DIR" beszel-maintenance-helper; then echo "Failed to extract maintenance helper" >&2; exit 1; fi
   chmod 0755 "$HELPER_EXTRACTED"
   HELPER_VERSION_OUTPUT=$("$HELPER_EXTRACTED" --version 2>&1) || { echo "New maintenance helper version check failed" >&2; exit 1; }
-  if ! printf '%s\n' "$HELPER_VERSION_OUTPUT" | grep -qx "Beszel Plus Maintenance Helper v${INSTALL_VERSION}" || ! printf '%s\n' "$HELPER_VERSION_OUTPUT" | grep -qx 'protocol 2'; then
+if ! printf '%s\n' "$HELPER_VERSION_OUTPUT" | grep -qx "Beszel Plus Maintenance Helper v${INSTALL_VERSION}" || ! printf '%s\n' "$HELPER_VERSION_OUTPUT" | grep -qx 'protocol 3'; then
     echo "Maintenance helper version or protocol does not match Agent v${INSTALL_VERSION}." >&2
     exit 1
   fi
@@ -1463,12 +1550,14 @@ if { [ "$OS_UPDATE_MANAGEMENT_FLAG" = "true" ] || [ "$POWER_MANAGEMENT_FLAG" = "
       echo "Failed to refresh APT metadata before the Beszel transaction started." >&2
       exit 1
     fi
-    if [ "$NEED_ETHTOOL" = "true" ] && [ "$NEED_UNATTENDED_UPGRADES" = "true" ]; then
-      DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout="$WAIT_FOR_APT" install -y ethtool unattended-upgrades || apt_dependency_status=$?
-    elif [ "$NEED_ETHTOOL" = "true" ]; then
-      DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout="$WAIT_FOR_APT" install -y ethtool || apt_dependency_status=$?
-    else
-      DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout="$WAIT_FOR_APT" install -y unattended-upgrades || apt_dependency_status=$?
+    APT_DEPENDENCY_PACKAGES=""
+    if [ "$NEED_ETHTOOL" = "true" ]; then APT_DEPENDENCY_PACKAGES="$APT_DEPENDENCY_PACKAGES ethtool"; fi
+    if [ "$NEED_UNATTENDED_UPGRADES" = "true" ]; then APT_DEPENDENCY_PACKAGES="$APT_DEPENDENCY_PACKAGES unattended-upgrades"; fi
+    if [ "$NEED_PYTHON3_APT" = "true" ]; then APT_DEPENDENCY_PACKAGES="$APT_DEPENDENCY_PACKAGES python3-apt"; fi
+    if [ -n "$APT_DEPENDENCY_PACKAGES" ]; then
+      # Package names above are fixed constants; this deliberately uses the
+      # distribution Python bindings instead of whichever python is on PATH.
+      DEBIAN_FRONTEND=noninteractive apt-get -o DPkg::Lock::Timeout="$WAIT_FOR_APT" install -y $APT_DEPENDENCY_PACKAGES || apt_dependency_status=$?
     fi
     if [ "${apt_dependency_status:-0}" -ne 0 ]; then
       restore_apt_timers || true
@@ -1500,7 +1589,7 @@ if { [ "$OS_UPDATE_MANAGEMENT_FLAG" = "true" ] || [ "$POWER_MANAGEMENT_FLAG" = "
     exit 1
   fi
   INSTALLED_HELPER_OUTPUT=$("$MAINTENANCE_HELPER_PATH" --version 2>&1) || { echo "New maintenance helper smoke test failed." >&2; exit 1; }
-  if ! printf '%s\n' "$INSTALLED_HELPER_OUTPUT" | grep -qx "Beszel Plus Maintenance Helper v${INSTALL_VERSION}" || ! printf '%s\n' "$INSTALLED_HELPER_OUTPUT" | grep -qx 'protocol 2'; then
+  if ! printf '%s\n' "$INSTALLED_HELPER_OUTPUT" | grep -qx "Beszel Plus Maintenance Helper v${INSTALL_VERSION}" || ! printf '%s\n' "$INSTALLED_HELPER_OUTPUT" | grep -qx 'protocol 3'; then
     echo "Installed maintenance helper has an incompatible version or protocol." >&2
     exit 1
   fi
@@ -1521,7 +1610,7 @@ fi
 echo "Beszel Plus Agent v${INSTALL_VERSION} validated."
 if [ "$HELPER_REPLACED" = "true" ] && [ "$HELPER_REMOVED" != "true" ]; then
   echo "Beszel Plus Maintenance Helper v${INSTALL_VERSION} validated."
-  echo "Maintenance protocol 2 validated."
+  echo "Maintenance protocol 3 validated."
 fi
 
 # Set SELinux context if needed
@@ -1900,7 +1989,8 @@ EOF
 Description=Beszel Plus privileged maintenance helper
 [Service]
 Type=oneshot
-TimeoutStartSec=3h
+TimeoutStartSec=infinity
+KillMode=process
 WorkingDirectory=/
 ExecStart=$MAINTENANCE_HELPER_PATH
 StandardInput=socket
@@ -1974,9 +2064,9 @@ EOF
   fi
   if [ "$OS_UPDATE_MANAGEMENT_FLAG" = "true" ] && [ "$OS_UPDATE_SUPPORTED" = "true" ] && { [ "$EXISTING_INSTALLATION" = "false" ] || { [ "$MAINTENANCE_CONFIGURED_BEFORE" = "true" ] && [ "$MAINTENANCE_POLICY_EXISTED" = "false" ]; }; }; then
     echo "Applying initial update policy..."
-    case "$OS_UPDATE_POLICY" in monitor) POLICY_MODE="monitor_only" ;; official-all) POLICY_MODE="official_all" ;; *) POLICY_MODE="security" ;; esac
+    case "$OS_UPDATE_POLICY" in monitor) POLICY_MODE="monitor_only" ;; security) POLICY_MODE="security" ;; official-all) POLICY_MODE="official_all" ;; *) POLICY_MODE="official_all" ;; esac
     INSTALLER_REQUEST_ID="installer-$(date +%s)-$$"
-    if ! POLICY_RESPONSE=$(printf '{"version":2,"request_id":"%s","operation":"apply-update-policy","idempotency_key":"%s","policy":{"enabled":true,"mode":"%s","update_package_lists_days":1,"unattended_upgrade_days":1,"automatic_reboot":false,"automatic_reboot_time":"04:00","remove_unused_dependencies":false}}\n' "$INSTALLER_REQUEST_ID" "$INSTALLER_REQUEST_ID" "$POLICY_MODE" | "$MAINTENANCE_HELPER_PATH"); then
+    if ! POLICY_RESPONSE=$(printf '{"version":3,"request_id":"%s","operation":"apply-update-policy","idempotency_key":"%s","policy":{"enabled":true,"mode":"%s","update_package_lists_days":1,"unattended_upgrade_days":1,"automatic_reboot":false,"automatic_reboot_time":"04:00","remove_unused_dependencies":false}}\n' "$INSTALLER_REQUEST_ID" "$INSTALLER_REQUEST_ID" "$POLICY_MODE" | "$MAINTENANCE_HELPER_PATH"); then
       echo "Error: Initial OS update policy validation failed; maintenance setup is incomplete." >&2
       exit 1
     fi
