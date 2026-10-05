@@ -43,4 +43,4 @@ Implementação revisada e integrada pelo principal sob AGENTS.md/config.toml at
 
 Checks inicialmente interrompidos por quota de /tmp e caminho de socket longo foram repetidos em condições válidas. Nenhum APT real, host de produção, reboot ou publicação de release foi executado. O rollout requer atualizar Agent e helper pareados nas máquinas e manter OS_UPDATE_MANAGEMENT habilitado.
 
-Entrega GitHub: preparar commit, push e PR com pipeline de snapshot. Release estável 0.3.0 depende de merge/tag posteriores.
+Entrega GitHub: commit funcional `7479c093`, branch `codex/os-updates-end-to-end` enviada e [PR #1](https://github.com/guzassis/beszel-plus/pull/1) aberto. O PR dispara validação/snapshot; acompanhar o resultado em [checks](https://github.com/guzassis/beszel-plus/pull/1/checks). Release estável 0.3.0 depende de merge/tag posteriores.
