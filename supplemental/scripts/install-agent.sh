@@ -1,7 +1,7 @@
 #!/bin/sh
 
 PRODUCT_NAME="Beszel Plus"
-PRODUCT_VERSION="0.3.0"
+PRODUCT_VERSION="0.3.1"
 REPOSITORY="guzassis/beszel-plus"
 
 is_alpine() {
@@ -1998,6 +1998,8 @@ StandardOutput=socket
 StandardError=journal
 User=root
 Group=root
+# Preserve UID switching for APT's _apt sandbox when systemd installs seccomp filters.
+AmbientCapabilities=CAP_SETUID
 UMask=0077
 NoNewPrivileges=yes
 PrivateTmp=yes

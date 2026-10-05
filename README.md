@@ -5,7 +5,7 @@ Beszel Plus is a public fork of [Beszel](https://github.com/henrygd/beszel), a l
 The fork preserves compatibility with the original project while adding operational features used by Beszel Plus deployments.
 
 [![Fork original version](https://img.shields.io/badge/fork_original-v0.18.2-2563eb)](https://github.com/henrygd/beszel/releases/tag/v0.18.2)
-[![Beszel Plus version](https://img.shields.io/badge/Beszel_Plus-v0.3.0-7c3aed)](https://github.com/guzassis/beszel-plus/releases/tag/v0.3.0)
+[![Beszel Plus version](https://img.shields.io/badge/Beszel_Plus-v0.3.1-7c3aed)](https://github.com/guzassis/beszel-plus/releases/tag/v0.3.1)
 [![MIT license](https://img.shields.io/github/license/henrygd/beszel?color=%239944ee)](https://github.com/henrygd/beszel/blob/main/LICENSE)
 [![Crowdin](https://badges.crowdin.net/beszel/localized.svg)](https://crowdin.com/project/beszel)
 
@@ -30,7 +30,7 @@ The fork preserves compatibility with the original project while adding operatio
 - **Serialized update operations**: Collection and privileged maintenance share a local gate, preventing overlapping APT commands and duplicate collection cycles.
 - **Partial eligibility reporting**: Eligibility dry-runs use the privileged helper. Temporary lock or helper failures preserve the rest of the update snapshot and the last successful eligibility value instead of showing a global collection error.
 - **Verified connection refresh**: Re-running the systemd installer neutralizes stale `BESZEL_AGENT_*` overrides, verifies the running process configuration without printing secrets, and requires a post-restart WebSocket handshake before reporting complete success.
-- **Independent version compatibility**: WebSocket and SSH negotiation advertise the preserved upstream protocol baseline (`v0.18.2`) while Hub, Agent, helper, installers, UI, and system data report the independent Beszel Plus release (`v0.3.0`).
+- **Independent version compatibility**: WebSocket and SSH negotiation advertise the preserved upstream protocol baseline (`v0.18.2`) while Hub, Agent, helper, installers, UI, and system data report the independent Beszel Plus release (`v0.3.1`).
 - **Enrollment-safe install commands**: New systems and fingerprints are persisted in the Hub before the Linux command is copied; failed fingerprint creation removes the incomplete system and concurrent submissions are ignored.
 - **Power management**: Administrators can configure local power networks, inspect Agent network/WOL readiness, and use the Hub to wake or safely shut down each machine from the main systems list.
 - **Hub-local WOL**: Magic packets are generated directly by the Hub and sent three times over UDP 7 or 9. No root process, external command, listening port, or Tailscale-specific dependency is required.
@@ -103,7 +103,7 @@ The deprecated `--auto-update` flag remains an alias for `--agent-auto-update`. 
 
 ## Versioning
 
-Beszel Plus tracks the original fork baseline as `v0.18.2` and uses an independent release sequence for its own changes. The current Beszel Plus release is `v0.3.0`. Hub, Agent, maintenance helper, frontend, installers, update checks, and release assets use the same product version injected from `internal/buildinfo`; upstream protocol and Go module compatibility are tracked separately and are not displayed as the Beszel Plus product version.
+Beszel Plus tracks the original fork baseline as `v0.18.2` and uses an independent release sequence for its own changes. The current Beszel Plus release is `v0.3.1`. Hub, Agent, maintenance helper, frontend, installers, update checks, and release assets use the same product version injected from `internal/buildinfo`; upstream protocol and Go module compatibility are tracked separately and are not displayed as the Beszel Plus product version.
 
 Each Beszel Plus release must update this README whenever user-visible functionality, installation behavior, supported platforms, security architecture, or operational requirements change.
 
