@@ -1,7 +1,7 @@
 import { plural, t } from "@lingui/core/macro"
 import { Trans } from "@lingui/react/macro"
 import type { ReactNode } from "react"
-import { useState } from "react"
+import { useEffect, useState } from "react"
 import { Button } from "@/components/ui/button"
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
 import {
@@ -16,13 +16,21 @@ import { Input } from "@/components/ui/input"
 import { Switch } from "@/components/ui/switch"
 import { isAdmin, pb } from "@/lib/api"
 import { cn } from "@/lib/utils"
-import { MAINTENANCE_PROTOCOL_VERSION } from "@/lib/maintenance"
+import {
+	allowsManualUpdateCycle,
+	isTerminalUpdateCycle,
+	MAINTENANCE_PROTOCOL_VERSION,
+	makeManualCycleFields,
+	supportsMaintenanceProtocol,
+	supportsUpdateCycles,
+} from "@/lib/maintenance"
 import type {
 	MaintenanceResponse,
 	UpdateOverallState,
 	UpdatePolicy,
 	UpdatePolicyMode,
 	UpdateRepository,
+	UpdateCycleStatus,
 	UpdateStatus,
 } from "@/types"
 
@@ -36,7 +44,7 @@ const stateColors: Partial<Record<UpdateOverallState, string>> = {
 
 const defaultPolicy: UpdatePolicy = {
 	enabled: true,
-	mode: "security",
+	mode: "official_all",
 	update_package_lists_days: 1,
 	unattended_upgrade_days: 1,
 	automatic_reboot: false,
@@ -97,6 +105,47 @@ function dateLabel(value?: string) {
 	const date = new Date(value)
 	return Number.isNaN(date.getTime()) || date.getUTCFullYear() <= 1 ? "—" : date.toLocaleString()
 }
+
+function cycleStateLabel(state?: UpdateCycleStatus["state"]) {
+	switch (state) {
+		case "queued":
+			return t`Queued`
+		case "running":
+			return t`Running`
+		case "retry_wait":
+			return t`Waiting to retry`
+		case "completed":
+			return t`Completed`
+		case "completed_with_pending":
+			return t`Completed with justified pending updates`
+		case "failed":
+			return t`Failed`
+		case "canceled":
+			return t`Canceled`
+		default:
+			return t`Unknown`
+	}
+}
+
+function cycleStageLabel(stage?: UpdateCycleStatus["stage"]) {
+	switch (stage) {
+		case "refresh":
+			return t`Refreshing package indexes`
+		case "install":
+			return t`Installing eligible updates`
+		case "verify":
+			return t`Verifying installed updates`
+		case "reconcile":
+			return t`Reconciling update cycle`
+		default:
+			return t`Unknown`
+	}
+}
+
+function cycleCount(value?: number) {
+	return value === undefined ? t`Unknown` : value
+}
+
 function Row({ label, children }: { label: ReactNode; children: ReactNode }) {
 	return (
 		<div className="grid grid-cols-[minmax(9rem,1fr)_minmax(0,1.5fr)] gap-3 py-1.5 text-sm">
@@ -109,7 +158,11 @@ function Row({ label, children }: { label: ReactNode; children: ReactNode }) {
 export function updateSummary(status?: UpdateStatus) {
 	if (!status) return "—"
 	if (status.overall_state === "updates_pending") {
-		const eligible = status.pending_updates_eligible ?? status.pending_updates ?? 0
+		const eligible =
+			status.cycle?.state === "completed_with_pending"
+				? status.cycle.counts?.pending
+				: (status.pending_updates_eligible ?? status.pending_updates)
+		if (eligible === undefined) return t`Unknown`
 		const updates = plural(eligible, { one: "# update", other: "# updates" })
 		return status.pending_security_updates === undefined
 			? updates
@@ -118,7 +171,12 @@ export function updateSummary(status?: UpdateStatus) {
 	return stateLabel(status.overall_state)
 }
 
-function maintenance(systemId: string, operation: string, policy?: UpdatePolicy) {
+function maintenance(
+	systemId: string,
+	operation: string,
+	policy?: UpdatePolicy,
+	cycleFields?: { cycle_id?: string; source?: "manual" | "automatic"; policy_revision?: string }
+) {
 	const requestId = crypto.randomUUID()
 	return pb.send<MaintenanceResponse>("/api/beszel/maintenance", {
 		method: "POST",
@@ -130,6 +188,7 @@ function maintenance(systemId: string, operation: string, policy?: UpdatePolicy)
 				operation,
 				idempotency_key: crypto.randomUUID(),
 				...(policy ? { policy } : {}),
+				...(cycleFields ?? {}),
 			},
 		},
 	})
@@ -169,13 +228,15 @@ function PolicyDialog({
 	const [message, setMessage] = useState("")
 	const [output, setOutput] = useState("")
 	const capabilities = status.capabilities
-	const readOnly = !capabilities?.privileged_helper || !capabilities?.update_management || !capabilities?.policy_read
+	const protocolReady = supportsMaintenanceProtocol(capabilities?.protocol_version)
+	const readOnly =
+		!protocolReady || !capabilities?.privileged_helper || !capabilities?.update_management || !capabilities?.policy_read
 
 	async function load() {
 		setBusy(true)
 		setMessage("")
 		setOutput("")
-		if (!capabilities?.policy_read) {
+		if (!protocolReady || !capabilities?.policy_read) {
 			setMessage(t`Update management is unavailable. The current controls are read-only.`)
 			setBusy(false)
 			return
@@ -250,6 +311,13 @@ function PolicyDialog({
 					<p className="text-sm text-orange-600">
 						<Trans>
 							Privileged helper unavailable. Reinstall or upgrade the Agent with OS update management enabled.
+						</Trans>
+					</p>
+				)}
+				{!protocolReady && (
+					<p className="text-sm text-orange-600">
+						<Trans>
+							Update management requires a protocol 3 Agent and maintenance helper. Upgrade both components.
 						</Trans>
 					</p>
 				)}
@@ -386,7 +454,7 @@ function PolicyDialog({
 					{status.installation_state !== "installed" && (
 						<Button
 							variant="outline"
-							disabled={busy || !capabilities?.update_management}
+							disabled={busy || !protocolReady || !capabilities?.update_management}
 							onClick={() => run("install-update-dependencies")}
 						>
 							<Trans>Install required dependencies</Trans>
@@ -395,10 +463,17 @@ function PolicyDialog({
 					<Button variant="outline" disabled={busy || readOnly} onClick={() => run("validate-update-policy", true)}>
 						<Trans>Validate</Trans>
 					</Button>
-					<Button variant="outline" disabled={busy || !capabilities?.dry_run} onClick={() => run("run-update-dry-run")}>
+					<Button
+						variant="outline"
+						disabled={busy || !protocolReady || !capabilities?.dry_run}
+						onClick={() => run("run-update-dry-run")}
+					>
 						<Trans>Run dry-run</Trans>
 					</Button>
-					<Button disabled={busy || !capabilities?.policy_write} onClick={() => run("apply-update-policy", true)}>
+					<Button
+						disabled={busy || readOnly || !capabilities?.policy_write}
+						onClick={() => run("apply-update-policy", true)}
+					>
 						<Trans>Save and apply</Trans>
 					</Button>
 				</DialogFooter>
@@ -411,21 +486,91 @@ export default function AutomaticUpdates({ status, systemId }: { status?: Update
 	const [open, setOpen] = useState(false)
 	const [running, setRunning] = useState(false)
 	const [message, setMessage] = useState("")
+	const [liveCycle, setLiveCycle] = useState<UpdateCycleStatus>()
+	useEffect(() => {
+		const incoming = status?.cycle
+		if (!incoming) return
+		setLiveCycle((current) => {
+			if (!current || incoming.cycle_id > current.cycle_id) return incoming
+			if (incoming.cycle_id < current.cycle_id) return current
+			const incomingTime = incoming.updated_at ? Date.parse(incoming.updated_at) : Number.NaN
+			const currentTime = current.updated_at ? Date.parse(current.updated_at) : Number.NaN
+			return Number.isFinite(incomingTime) && (!Number.isFinite(currentTime) || incomingTime > currentTime)
+				? incoming
+				: current
+		})
+	}, [status?.cycle])
 	if (!status) return null
 	const caps = status.capabilities
+	const cycle = liveCycle ?? status.cycle
+	const cycleAvailable = supportsUpdateCycles(caps)
+
+	async function followCycle(cycleID: string, initial?: UpdateCycleStatus) {
+		let current = initial
+		for (let poll = 0; poll < 120; poll++) {
+			if (current) {
+				setLiveCycle(current)
+				if (isTerminalUpdateCycle(current.state)) break
+			}
+			await new Promise((resolve) => setTimeout(resolve, 2000))
+			const response = await maintenance(systemId, "get-update-cycle-status", undefined, { cycle_id: cycleID })
+			current = response.result?.update_cycle
+			if (!current && response.status === "failed") {
+				setMessage(maintenanceError(response))
+				return
+			}
+		}
+		if (!current) {
+			setMessage(t`The update cycle status is unavailable. The Agent may still be working.`)
+			return
+		}
+		setLiveCycle(current)
+		if (current.state === "completed") setMessage(t`Updates completed and verified successfully`)
+		else if (current.state === "completed_with_pending")
+			setMessage(t`Updates completed; justified pending updates remain`)
+		else if (current.state === "failed") setMessage(current.error || t`The update cycle failed`)
+		else if (current.state === "canceled") setMessage(t`The update cycle was canceled because its policy changed`)
+		else setMessage(t`The update cycle is still active. Its status will remain visible here.`)
+	}
+
 	async function runNow() {
 		if (!window.confirm(t`Run system updates now?`)) return
+		if (!cycleAvailable || !caps?.run_upgrade) {
+			setMessage(t`Update cycle support is unavailable. Upgrade the Agent and maintenance helper.`)
+			return
+		}
 		setRunning(true)
-		setMessage(t`Operation queued`)
+		setMessage(t`Checking update cycle status`)
 		try {
-			let response = await maintenance(systemId, "run-unattended-upgrades")
-			while (response.status === "queued" || response.status === "running") {
-				await new Promise((resolve) => setTimeout(resolve, 2000))
-				response = await maintenance(systemId, "get-operation-status")
+			const snapshot = await maintenance(systemId, "get-update-cycle-status")
+			if (snapshot.status === "failed") {
+				setMessage(maintenanceError(snapshot))
+				return
 			}
-			setMessage(response.status === "completed" ? t`Updates completed successfully` : maintenanceError(response))
+			const current = snapshot.result?.update_cycle
+			if (current && !isTerminalUpdateCycle(current.state)) {
+				setMessage(t`An update cycle is already active. Following its status.`)
+				await followCycle(current.cycle_id, current)
+				return
+			}
+			if (!allowsManualUpdateCycle(snapshot.result?.policy)) {
+				setMessage(t`The current update policy does not allow a manual cycle.`)
+				return
+			}
+			const fields = makeManualCycleFields(snapshot.result?.next_cycle_id, snapshot.result?.policy_revision)
+			if (!fields) {
+				setMessage(t`The helper did not provide a cycle ID and policy revision.`)
+				return
+			}
+			const response = await maintenance(systemId, "run-unattended-upgrades", undefined, fields)
+			if (response.status === "failed" && !response.result?.update_cycle) {
+				setMessage(maintenanceError(response))
+				return
+			}
+			setMessage(t`Update cycle is running`)
+			await followCycle(fields.cycle_id, response.result?.update_cycle)
 		} catch {
-			setMessage(t`Update failed`)
+			setMessage(t`The update cycle request failed`)
 		} finally {
 			setRunning(false)
 		}
@@ -442,7 +587,7 @@ export default function AutomaticUpdates({ status, systemId }: { status?: Update
 							<Trans>Configure</Trans>
 						</Button>
 					)}
-					{isAdmin() && caps?.run_upgrade && (
+					{isAdmin() && caps?.run_upgrade && cycleAvailable && (
 						<Button size="sm" disabled={running} onClick={runNow}>
 							<Trans>Run updates now</Trans>
 						</Button>
@@ -486,13 +631,76 @@ export default function AutomaticUpdates({ status, systemId }: { status?: Update
 					<Row label={<Trans>Excluded repositories</Trans>}>{status.excluded_repositories.join(", ")}</Row>
 				)}
 				<Row label={<Trans>Last check</Trans>}>{dateLabel(status.last_check_at)}</Row>
-				<Row label={<Trans>Last upgrade</Trans>}>{dateLabel(status.last_upgrade_at)}</Row>
-				{!!status.last_upgrade_source && (
+				{!status.cycle_management_enabled && (
+					<Row label={<Trans>Last upgrade</Trans>}>{dateLabel(status.last_upgrade_at)}</Row>
+				)}
+				{!!(cycle?.source || (!status.cycle_management_enabled && status.last_upgrade_source)) && (
 					<Row label={<Trans>Upgrade source</Trans>}>
-						{status.last_upgrade_source === "manual" ? t`Manual` : t`Automatic`}
+						{(cycle?.source ?? status.last_upgrade_source) === "manual" ? t`Manual` : t`Automatic`}
 					</Row>
 				)}
-				<Row label={<Trans>Last result</Trans>}>{valueLabel(status.last_result)}</Row>
+				{!status.cycle_management_enabled && (
+					<Row label={<Trans>Last result</Trans>}>{valueLabel(status.last_result)}</Row>
+				)}
+				{(status.cycle_management_enabled || cycleAvailable) && (
+					<>
+						<Row label={<Trans>Update cycle</Trans>}>
+							<strong className={cn(cycle?.state === "failed" ? "text-red-600 dark:text-red-400" : undefined)}>
+								{cycleStateLabel(cycle?.state)}
+							</strong>
+						</Row>
+						{cycle && (
+							<>
+								<Row label={<Trans>Cycle ID</Trans>}>{cycle.cycle_id}</Row>
+								<Row label={<Trans>Cycle source</Trans>}>{cycle.source === "manual" ? t`Manual` : t`Automatic`}</Row>
+								<Row label={<Trans>Current phase</Trans>}>{cycleStageLabel(cycle.stage)}</Row>
+								<Row label={<Trans>Attempt</Trans>}>{cycle.attempt}</Row>
+								<Row label={<Trans>Last attempt</Trans>}>{dateLabel(cycle.last_attempt_at)}</Row>
+								<Row label={<Trans>Last successful cycle</Trans>}>{dateLabel(cycle.last_success_at)}</Row>
+								<Row label={<Trans>Next scheduled cycle</Trans>}>{dateLabel(cycle.next_run_at)}</Row>
+								<Row label={<Trans>Next retry</Trans>}>{dateLabel(cycle.next_attempt_at)}</Row>
+								<Row label={<Trans>Verification</Trans>}>
+									{cycle.verified ? t`Verified` : cycle.verification_message || t`Unknown`}
+								</Row>
+								{cycle.timeout_observed && (
+									<Row label={<Trans>Client wait timed out</Trans>}>
+										<Trans>The helper is still supervising the package process.</Trans>
+									</Row>
+								)}
+								{(cycle.error || cycle.error_code) && (
+									<Row label={<Trans>Cycle error</Trans>}>
+										<span className="text-red-600 dark:text-red-400">
+											{cycle.error_code ? `${cycle.error_code}: ` : ""}
+											{cycle.error || t`Unknown error`}
+										</span>
+									</Row>
+								)}
+								<Row label={<Trans>Cycle candidates</Trans>}>{cycleCount(cycle.counts?.candidates)}</Row>
+								<Row label={<Trans>Eligible to install</Trans>}>{cycleCount(cycle.counts?.eligible)}</Row>
+								<Row label={<Trans>Held packages</Trans>}>{cycleCount(cycle.counts?.held)}</Row>
+								<Row label={<Trans>Excluded packages</Trans>}>{cycleCount(cycle.counts?.excluded)}</Row>
+								<Row label={<Trans>Blocked packages</Trans>}>{cycleCount(cycle.counts?.blocked)}</Row>
+								<Row label={<Trans>Unknown packages</Trans>}>{cycleCount(cycle.counts?.unknown)}</Row>
+								<Row label={<Trans>Pending packages</Trans>}>{cycleCount(cycle.counts?.pending)}</Row>
+								<Row label={<Trans>Initially eligible to install</Trans>}>
+									{cycleCount(cycle.initial_counts?.eligible)}
+								</Row>
+								{!!cycle.counts?.packages?.length && (
+									<Row label={<Trans>Package details</Trans>}>
+										<ul className="grid gap-1">
+											{cycle.counts.packages.map((pkg) => (
+												<li key={`${pkg.name}:${pkg.state}`}>
+													<strong>{pkg.name}</strong> · {pkg.state}
+													{pkg.reason ? ` — ${pkg.reason}` : ""}
+												</li>
+											))}
+										</ul>
+									</Row>
+								)}
+							</>
+						)}
+					</>
+				)}
 				<Row label={<Trans>Reboot required</Trans>}>{status.reboot_required ? t`Yes` : t`No`}</Row>
 				{!!status.reboot_required_by?.length && (
 					<Row label={<Trans>Reboot required by</Trans>}>{status.reboot_required_by.join(", ")}</Row>

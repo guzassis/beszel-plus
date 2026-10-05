@@ -59,6 +59,16 @@ func testHelper(t *testing.T) *Helper {
 	return &Helper{Root: root, Runner: &fakeRunner{}, Now: func() time.Time { return time.Unix(100, 0).UTC() }}
 }
 
+func TestCapabilitiesAdvertiseMinimumAgentVersionAndCycleProtocol(t *testing.T) {
+	caps := testHelper(t).capabilities()
+	if MinAgentVersion != "0.3.0" || caps.MinAgentVersion != "0.3.0" {
+		t.Fatalf("minimum Agent version mismatch: constant=%q capability=%q", MinAgentVersion, caps.MinAgentVersion)
+	}
+	if caps.ProtocolVersion != 3 || caps.MaxProtocolVersion != 3 || !caps.UpdateCycle {
+		t.Fatalf("protocol 3 cycle capability missing: %#v", caps)
+	}
+}
+
 func setAPTLock(t *testing.T, h *Helper, lockPath string, pid int, command, unit string) {
 	t.Helper()
 	if err := os.MkdirAll(filepath.Dir(h.path(lockPath)), 0o755); err != nil {
@@ -501,6 +511,7 @@ func TestOfficialAllIncludesRaspberryPiAndUsesCodename(t *testing.T) {
 func TestSafePolicyModesAndRebootDefaults(t *testing.T) {
 	h := testHelper(t)
 	security := entity.DefaultPolicy()
+	security.Mode = entity.ModeSecurity
 	if security.AutomaticReboot {
 		t.Fatal("automatic reboot must default to false")
 	}
@@ -530,7 +541,11 @@ func TestCapabilitiesRejectUnsupportedPlatform(t *testing.T) {
 	if caps.UpdateManagement || caps.PolicyWrite || caps.RunUpgrade || caps.SupportedPlatform != "fedora" {
 		t.Fatalf("unsupported platform advertised management: %#v", caps)
 	}
-	if response := h.Execute(context.Background(), req(entity.RunUnattendedUpgrades)); response.Status != entity.StateFailed || !strings.Contains(response.Error, "unsupported") {
+	request := req(entity.RunUnattendedUpgrades)
+	request.CycleID = "cycle-00000000000000000001"
+	request.Source = entity.CycleSourceManual
+	request.PolicyRevision = strings.Repeat("a", 64)
+	if response := h.Execute(context.Background(), request); response.Status != entity.StateFailed || !strings.Contains(response.Error, "unsupported") {
 		t.Fatalf("unsupported platform executed an APT operation: %#v", response)
 	}
 }

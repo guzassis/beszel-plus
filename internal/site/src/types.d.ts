@@ -180,6 +180,9 @@ export interface UpdateStatus {
 	last_successful_eligibility_check?: string
 	capabilities?: MaintenanceCapabilities
 	last_upgrade_source?: "automatic" | "manual"
+	cycle?: UpdateCycleStatus
+	cycle_management_enabled?: boolean
+	update_policy?: UpdatePolicy
 }
 
 export interface MaintenanceCapabilities {
@@ -194,6 +197,7 @@ export interface MaintenanceCapabilities {
 	supported_platform?: string
 	helper_version?: string
 	protocol_version?: number
+	update_cycle?: boolean
 	min_agent_version?: string
 	max_protocol_version?: number
 	build_commit?: string
@@ -223,6 +227,52 @@ export interface UpdateRepository {
 	trusted: boolean
 	official: boolean
 }
+export type UpdateCycleState =
+	| "queued"
+	| "running"
+	| "retry_wait"
+	| "completed"
+	| "completed_with_pending"
+	| "failed"
+	| "canceled"
+export type UpdateCycleStage = "refresh" | "install" | "verify" | "reconcile"
+export interface UpdateCyclePackage {
+	name: string
+	state: string
+	reason?: string
+}
+export interface UpdateCycleCounts {
+	candidates: number
+	eligible: number
+	held: number
+	excluded: number
+	blocked: number
+	unknown: number
+	pending: number
+	packages?: UpdateCyclePackage[]
+}
+export interface UpdateCycleStatus {
+	cycle_id: string
+	source: "manual" | "automatic"
+	policy_revision: string
+	state: UpdateCycleState
+	stage?: UpdateCycleStage
+	attempt: number
+	last_attempt_at?: string
+	started_at?: string
+	finished_at?: string
+	last_success_at?: string
+	next_run_at?: string
+	next_attempt_at?: string
+	error?: string
+	error_code?: string
+	counts?: UpdateCycleCounts
+	verified: boolean
+	verification_message?: string
+	updated_at?: string
+	timeout_observed?: boolean
+	initial_counts?: UpdateCycleCounts
+}
 export interface MaintenanceResponse {
 	version: number
 	request_id: string
@@ -236,6 +286,9 @@ export interface MaintenanceResponse {
 		repositories?: UpdateRepository[]
 		output?: string
 		changed?: boolean
+		update_cycle?: UpdateCycleStatus
+		next_cycle_id?: string
+		policy_revision?: string
 	}
 	error?: string
 	error_code?: string

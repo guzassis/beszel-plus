@@ -313,42 +313,42 @@ func TestMaintenancePreflightClassifiesProtocolOperation(t *testing.T) {
 	}
 	functions := script[start : start+end]
 	for _, tc := range []struct {
-		name, operation string
-		wantStatus      int
-		wantStop        bool
+		name, operation, activeState string
+		wantStatus                   int
 	}{
-		{name: "critical upgrade", operation: "run-unattended-upgrades", wantStatus: 75},
-		{name: "transactional policy", operation: "apply-update-policy", wantStatus: 75},
-		{name: "cancelable validation", operation: "run-update-dry-run", wantStatus: 0, wantStop: true},
+		{name: "critical upgrade", operation: "run-unattended-upgrades", activeState: "active", wantStatus: 75},
+		{name: "unit activating before helper response", operation: "run-unattended-upgrades", activeState: "activating", wantStatus: 75},
+		{name: "transactional policy", operation: "apply-update-policy", activeState: "active", wantStatus: 75},
+		{name: "APT simulation stays supervised", operation: "run-update-dry-run", activeState: "active", wantStatus: 75},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			dir := t.TempDir()
 			statusPath := filepath.Join(dir, "status.json")
-			stopPath := filepath.Join(dir, "stopped")
 			if err := os.WriteFile(statusPath, []byte(`{"operation":"`+tc.operation+`","request_id":"request-123","status":"running","started_at":"2026-07-14T10:00:00Z"}`), 0o600); err != nil {
 				t.Fatal(err)
 			}
 			harness := functions + `
 systemctl() {
   if [ "$1" = "list-units" ]; then echo "beszel-maintenance@1.service loaded active running"; return 0; fi
-  if [ "$1" = "stop" ]; then : > "$STOP_PATH"; return 0; fi
   if [ "$1" = "show" ]; then
     property=""
     while [ $# -gt 0 ]; do [ "$1" = "-p" ] && { shift; property="$1"; }; shift; done
-    if [ -f "$STOP_PATH" ] && [ "$property" = "ActiveState" ]; then echo inactive; return 0; fi
-    case "$property" in ActiveState) echo active ;; SubState) echo running ;; MainPID|ExecMainPID) echo 4242 ;; ActiveEnterTimestamp) echo "Tue 2026-07-14 10:00:00 UTC" ;; esac
+    case "$property" in ActiveState) echo "${ACTIVE_STATE:-active}" ;; SubState) echo running ;; MainPID|ExecMainPID) echo 4242 ;; ActiveEnterTimestamp) echo "Tue 2026-07-14 10:00:00 UTC" ;; esac
   fi
 }
 readlink() { echo "$MAINTENANCE_HELPER_PATH"; }
+fuser() { return 0; }
 cat() { case "$1" in /proc/*/cgroup) echo "0::/system.slice/beszel-maintenance@1.service" ;; *) command cat "$@" ;; esac; }
 maintenance_preflight
 `
 			cmd := exec.Command("sh", "-c", harness)
 			cmd.Env = append(os.Environ(),
 				"MAINTENANCE_STATUS_PATH="+statusPath,
+				"MAINTENANCE_CYCLE_PATH="+filepath.Join(dir, "no-cycle.json"),
+				"MAINTENANCE_LEGACY_STATUS_PATH="+filepath.Join(dir, "legacy-status.json"),
 				"MAINTENANCE_HELPER_PATH=/usr/local/libexec/beszel/maintenance-helper",
-				"STOP_PATH="+stopPath,
 				"WAIT_FOR_MAINTENANCE=1",
+				"ACTIVE_STATE="+tc.activeState,
 				"VERBOSE=false",
 			)
 			output, runErr := cmd.CombinedOutput()
@@ -361,12 +361,123 @@ maintenance_preflight
 			if status != tc.wantStatus {
 				t.Fatalf("status=%d output=%s", status, output)
 			}
-			if tc.wantStatus == 75 && (!strings.Contains(string(output), tc.operation) || !strings.Contains(string(output), "No binaries or configuration files were changed")) {
+			if !strings.Contains(string(output), tc.operation) || !strings.Contains(string(output), "No binaries or configuration files were changed") {
 				t.Fatalf("blocking diagnostic is incomplete: %s", output)
 			}
-			_, stopErr := os.Stat(stopPath)
-			if tc.wantStop != (stopErr == nil) {
-				t.Fatalf("stop=%v want=%v output=%s", stopErr == nil, tc.wantStop, output)
+		})
+	}
+}
+
+func TestInstallerRecognizesV2ForUpgradeAndRequiresV3Payload(t *testing.T) {
+	data, err := os.ReadFile("../../supplemental/scripts/install-agent.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	script := string(data)
+	for _, required := range []string{
+		`case "$1" in`,
+		"2|3) return 0",
+		`maintenance_protocol_supported "$EXISTING_HELPER_PROTOCOL"`,
+		`grep -qx 'protocol 3'`,
+		`MAINTENANCE_STATUS_PATH="/var/lib/beszel-maintenance/operation.json"`,
+		`MAINTENANCE_LEGACY_STATUS_PATH="/var/lib/beszel-maintenance/status.json"`,
+		`MAINTENANCE_CYCLE_PATH="/var/lib/beszel-maintenance/update-cycles.json"`,
+		`TimeoutStartSec=infinity`,
+		`KillMode=process`,
+		`python3-apt`,
+		`/usr/bin/python3 -c 'import apt, apt_pkg'`,
+	} {
+		if !strings.Contains(script, required) {
+			t.Fatalf("installer missing protocol3/legacy/lifecycle safeguard %q", required)
+		}
+	}
+	if !strings.Contains(script, `printf '{"version":3,"request_id":"%s","operation":"apply-update-policy"`) {
+		t.Fatal("initial policy payload does not use protocol 3")
+	}
+
+	start := strings.Index(script, "maintenance_protocol_supported() {")
+	if start < 0 {
+		t.Fatal("legacy protocol negotiation helper not found")
+	}
+	end := strings.Index(script[start:], "\n}")
+	if end < 0 {
+		t.Fatal("legacy protocol negotiation helper not terminated")
+	}
+	function := script[start : start+end+2]
+	for _, tc := range []struct {
+		protocol string
+		want     bool
+	}{{"2", true}, {"3", true}, {"1", false}, {"unknown", false}} {
+		cmd := exec.Command("sh", "-c", function+"\nmaintenance_protocol_supported \"$PROTOCOL\"")
+		cmd.Env = append(os.Environ(), "PROTOCOL="+tc.protocol)
+		err := cmd.Run()
+		if (err == nil) != tc.want {
+			t.Fatalf("protocol %s supported=%v want=%v err=%v", tc.protocol, err == nil, tc.want, err)
+		}
+	}
+}
+
+func TestInstallerPreflightProtectsCycleAndOrphanPackageLocks(t *testing.T) {
+	data, err := os.ReadFile("../../supplemental/scripts/install-agent.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	script := string(data)
+	start := strings.Index(script, "json_string_value() {")
+	if start < 0 {
+		t.Fatal("preflight functions not found")
+	}
+	end := strings.Index(script[start:], "\nrestore_transaction_file() {")
+	if end < 0 {
+		t.Fatal("preflight functions not terminated")
+	}
+	functions := script[start : start+end]
+	for _, tc := range []struct {
+		name, cycleState, lockOutput string
+		wantCode                     int
+		wantContains                 string
+	}{
+		{name: "root cycle running after unit disappeared", cycleState: "running", wantCode: 75, wantContains: "Update cycle cycle-00000000000000000012 remains running"},
+		{name: "orphan apt child holds lock", lockOutput: "4242", wantCode: 75, wantContains: "APT/dpkg process still holds"},
+		{name: "reconciled cycle is clear", cycleState: "completed", wantCode: 0},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			dir := t.TempDir()
+			statusPath := filepath.Join(dir, "operation.json")
+			cyclePath := filepath.Join(dir, "update-cycles.json")
+			if err := os.WriteFile(statusPath, []byte(`{"operation":"get-update-cycle-status","request_id":"request-123","status":"completed"}`), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			if tc.cycleState != "" {
+				cycleData := `{"watermark":12,"current":{"cycle_id":"cycle-00000000000000000012","source":"automatic","policy_revision":"rev-1","state":"` + tc.cycleState + `","stage":"verify","attempt":1,"counts":{"candidates":0,"eligible":0,"held":0,"excluded":0,"blocked":0,"unknown":0,"pending":0}}}`
+				if err := os.WriteFile(cyclePath, []byte(cycleData), 0o600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			harness := functions + `
+systemctl() { [ "$1" = "list-units" ] && return 0; }
+fuser() { [ "$LOCK_OUTPUT" = "unavailable" ] && return 127; [ -n "$LOCK_OUTPUT" ] && printf '%s\n' "$LOCK_OUTPUT"; return 0; }
+maintenance_preflight
+`
+			cmd := exec.Command("sh", "-c", harness)
+			cmd.Env = append(os.Environ(),
+				"MAINTENANCE_STATUS_PATH="+statusPath,
+				"MAINTENANCE_CYCLE_PATH="+cyclePath,
+				"MAINTENANCE_LEGACY_STATUS_PATH="+filepath.Join(dir, "status.json"),
+				"MAINTENANCE_HELPER_PATH=/usr/local/libexec/beszel/maintenance-helper",
+				"WAIT_FOR_MAINTENANCE=0",
+				"VERBOSE=false",
+				"LOCK_OUTPUT="+tc.lockOutput,
+			)
+			output, runErr := cmd.CombinedOutput()
+			status := 0
+			if exitErr, ok := runErr.(*exec.ExitError); ok {
+				status = exitErr.ExitCode()
+			} else if runErr != nil {
+				t.Fatal(runErr)
+			}
+			if status != tc.wantCode || (tc.wantContains != "" && !strings.Contains(string(output), tc.wantContains)) {
+				t.Fatalf("status=%d output=%s; want status=%d containing %q", status, output, tc.wantCode, tc.wantContains)
 			}
 		})
 	}

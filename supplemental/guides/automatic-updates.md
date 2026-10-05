@@ -1,6 +1,6 @@
-# Automatic update monitoring
+# Automatic update monitoring and management
 
-Beszel can collect a read-only snapshot of Debian and Ubuntu automatic update health. The feature monitors `unattended-upgrades`; it never installs packages, refreshes APT metadata, changes APT or systemd configuration, runs an upgrade, or reboots the machine. Connectivity is unchanged: `HUB_URL` continues to accept any URL the Agent can reach.
+Beszel can collect a read-only snapshot of Debian and Ubuntu automatic update health. Monitoring observes `unattended-upgrades`; by itself it never installs packages, refreshes APT metadata, changes APT or systemd configuration, runs an upgrade, or reboots the machine. Beszel Plus can separately manage operating-system updates through an explicit administrator policy and a privileged helper. Connectivity is unchanged: `HUB_URL` continues to accept any URL the Agent can reach.
 
 Beszel Plus can additionally enable explicit operating-system update management. Management is separate from monitoring and uses this fixed flow:
 
@@ -29,7 +29,7 @@ UPDATE_APT_TIMEOUT=2m
 OS_UPDATE_MANAGEMENT=true
 ```
 
-Set `UPDATE_MONITORING=false` (or remove it) and restart the Agent to disable all update-related commands and log access. The interval must be at least one minute, the timeout between one second and five minutes, and the package limit between 0 and 500.
+Set `UPDATE_MONITORING=false` (or remove it) and restart the Agent to disable monitoring collection and its related commands/log access. This flag does not control the independent OS-management schedule. The interval must be at least one minute, the timeout between one second and five minutes, and the package limit between 0 and 500.
 
 Set `OS_UPDATE_MANAGEMENT=false` and restart the Agent to hide and reject management operations while keeping monitoring. To remove the privileged component completely:
 
@@ -48,20 +48,22 @@ Removing `/var/lib/beszel-maintenance` also deletes the last policy and operatio
 
 The main Agent remains the `beszel` user with its existing `ProtectSystem=strict`, `ProtectHome`, `RestrictSUIDSGID`, and other hardening. The helper is installed as `root:root` at `/usr/local/libexec/beszel/maintenance-helper`, inside a dedicated root-owned directory and outside the Agent-owned directory. systemd owns a passive Unix socket. With `Accept=yes`, each request starts a root helper whose standard input/output is the accepted local socket; the process exits after one structured request. There is no permanent root daemon.
 
-The helper accepts only versioned operations defined in the maintenance protocol. Agent and helper must report the same Beszel Plus release, and protocol compatibility is negotiated before write operations. It rejects unknown JSON fields, unknown operations, malformed IDs, oversized requests, invalid policy modes, unsafe repository identifiers, control characters, path traversal, unconfirmed third-party repositories, replays, and concurrent changes. It never accepts a shell command, path, filename, environment map, or generic command arguments from the Hub. External tools are invoked with explicit argument arrays and no shell.
+The helper accepts only versioned operations defined in maintenance protocol 3. Existing protocol-2 helpers are recognized during an upgrade, while newly installed helpers and cycle operations require protocol 3 and the `UpdateCycle` capability. Agent and helper must report the same Beszel Plus release, and protocol/capability compatibility is checked before write operations. It rejects unknown JSON fields, unknown operations, malformed IDs, oversized requests, invalid policy modes, unsafe repository identifiers, control characters, path traversal, unconfirmed third-party repositories, replays, and concurrent changes. It never accepts a shell command, path, filename, environment map, or generic command arguments from the Hub. External tools are invoked with explicit argument arrays and no shell.
 
 From v0.1.3, upgrades are transactional. Detection of a legacy helper is time-bounded, Agent and helper binaries are validated before activation, and the previous binaries and managed systemd units are restored if installation fails or is interrupted. The maintenance socket and IPC smoke test run before the initial policy, and the Agent starts only after that attempt finishes.
 
-APT coordination uses ownership of the known dpkg/APT lock files reported by `/proc/locks`; a process name alone is never considered a lock. Update collection and maintenance are serialized inside the Agent. Eligibility is calculated through the privileged helper, and a temporary lock produces a partial snapshot while preserving other update data and the last successful eligibility result. During installation, APT activity blocks progress only when a missing dependency must be installed. The installer waits for up to 60 seconds by default (`--wait-for-apt=SECONDS`), reports the exact lock holders, and never kills or suspends APT, dpkg, or `unattended-upgrades`. When no package change is needed, installation may safely continue while those processes run.
+APT coordination uses ownership of the known dpkg/APT lock files reported by `/proc/locks`; a process name alone is never considered a lock. Update collection and maintenance are serialized inside the Agent. Eligibility is calculated through the privileged helper, and a temporary lock produces a partial snapshot while preserving other update data and the last successful eligibility result. The installer waits for up to 60 seconds by default (`--wait-for-apt=SECONDS`), reports lock holders, and never kills or suspends APT, dpkg, or `unattended-upgrades`. It also postpones an Agent upgrade while a maintenance unit is activating/deactivating, a persisted update cycle is queued/running, or a package-manager lock is held, including by an orphaned child. When no package change is needed, installation may safely continue while unrelated processes run.
 
 Defense in depth consists of Hub administrator and system-membership checks, the authenticated Agent handler and typed payload validation, socket permissions, and a second allowlist/validation layer in the root helper. The helper logs request ID, enumerated operation, and result to journald without logging tokens, keys, or arbitrary command strings.
 
 ## Policies
 
-New installations initiated by the Hub use `security`, daily package-list checks, daily unattended upgrades, no third-party repositories, and automatic reboot disabled. Existing installations receive the helper and socket but their manual APT policy is not silently replaced.
+New installations initiated by the Hub use `official_all`, daily package-list checks, daily unattended upgrades, no third-party repositories, and automatic reboot disabled. Existing installations receive the helper and socket but their manual APT policy is not silently replaced.
+
+On the first protocol-3 start, an enabled Beszel-managed legacy `security` policy is adopted as `official_all`, preserving intervals and reboot settings. Disabled, monitoring-only, custom, and unmanaged machines retain their choices. New administrator choices are marked as adopted and are not migrated again.
 
 - `monitor_only`: observes state and disables automatic execution when explicitly applied.
-- `security`: official security updates only; safe default.
+- `security`: official security updates only.
 - `official_all`: official Debian, Ubuntu, Raspbian, and Raspberry Pi Foundation repositories. It excludes vendors such as Tailscale.
 - `custom`: uses detected repository IDs. Every third-party selection requires explicit confirmation.
 
@@ -77,11 +79,17 @@ Beszel owns only `/etc/apt/apt.conf.d/52beszel-plus-unattended-upgrades` and the
 --os-update-policy=monitor|security|official-all
 ```
 
-The legacy `--auto-update` remains a deprecated alias for `--agent-auto-update`. Agent binary updates and operating-system package updates are independent. On supported new installations, the script verifies release checksums, installs `unattended-upgrades` when missing, installs the helper and systemd units, enables the APT timers, and applies the selected initial policy. Upgrades preserve `KEY`, `TOKEN`, `HUB_URL`, fingerprint identity, service configuration, and existing APT policy. Connection credentials are stored in `/etc/beszel-agent/agent.env`, owned by root with mode `0600`, rather than embedded in the service unit. Neither path reboots the machine.
+The legacy `--auto-update` remains a deprecated alias for `--agent-auto-update`. Agent binary updates and operating-system package updates are independent. On supported new installations, the script verifies release checksums, installs `unattended-upgrades` and `python3-apt` when missing, installs the helper and systemd units, enables the APT timers, and applies the selected initial policy. The helper uses the distribution's `/usr/bin/python3` and `python3-apt` bindings for its package inventory; a missing import is reported as an error/unknown inventory, never as zero pending packages. Upgrades preserve `KEY`, `TOKEN`, `HUB_URL`, fingerprint identity, service configuration, and existing APT policy. Connection credentials are stored in `/etc/beszel-agent/agent.env`, owned by root with mode `0600`, rather than embedded in the service unit. Neither path reboots the machine.
 
 ## Operations and recovery
 
-Long operations return `queued` immediately. The UI polls persisted `running`, `completed`, or `failed` state by request/idempotency ID, so normal metrics continue and the final result survives Agent or Hub reconnection. A local flock prevents two upgrades or policy writes at once. Completed policy changes and upgrades trigger an immediate update snapshot refresh.
+With `OS_UPDATE_MANAGEMENT=true` and an enabled policy, the Agent runs a local schedule even when the Hub is offline. Each cycle refreshes all configured APT indexes with strict error handling, checks the effective policy, installs every eligible upgrade through `unattended-upgrade`, then checks dpkg and the complete package inventory. A partial refresh prevents installation. The visual package-detail limit does not limit installed upgrades.
+
+The next automatic cycle is scheduled from completion plus `unattended_upgrade_days`. Setting that interval to zero disables automatic runs and retries; an enabled policy still permits a new manual cycle. Transient network/lock failures retry after 1, 5, 15, 30, then 60 minutes. Retries persist across restarts and are canceled when the policy changes or is revoked.
+
+An OS update run is a persisted cycle with a monotonic cycle ID, source (`manual` or `automatic`), policy revision, attempt number, stage, outcome, timestamps, verification, counts, and bounded package details. The Hub polls the cycle-specific status operation by cycle ID; it does not infer cycle success from generic operation status, old unattended-upgrade logs, or timers. The status also supplies the next cycle ID and current policy revision so a manual run can bind to the exact policy it is authorized to use. A retry is persisted with its next-attempt time, and only a verified cycle with no remaining installable packages records a successful completion. Held, excluded, blocked, or unknown packages remain visible as pending details; unavailable counts are shown as unknown rather than zero. The cycle status survives Agent/Hub reconnects and helper restarts.
+
+A local flock prevents two upgrades or policy writes at once. APT commands remain supervised until the child process exits: IPC loss or an observed timeout does not kill APT/dpkg, release the lock early, or permit a second install. Completed policy changes and upgrades trigger an immediate update snapshot refresh. Applying a policy never triggers a reboot; an automatic reboot is possible only when explicitly enabled in the policy.
 
 Audit history includes dependency installation, policy validation/application, dry-runs, upgrades, refusals, timeouts, incompatibility, and reboot transitions. View helper logs with:
 
@@ -100,7 +108,7 @@ The installer adds the `beszel` user to the existing `adm` and `systemd-journal`
 - `apt-config dump` supplies the effective `APT::Periodic` values, including overrides from later configuration files.
 - The existing systemd D-Bus connection reads the APT timers and services. A completed inactive oneshot service is not treated as a failure.
 - Ubuntu's `apt-check` supplies total and security counts. A read-only `apt-get -s -o Debug::NoLocking=true upgrade` is the fallback; its security count remains unknown rather than becoming zero.
-- A bounded `unattended-upgrade --dry-run --debug` step separately determines policy-eligible packages. Total APT candidates, eligible automatic updates, manual/excluded updates, security updates, and detected excluded origins are distinct fields.
+- The helper's `/usr/bin/python3` with distribution `python3-apt` enumerates package candidates, versions, holds, origins, pins, and installability. A bounded `unattended-upgrade --dry-run --debug` step separately determines policy-eligible packages. Total APT candidates, eligible automatic updates, held/excluded/blocked/unknown updates, security updates, and detected excluded origins are distinct fields; a missing or incomplete inventory stays unknown.
 - `/run/reboot-required` and `/run/reboot-required.pkgs` supply reboot state.
 - A bounded tail (256 KiB) of the current or once-rotated APT history supplies the latest timestamp and at most the configured package count. Missing or unreadable logs result in partial data, not an Agent failure.
 
@@ -125,4 +133,4 @@ The Hub stores the current snapshot in the system record, separately from CPU/RA
 
 The alert editor includes package missing, automatic updates disabled, last update failed, security updates pending, reboot required, and stale information. Unknown values do not trigger alerts, and normal alert resolution/history and quiet-hours behavior is retained.
 
-The first version depends on the host's existing APT cache and accessible systemd/log metadata. It does not call `apt update`, so pending counts can only be as current as that cache. Security counts may be unknown outside Ubuntu or when `apt-check` is unavailable. Localized free-form log error messages are not used to infer failure; systemd's structured result is preferred.
+Monitoring-only snapshots depend on the host's existing APT cache and accessible systemd/log metadata. Managed protocol-3 cycles refresh that cache and install eligible upgrades before verifying completion. Roll out matching Agent and helper binaries to each host to enable the new cycle; legacy helpers remain read-only until upgraded. Security counts may be unknown outside Ubuntu or when `apt-check` is unavailable. Missing inventory cannot produce a successful cycle.

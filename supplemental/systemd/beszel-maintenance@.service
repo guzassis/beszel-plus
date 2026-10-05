@@ -4,7 +4,8 @@ Documentation=https://github.com/guzassis/beszel-plus
 
 [Service]
 Type=oneshot
-TimeoutStartSec=3h
+TimeoutStartSec=infinity
+KillMode=process
 WorkingDirectory=/
 ExecStart=/usr/local/libexec/beszel/maintenance-helper
 StandardInput=socket

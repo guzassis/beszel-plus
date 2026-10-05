@@ -43,19 +43,27 @@ builds:
     goarch: [amd64, arm64]
     ldflags: *build_ldflags
 
+snapshot:
+  version_template: "{{ .Env.BESZEL_VERSION }}-snapshot.{{ .Commit }}"
+
 archives:
   - id: hub-archive
     ids: [beszel]
     formats: [tar.gz]
     name_template: "{{ .Binary }}_{{ .Os }}_{{ .Arch }}"
+    files: &archive_docs
+      - LICENSE
+      - README.md
   - id: agent-archive
     ids: [beszel-agent]
     formats: [tar.gz]
     name_template: "{{ .Binary }}_{{ .Os }}_{{ .Arch }}"
+    files: *archive_docs
   - id: helper-archive
     ids: [beszel-maintenance-helper]
     formats: [tar.gz]
     name_template: "{{ .Binary }}_{{ .Os }}_{{ .Arch }}"
+    files: *archive_docs
 
 checksum:
   name_template: "beszel_{{ .Version }}_checksums.txt"

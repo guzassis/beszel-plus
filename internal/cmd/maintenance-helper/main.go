@@ -6,7 +6,6 @@ import (
 	"os"
 	"os/signal"
 	"syscall"
-	"time"
 
 	"github.com/henrygd/beszel/internal/buildinfo"
 	"github.com/henrygd/beszel/internal/maintenance"
@@ -23,7 +22,7 @@ func main() {
 	// Convert an early peer close into a regular EPIPE returned by Encode so
 	// systemd does not report the one-shot unit as killed by SIGPIPE.
 	signal.Ignore(syscall.SIGPIPE)
-	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Hour)
+	ctx, cancel := signal.NotifyContext(context.Background(), syscall.SIGINT, syscall.SIGTERM)
 	defer cancel()
 	if err := maintenance.NewHelper().Serve(ctx, os.Stdin, os.Stdout); err != nil {
 		os.Exit(1)

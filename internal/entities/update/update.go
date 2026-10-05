@@ -100,6 +100,9 @@ type Status struct {
 	EligibilityErrorCode    string                          `json:"eligibility_error_code,omitempty" cbor:"32,keyasint,omitempty"`
 	EligibilityRetryable    bool                            `json:"eligibility_retryable,omitempty" cbor:"33,keyasint,omitempty"`
 	LastEligibilityCheck    *time.Time                      `json:"last_successful_eligibility_check,omitempty" cbor:"34,keyasint,omitempty"`
+	Cycle                   *maintenanceentity.CycleStatus  `json:"cycle,omitempty" cbor:"35,keyasint,omitempty"`
+	CycleManagementEnabled  bool                            `json:"cycle_management_enabled,omitempty" cbor:"36,keyasint,omitempty"`
+	UpdatePolicy            *maintenanceentity.Policy       `json:"update_policy,omitempty" cbor:"37,keyasint,omitempty"`
 }
 
 // DeriveOverallState is the single precedence definition used by agent and hub.
@@ -111,6 +114,16 @@ func DeriveOverallState(s *Status) OverallState {
 	}
 	if s.InstallationState == InstallationNotInstalled {
 		return OverallNotInstalled
+	}
+	if s.CycleManagementEnabled && s.Cycle != nil {
+		switch s.Cycle.State {
+		case maintenanceentity.CycleQueued, maintenanceentity.CycleRunning, maintenanceentity.CycleRetryWait:
+			return OverallUpdateInProgress
+		case maintenanceentity.CycleFailed:
+			return OverallLastRunFailed
+		case maintenanceentity.CycleCompletedWithPending:
+			return OverallUpdatesPending
+		}
 	}
 	if s.InstallationState == InstallationInstalled && (s.ConfigurationState == ConfigurationMissing || s.ConfigurationState == ConfigurationPartial) {
 		return OverallInstalledNotConfigured
