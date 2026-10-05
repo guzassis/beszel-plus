@@ -1,7 +1,7 @@
 #!/bin/sh
 
 PRODUCT_NAME="Beszel Plus"
-PRODUCT_VERSION="0.3.1"
+PRODUCT_VERSION="0.3.2"
 REPOSITORY="guzassis/beszel-plus"
 
 is_alpine() {

@@ -17,7 +17,7 @@ func TestProductMetadata(t *testing.T) {
 	if UpstreamVersion != "0.18.2" {
 		t.Fatalf("unexpected upstream compatibility version %q", UpstreamVersion)
 	}
-	if Version != "0.3.1-dev" {
+	if Version != "0.3.2-dev" {
 		t.Fatalf("unexpected development product version %q", Version)
 	}
 }
@@ -25,18 +25,18 @@ func TestProductMetadata(t *testing.T) {
 func TestVersionFallbacksAndInstallersStayAligned(t *testing.T) {
 	root := filepath.Join("..", "..")
 	for _, check := range []struct{ path, marker string }{
-		{"internal/site/package.json", `"version": "0.3.1"`},
-		{"internal/site/src/lib/build-info.ts", `"0.3.1-dev"`},
-		{"supplemental/scripts/install-agent.sh", `PRODUCT_VERSION="0.3.1"`},
-		{"supplemental/scripts/install-hub.sh", `PRODUCT_VERSION="0.3.1"`},
-		{"README.md", "The current Beszel Plus release is `v0.3.1`."},
+		{"internal/site/package.json", `"version": "0.3.2"`},
+		{"internal/site/src/lib/build-info.ts", `"0.3.2-dev"`},
+		{"supplemental/scripts/install-agent.sh", `PRODUCT_VERSION="0.3.2"`},
+		{"supplemental/scripts/install-hub.sh", `PRODUCT_VERSION="0.3.2"`},
+		{"README.md", "The current Beszel Plus release is `v0.3.2`."},
 	} {
 		data, err := os.ReadFile(filepath.Join(root, check.path))
 		if err != nil {
 			t.Fatal(err)
 		}
 		if !strings.Contains(string(data), check.marker) {
-			t.Errorf("%s is not aligned with v0.3.1", check.path)
+			t.Errorf("%s is not aligned with v0.3.2", check.path)
 		}
 	}
 }
@@ -135,6 +135,9 @@ func TestReleaseMatrixIsNativeLinuxOnly(t *testing.T) {
 		"contents: write",
 		"release-publish:",
 		"runs-on: ubuntu-24.04",
+		"Install distribution APT bindings for inventory regression",
+		"sudo apt-get install -y python3-apt",
+		`BESZEL_TEST_APT: "1"`,
 		"Verify APT privilege drop in hardened helper",
 		`BESZEL_TEST_SYSTEMD: "1"`,
 	} {
