@@ -13,6 +13,8 @@ StandardOutput=socket
 StandardError=journal
 User=root
 Group=root
+# Preserve UID switching for APT's _apt sandbox when systemd installs seccomp filters.
+AmbientCapabilities=CAP_SETUID
 UMask=0077
 NoNewPrivileges=yes
 PrivateTmp=yes

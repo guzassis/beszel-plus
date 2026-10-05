@@ -13,7 +13,7 @@ permissions:
 
 jobs:
   validate:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     outputs:
@@ -45,6 +45,11 @@ jobs:
 
       - name: Test Go packages
         run: go test -tags=testing ./...
+
+      - name: Verify APT privilege drop in hardened helper
+        env:
+          BESZEL_TEST_SYSTEMD: "1"
+        run: go test -tags=testing -run '^TestSystemdMaintenanceSandboxAllowsAPTPrivilegeDrop$' -count=1 -v ./internal/maintenance
 
       - name: Determine and validate release identity
         id: identity
