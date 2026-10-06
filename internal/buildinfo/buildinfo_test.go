@@ -17,7 +17,7 @@ func TestProductMetadata(t *testing.T) {
 	if UpstreamVersion != "0.18.2" {
 		t.Fatalf("unexpected upstream compatibility version %q", UpstreamVersion)
 	}
-	if Version != "0.3.2-dev" {
+	if Version != "0.3.3-dev" {
 		t.Fatalf("unexpected development product version %q", Version)
 	}
 }
@@ -25,18 +25,18 @@ func TestProductMetadata(t *testing.T) {
 func TestVersionFallbacksAndInstallersStayAligned(t *testing.T) {
 	root := filepath.Join("..", "..")
 	for _, check := range []struct{ path, marker string }{
-		{"internal/site/package.json", `"version": "0.3.2"`},
-		{"internal/site/src/lib/build-info.ts", `"0.3.2-dev"`},
-		{"supplemental/scripts/install-agent.sh", `PRODUCT_VERSION="0.3.2"`},
-		{"supplemental/scripts/install-hub.sh", `PRODUCT_VERSION="0.3.2"`},
-		{"README.md", "The current Beszel Plus release is `v0.3.2`."},
+		{"internal/site/package.json", `"version": "0.3.3"`},
+		{"internal/site/src/lib/build-info.ts", `"0.3.3-dev"`},
+		{"supplemental/scripts/install-agent.sh", `PRODUCT_VERSION="0.3.3"`},
+		{"supplemental/scripts/install-hub.sh", `PRODUCT_VERSION="0.3.3"`},
+		{"README.md", "The current Beszel Plus release is `v0.3.3`."},
 	} {
 		data, err := os.ReadFile(filepath.Join(root, check.path))
 		if err != nil {
 			t.Fatal(err)
 		}
 		if !strings.Contains(string(data), check.marker) {
-			t.Errorf("%s is not aligned with v0.3.2", check.path)
+			t.Errorf("%s is not aligned with v0.3.3", check.path)
 		}
 	}
 }

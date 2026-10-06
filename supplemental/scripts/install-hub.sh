@@ -1,7 +1,7 @@
 #!/bin/sh
 
 PRODUCT_NAME="Beszel Plus"
-PRODUCT_VERSION="0.3.2"
+PRODUCT_VERSION="0.3.3"
 REPOSITORY="guzassis/beszel-plus"
 GITHUB_URL="https://github.com"
 PORT=8090

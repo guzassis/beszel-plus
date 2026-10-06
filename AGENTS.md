@@ -11,6 +11,7 @@
 - Responda com o mínimo necessário: atualizações breves, sem narrar passos rotineiros; ao concluir, informe resultado, checks e limitações. Pergunte apenas quando faltar decisão que afete o trabalho; sem aprovações recorrentes para ações já autorizadas.
 - Use `docs/tasks/<id>.md` apenas para trabalhos longos, retomáveis ou quando solicitado: objetivo, critérios, estado e checks. Sem cerimônia de versionamento ou aprovação obrigatória.
 - O principal revisa todas as alterações e verifica o resultado integrado. Checks bloqueados ou ausentes não passaram; mudanças posteriores exigem repetir os checks afetados. Encerre ao cumprir os critérios.
+- Toda entrega via PR deve incluir uma nova versão e o envio da tag `vX.Y.Z`, inclusive mudanças de testes ou documentação. Incremente `+0.0.1` para ajustes, correções e entregas menores; `+0.1.0` para funcionalidades e entregas maiores. Alinhe as versões dos componentes e instaladores, valide os checks e publique a tag após integrar o PR.
 
 ## Project & Commands
 
