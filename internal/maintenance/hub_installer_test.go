@@ -13,7 +13,7 @@ func TestHubInstallerHasTransactionalNativeFlow(t *testing.T) {
 	}
 	script := string(data)
 	for _, required := range []string{
-		`PRODUCT_VERSION="0.3.2"`,
+		`PRODUCT_VERSION="0.3.3"`,
 		"beszel-plus-hub-install.lock",
 		"sha256sum",
 		"Checksum entry is missing or invalid",
