@@ -52,6 +52,15 @@ describe("maintenance frontend contract", () => {
 		expect(isTerminalUpdateCycle(undefined)).toBe(false)
 	})
 
+	test("starts a new manual cycle after a saved failure using the helper's next ID", () => {
+		expect(isTerminalUpdateCycle("failed")).toBe(true)
+		expect(makeManualCycleFields("cycle-00000000000000000002", "rev-a")).toEqual({
+			cycle_id: "cycle-00000000000000000002",
+			source: "manual",
+			policy_revision: "rev-a",
+		})
+	})
+
 	test("allows manual cycles only when an enabled update policy is known", () => {
 		const base = {
 			update_package_lists_days: 1,

@@ -199,6 +199,52 @@ func TestCycleRestartReconcilesEveryStageWithoutReinstalling(t *testing.T) {
 	}
 }
 
+func TestCycleUpgradePreservesFailedHistoryAndNewCycleCompletes(t *testing.T) {
+	policy := entity.DefaultPolicy()
+	h, runner := cycleScenario(t, policy)
+	failedAt := time.Date(2026, 10, 5, 9, 54, 17, 0, time.UTC)
+	upgradedAt := failedAt.Add(2 * time.Hour)
+	old := entity.CycleStatus{
+		CycleID: cycleID(1), Source: entity.CycleSourceManual,
+		PolicyRevision: policyRevision(policy), State: entity.CycleFailed,
+		Stage: entity.CycleStageVerify, Attempt: 1, FinishedAt: &failedAt,
+		UpdatedAt: &failedAt, NextRunAt: ptrTime(failedAt.Add(24 * time.Hour)),
+		ErrorCode: "inventory_failed",
+		Error:     "APT inventory failed: AttributeError: 'Cache' object has no attribute 'items'",
+	}
+	if err := h.writeCycleStore(cycleStore{Watermark: 1, Current: &old}); err != nil {
+		t.Fatal(err)
+	}
+	// Replacing the binary and restarting creates a fresh Helper, preserving the
+	// durable failure. A status query or replay must never rerun package commands.
+	h = &Helper{Root: h.Root, Runner: runner, Now: func() time.Time { return upgradedAt }}
+	runner.base.helper = h
+	query := entity.Request{Version: entity.ProtocolVersion, RequestID: "after-upgrade", Operation: entity.GetUpdateCycleStatus}
+	response := h.Execute(context.Background(), query)
+	cycle := responseCycleForTest(t, response)
+	if response.Status != entity.StateCompleted || cycle.State != entity.CycleFailed || cycle.Error != old.Error || cycle.NextRunAt == nil || !cycle.NextRunAt.Equal(*old.NextRunAt) || response.Result.NextCycleID != cycleID(2) || len(runner.base.calls) != 0 {
+		t.Fatalf("upgrade concealed or reran the historical failure: %#v calls=%v", response, runner.base.calls)
+	}
+	replayed := responseCycleForTest(t, h.Execute(context.Background(), cycleRequest(policy)))
+	if replayed.CycleID != old.CycleID || replayed.Error != old.Error || len(runner.base.calls) != 0 {
+		t.Fatalf("failed cycle replay executed commands: %#v calls=%v", replayed, runner.base.calls)
+	}
+
+	// The UI obtains NextCycleID and starts a distinct manual cycle, even before
+	// the next daily schedule. Its refresh/install/verify replace the visible state.
+	request := cycleRequest(policy)
+	request.RequestID, request.IdempotencyKey = "new-manual-cycle", "new-manual-cycle"
+	request.CycleID = response.Result.NextCycleID
+	current := responseCycleForTest(t, h.Execute(context.Background(), request))
+	if current.CycleID != cycleID(2) || current.State != entity.CycleCompleted || !current.Verified || current.Error != "" || current.ErrorCode != "" || current.LastSuccessAt == nil || !current.LastSuccessAt.Equal(upgradedAt) || installCalls(runner.base.calls) != 1 {
+		t.Fatalf("new manual cycle did not install and verify: %#v calls=%v", current, runner.base.calls)
+	}
+	store, err := h.readCycleStore()
+	if err != nil || store.Watermark != 2 || len(store.History) != 1 || store.History[0].Error != old.Error || store.History[0].CycleID != old.CycleID {
+		t.Fatalf("new success destroyed the historical audit: %#v err=%v", store, err)
+	}
+}
+
 func TestCycleLiveSubprocessBlocksReplayAndRevocationWaitsForExit(t *testing.T) {
 	policy := entity.DefaultPolicy()
 	h, runner := cycleScenario(t, policy)
