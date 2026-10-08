@@ -209,9 +209,57 @@ func TestParseLatestAptHistoryLimitsAndDeduplicates(t *testing.T) {
 
 func TestParseLatestAptHistoryDetectsUnattendedUpgrade(t *testing.T) {
 	data := []byte("Start-Date: 2026-07-11  03:12:00\nCommandline: /usr/bin/unattended-upgrade\nUpgrade: openssl:amd64 (1, 2)\nEnd-Date: 2026-07-11  03:12:02\n")
-	_, _, source := parseLatestAptHistory(data, 2)
-	if source != "automatic" {
-		t.Fatalf("source=%q", source)
+	when, packages, source := parseLatestAptHistory(data, 2)
+	if when == nil || len(packages) != 1 || packages[0] != "openssl" || source != "automatic" {
+		t.Fatalf("got %v %#v source=%q", when, packages, source)
+	}
+}
+
+func TestParseLatestAptHistorySkipsLatestDryRun(t *testing.T) {
+	data := []byte("Start-Date: 2026-07-10  04:18:00\nCommandline: apt-get install curl\nUpgrade: curl:amd64 (1, 2)\nEnd-Date: 2026-07-10  04:18:02\n\nStart-Date: 2026-07-11  04:18:00\nCommandline: /usr/bin/unattended-upgrade --dry-run --debug\nUpgrade: openssl:amd64 (1, 2)\nEnd-Date: 2026-07-11  04:18:02\n")
+	when, packages, source := parseLatestAptHistory(data, 2)
+	if when == nil || when.Day() != 10 || len(packages) != 1 || packages[0] != "curl" || source != "manual" {
+		t.Fatalf("dry-run replaced effective upgrade: got %v %#v source=%q", when, packages, source)
+	}
+}
+
+func TestParseLatestAptHistoryReturnsNilForOnlyDryRuns(t *testing.T) {
+	commands := []string{
+		"/usr/bin/unattended-upgrade --dry-run --debug",
+		"apt -s upgrade",
+		"/usr/bin/apt-get --simulate upgrade",
+		"apt-get --just-print upgrade",
+		"apt --dry-run upgrade",
+	}
+	for _, command := range commands {
+		t.Run(command, func(t *testing.T) {
+			data := []byte("Start-Date: 2026-07-11  04:18:00\nCommandline: " + command + "\nUpgrade: openssl:amd64 (1, 2)\nEnd-Date: 2026-07-11  04:18:02\n")
+			when, packages, source := parseLatestAptHistory(data, 2)
+			if when != nil || len(packages) != 0 || source != "" {
+				t.Fatalf("dry-run was reported as an upgrade: got %v %#v source=%q", when, packages, source)
+			}
+		})
+	}
+}
+
+func TestParseLatestAptHistoryRequiresExactCommandAndFlagTokens(t *testing.T) {
+	commands := []struct {
+		command string
+		source  string
+	}{
+		{command: "/usr/local/unattended-upgrade-wrapper --dry-run", source: "manual"},
+		{command: "/usr/bin/apt-get-wrapper --simulate upgrade", source: "manual"},
+		{command: "/usr/bin/unattended-upgrade --dry-runner", source: "automatic"},
+		{command: "/opt/apt-tools/apt-get install --simulate-package", source: "manual"},
+	}
+	for _, tc := range commands {
+		t.Run(tc.command, func(t *testing.T) {
+			data := []byte("Start-Date: 2026-07-11  04:18:00\nCommandline: " + tc.command + "\nUpgrade: openssl:amd64 (1, 2)\n")
+			when, packages, source := parseLatestAptHistory(data, 2)
+			if when == nil || len(packages) != 1 || packages[0] != "openssl" || source != tc.source {
+				t.Fatalf("unexpected classification: got %v %#v source=%q", when, packages, source)
+			}
+		})
 	}
 }
 

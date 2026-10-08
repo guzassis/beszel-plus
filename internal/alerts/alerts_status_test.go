@@ -29,10 +29,11 @@ func setStatusAlertEmail(t *testing.T, hub core.App, userID, email string) {
 }
 
 func TestStatusAlerts(t *testing.T) {
-	synctest.Test(t, func(t *testing.T) {
-		hub, user := beszelTests.GetHubWithUser(t)
-		defer hub.Cleanup()
+	hub, user := beszelTests.GetHubWithUser(t)
+	defer hub.Cleanup()
 
+	synctest.Test(t, func(t *testing.T) {
+		defer hub.StopBackgroundTasks()
 		systems, err := beszelTests.CreateSystems(hub, 4, user.Id, "paused")
 		assert.NoError(t, err)
 
@@ -234,10 +235,11 @@ func TestHandleStatusAlertsDoesNotSendRecoveryWhileDownIsOnlyPending(t *testing.
 }
 
 func TestStatusAlertTimerCancellationPreventsBoundaryDelivery(t *testing.T) {
-	synctest.Test(t, func(t *testing.T) {
-		hub, user := beszelTests.GetHubWithUser(t)
-		defer hub.Cleanup()
+	hub, user := beszelTests.GetHubWithUser(t)
+	defer hub.Cleanup()
 
+	synctest.Test(t, func(t *testing.T) {
+		defer hub.StopBackgroundTasks()
 		userSettings, err := hub.FindFirstRecordByFilter("user_settings", "user={:user}", map[string]any{"user": user.Id})
 		require.NoError(t, err)
 		userSettings.Set("settings", `{"emails":["test@example.com"],"webhooks":[]}`)
@@ -336,10 +338,11 @@ func TestStatusAlertDownFiresAfterDelayExpires(t *testing.T) {
 }
 
 func TestStatusAlertMultipleUsersRespectDifferentMinutes(t *testing.T) {
-	synctest.Test(t, func(t *testing.T) {
-		hub, user1 := beszelTests.GetHubWithUser(t)
-		defer hub.Cleanup()
+	hub, user1 := beszelTests.GetHubWithUser(t)
+	defer hub.Cleanup()
 
+	synctest.Test(t, func(t *testing.T) {
+		defer hub.StopBackgroundTasks()
 		setStatusAlertEmail(t, hub, user1.Id, "user1@example.com")
 
 		user2, err := beszelTests.CreateUser(hub, "user2@example.com", "password")
@@ -423,10 +426,11 @@ func TestStatusAlertMultipleUsersRespectDifferentMinutes(t *testing.T) {
 }
 
 func TestStatusAlertMultipleUsersRecoveryBetweenMinutesOnlyAlertsEarlierUser(t *testing.T) {
-	synctest.Test(t, func(t *testing.T) {
-		hub, user1 := beszelTests.GetHubWithUser(t)
-		defer hub.Cleanup()
+	hub, user1 := beszelTests.GetHubWithUser(t)
+	defer hub.Cleanup()
 
+	synctest.Test(t, func(t *testing.T) {
+		defer hub.StopBackgroundTasks()
 		setStatusAlertEmail(t, hub, user1.Id, "user1@example.com")
 
 		user2, err := beszelTests.CreateUser(hub, "user2@example.com", "password")
@@ -816,10 +820,11 @@ func TestResolveStatusAlerts(t *testing.T) {
 }
 
 func TestAlertsHistoryStatus(t *testing.T) {
-	synctest.Test(t, func(t *testing.T) {
-		hub, user := beszelTests.GetHubWithUser(t)
-		defer hub.Cleanup()
+	hub, user := beszelTests.GetHubWithUser(t)
+	defer hub.Cleanup()
 
+	synctest.Test(t, func(t *testing.T) {
+		defer hub.StopBackgroundTasks()
 		// Create a system
 		systems, err := beszelTests.CreateSystems(hub, 1, user.Id, "up")
 		assert.NoError(t, err)
@@ -882,10 +887,11 @@ func TestAlertsHistoryStatus(t *testing.T) {
 }
 
 func TestStatusAlertClearedBeforeSend(t *testing.T) {
-	synctest.Test(t, func(t *testing.T) {
-		hub, user := beszelTests.GetHubWithUser(t)
-		defer hub.Cleanup()
+	hub, user := beszelTests.GetHubWithUser(t)
+	defer hub.Cleanup()
 
+	synctest.Test(t, func(t *testing.T) {
+		defer hub.StopBackgroundTasks()
 		// Create a system
 		systems, err := beszelTests.CreateSystems(hub, 1, user.Id, "up")
 		assert.NoError(t, err)

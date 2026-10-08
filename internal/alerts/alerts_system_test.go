@@ -27,12 +27,10 @@ func createCombinedData[T any](value T, setValue systemAlertValueSetter[T]) *sys
 	return &data
 }
 
-func newSystemAlertTestFixture(t *testing.T, alertName string, min int, threshold float64) *systemAlertTestFixture {
+func newSystemAlertTestFixture(t *testing.T, hub *beszelTests.TestHub, userID, alertName string, min int, threshold float64) *systemAlertTestFixture {
 	t.Helper()
 
-	hub, user := beszelTests.GetHubWithUser(t)
-
-	systems, err := beszelTests.CreateSystems(hub, 1, user.Id, "up")
+	systems, err := beszelTests.CreateSystems(hub, 1, userID, "up")
 	require.NoError(t, err)
 	systemRecord := systems[0]
 
@@ -41,7 +39,7 @@ func newSystemAlertTestFixture(t *testing.T, alertName string, min int, threshol
 	require.NotNil(t, sysManagerSystem)
 	sysManagerSystem.StopUpdater()
 
-	userSettings, err := hub.FindFirstRecordByFilter("user_settings", "user={:user}", map[string]any{"user": user.Id})
+	userSettings, err := hub.FindFirstRecordByFilter("user_settings", "user={:user}", map[string]any{"user": userID})
 	require.NoError(t, err)
 	userSettings.Set("settings", `{"emails":["test@example.com"],"webhooks":[]}`)
 	require.NoError(t, hub.Save(userSettings))
@@ -49,7 +47,7 @@ func newSystemAlertTestFixture(t *testing.T, alertName string, min int, threshol
 	alertRecord, err := beszelTests.CreateRecord(hub, "alerts", map[string]any{
 		"name":   alertName,
 		"system": systemRecord.Id,
-		"user":   user.Id,
+		"user":   userID,
 		"min":    min,
 		"value":  threshold,
 	})
@@ -69,10 +67,6 @@ func newSystemAlertTestFixture(t *testing.T, alertName string, min int, threshol
 			return err
 		},
 	}
-}
-
-func (fixture *systemAlertTestFixture) cleanup() {
-	fixture.hub.Cleanup()
 }
 
 func submitValue[T any](fixture *systemAlertTestFixture, t *testing.T, value T, setValue systemAlertValueSetter[T]) {
@@ -95,10 +89,12 @@ func waitForSystemAlert(d time.Duration) {
 
 func testOneMinuteSystemAlert[T any](t *testing.T, alertName string, threshold float64, setValue systemAlertValueSetter[T], triggerValue, resolveValue T) {
 	t.Helper()
+	hub, user := beszelTests.GetHubWithUser(t)
+	defer hub.Cleanup()
 
 	synctest.Test(t, func(t *testing.T) {
-		fixture := newSystemAlertTestFixture(t, alertName, 1, threshold)
-		defer fixture.cleanup()
+		defer hub.StopBackgroundTasks()
+		fixture := newSystemAlertTestFixture(t, hub, user.Id, alertName, 1, threshold)
 
 		submitValue(fixture, t, triggerValue, setValue)
 		waitForSystemAlert(time.Second)
@@ -118,10 +114,12 @@ func testOneMinuteSystemAlert[T any](t *testing.T, alertName string, threshold f
 
 func testMultiMinuteSystemAlert[T any](t *testing.T, alertName string, threshold float64, min int, setValue systemAlertValueSetter[T], baselineValue, triggerValue, resolveValue T) {
 	t.Helper()
+	hub, user := beszelTests.GetHubWithUser(t)
+	defer hub.Cleanup()
 
 	synctest.Test(t, func(t *testing.T) {
-		fixture := newSystemAlertTestFixture(t, alertName, min, threshold)
-		defer fixture.cleanup()
+		defer hub.StopBackgroundTasks()
+		fixture := newSystemAlertTestFixture(t, hub, user.Id, alertName, min, threshold)
 
 		submitValue(fixture, t, baselineValue, setValue)
 		waitForSystemAlert(time.Minute + time.Second)

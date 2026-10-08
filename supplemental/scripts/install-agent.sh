@@ -1,7 +1,7 @@
 #!/bin/sh
 
 PRODUCT_NAME="Beszel Plus"
-PRODUCT_VERSION="0.3.3"
+PRODUCT_VERSION="0.3.4"
 REPOSITORY="guzassis/beszel-plus"
 
 is_alpine() {
@@ -2005,9 +2005,11 @@ NoNewPrivileges=yes
 PrivateTmp=yes
 ProtectHome=yes
 ProtectKernelTunables=yes
-ProtectKernelModules=yes
+# Package triggers need module files to rebuild initramfs. Deny loading instead.
+CapabilityBoundingSet=~CAP_SYS_MODULE
+SystemCallFilter=~@module
 ProtectControlGroups=yes
-RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6
+RestrictAddressFamilies=AF_UNIX AF_INET AF_INET6 AF_NETLINK
 RestrictNamespaces=yes
 LockPersonality=yes
 MemoryDenyWriteExecute=yes

@@ -47,8 +47,8 @@ func TestMaintenanceManagerRefusesRequestsDuringUpgradeDrain(t *testing.T) {
 func TestHelperCompatibilityMatchesBuiltAgentVersion(t *testing.T) {
 	version := beszel.PlusVersion
 	switch {
-	case version == "0.3.3-dev", version == "0.3.3":
-	case strings.HasPrefix(version, "0.3.3-snapshot.") && len(strings.TrimPrefix(version, "0.3.3-snapshot.")) == 40:
+	case version == "0.3.4-dev", version == "0.3.4":
+	case strings.HasPrefix(version, "0.3.4-snapshot.") && len(strings.TrimPrefix(version, "0.3.4-snapshot.")) == 40:
 	default:
 		t.Fatalf("unexpected Agent build version %q; run this test with the dev, snapshot or release build version", version)
 	}
