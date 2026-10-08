@@ -56,14 +56,18 @@ func TestHelperUnitsRetainAPTSandboxCapabilityWithoutElevatingAgent(t *testing.T
 	for key, expected := range map[string]string{
 		"User": "root", "Group": "root", "AmbientCapabilities": "CAP_SETUID",
 		"NoNewPrivileges": "yes", "PrivateTmp": "yes", "ProtectHome": "yes",
-		"ProtectKernelTunables": "yes", "ProtectKernelModules": "yes", "ProtectControlGroups": "yes",
-		"RestrictAddressFamilies": "AF_UNIX AF_INET AF_INET6", "RestrictNamespaces": "yes",
+		"ProtectKernelTunables": "yes", "ProtectControlGroups": "yes",
+		"CapabilityBoundingSet": "~CAP_SYS_MODULE", "SystemCallFilter": "~@module",
+		"RestrictAddressFamilies": "AF_UNIX AF_INET AF_INET6 AF_NETLINK", "RestrictNamespaces": "yes",
 		"LockPersonality": "yes", "MemoryDenyWriteExecute": "yes",
 		"TimeoutStartSec": "infinity", "KillMode": "process",
 	} {
 		if shipped[key] != expected {
 			t.Errorf("helper %s=%q; expected %q", key, shipped[key], expected)
 		}
+	}
+	if shipped["ProtectKernelModules"] != "" {
+		t.Fatal("kernel package triggers must be able to read and install module files")
 	}
 	data, err := os.ReadFile("../../supplemental/scripts/install-agent.sh")
 	if err != nil {

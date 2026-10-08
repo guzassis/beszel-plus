@@ -339,6 +339,9 @@ func (h *Helper) executeUpdateCycle(ctx context.Context, req entity.Request) ent
 	cycle.InitialCounts = &before.Counts
 	cycle.Verified = false
 	cycle.VerificationMessage = "pre-install inventory is complete"
+	if !before.Valid {
+		cycle.VerificationMessage = "pre-install inventory contains unknown eligibility; completion requires a complete post-install inventory"
+	}
 	cycle.UpdatedAt = ptrTime(h.Now().UTC())
 	if err := h.writeCycleStore(store); err != nil {
 		return failureFor(req, &operationError{code: "cycle_state_write_failed", stage: "cycle_inventory", message: err.Error()})
@@ -347,10 +350,17 @@ func (h *Helper) executeUpdateCycle(ctx context.Context, req entity.Request) ent
 		if err := h.cycleSetStage(&store, entity.CycleStageInstall); err != nil {
 			return failureFor(req, &operationError{code: "cycle_state_write_failed", stage: "cycle_install", message: err.Error()})
 		}
+		logs := h.installLogCursors()
 		_, installTimedOut, installErr := h.cycleCommand(ctx, &store, 2*time.Hour, string(entity.CycleStageInstall), "unattended-upgrade", "--verbose")
 		if installErr != nil {
-			return h.cycleFailure(req, store, h.classifyCycleCommandFailure("unattended-upgrade", entity.CycleStageInstall, installErr))
+			cause := h.classifyCycleCommandFailure("unattended-upgrade", entity.CycleStageInstall, installErr)
+			if summary := installFailureSummary(logs); summary != "" {
+				cause.message = "unattended-upgrade failed: " + summary
+			}
+			closeInstallLogs(logs)
+			return h.cycleFailure(req, store, cause)
 		}
+		closeInstallLogs(logs)
 		if installTimedOut {
 			cycle.TimeoutObserved = true
 			cycle.VerificationMessage = "install exceeded its client deadline; subprocess exited and the cycle was reconciled"

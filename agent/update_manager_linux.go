@@ -505,6 +505,7 @@ func parseLatestAptHistory(data []byte, maxPackages int) (*time.Time, []string, 
 		var when *time.Time
 		var packages []string
 		source := "manual"
+		dryRun := false
 		for line := range strings.Lines(blocks[i]) {
 			line = strings.TrimSpace(line)
 			if value, ok := strings.CutPrefix(line, "Start-Date:"); ok {
@@ -526,15 +527,48 @@ func parseLatestAptHistory(data []byte, maxPackages int) (*time.Time, []string, 
 					}
 				}
 			}
-			if value, ok := strings.CutPrefix(line, "Commandline:"); ok && strings.Contains(value, "unattended-upgrade") {
-				source = "automatic"
+			if value, ok := strings.CutPrefix(line, "Commandline:"); ok {
+				command, args := aptHistoryCommandline(strings.TrimSpace(value))
+				if command == "unattended-upgrade" {
+					source = "automatic"
+					if hasAptHistoryFlag(args, "--dry-run") {
+						dryRun = true
+					}
+				}
+				if (command == "apt" || command == "apt-get") && hasAptHistoryFlag(args, "-s", "--simulate", "--just-print", "--dry-run") {
+					dryRun = true
+				}
 			}
 		}
-		if when != nil && len(packages) > 0 {
+		if !dryRun && when != nil && len(packages) > 0 {
 			return when, readPackageLines([]byte(strings.Join(packages, "\n")), maxPackages), source
 		}
 	}
 	return nil, nil, ""
+}
+
+func aptHistoryCommandline(value string) (string, []string) {
+	fields := strings.Fields(value)
+	if len(fields) == 0 {
+		return "", nil
+	}
+	command := filepath.Base(strings.Trim(fields[0], "\"'"))
+	args := make([]string, 0, len(fields)-1)
+	for _, field := range fields[1:] {
+		args = append(args, strings.Trim(field, "\"'"))
+	}
+	return command, args
+}
+
+func hasAptHistoryFlag(args []string, flags ...string) bool {
+	for _, arg := range args {
+		for _, flag := range flags {
+			if arg == flag {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 func appendUnique(values []string, value string) []string {

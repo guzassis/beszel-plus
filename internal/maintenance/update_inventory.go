@@ -199,7 +199,7 @@ func candidateAllowed(pkg inventoryPackage, policy entity.Policy, release string
 
 func inventoryOriginIncomplete(origins []inventoryOrigin) bool {
 	for _, origin := range origins {
-		if origin.Origin == "" || origin.Label == "" || origin.Codename == "" || origin.Archive == "" || origin.Site == "" {
+		if origin.Origin == "" || origin.Label == "" || origin.Codename == "" || origin.Site == "" {
 			return true
 		}
 	}
