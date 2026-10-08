@@ -58,6 +58,11 @@ jobs:
           BESZEL_TEST_SYSTEMD: "1"
         run: go test -tags=testing -run '^TestSystemdMaintenanceSandbox' -count=1 -v ./internal/maintenance
 
+      - name: Verify previous PocketBase database upgrade
+        env:
+          BESZEL_TEST_PB_UPGRADE: "1"
+        run: go test -tags=testing -run '^TestPocketBaseUpgradePreservesRecordsAndIndexes$' -count=1 -v ./internal/tests
+
       - name: Determine and validate release identity
         id: identity
         shell: bash

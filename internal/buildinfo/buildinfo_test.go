@@ -141,6 +141,8 @@ func TestReleaseMatrixIsNativeLinuxOnly(t *testing.T) {
 		"Verify APT sandbox and real initramfs package installation",
 		"-run '^TestSystemdMaintenanceSandbox'",
 		`BESZEL_TEST_SYSTEMD: "1"`,
+		"Verify previous PocketBase database upgrade",
+		`BESZEL_TEST_PB_UPGRADE: "1"`,
 	} {
 		if !strings.Contains(workflow, marker) {
 			t.Errorf("release workflow is missing %q", marker)

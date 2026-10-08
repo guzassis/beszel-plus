@@ -116,9 +116,15 @@ func ClearCollection(t testing.TB, app core.App, collectionName string) error {
 }
 
 func (h *TestHub) Cleanup() {
+	h.StopBackgroundTasks()
+	h.TestApp.Cleanup()
+}
+
+// StopBackgroundTasks drains Hub timers/updaters inside synctest, while the
+// PocketBase watcher created outside the bubble is closed by Cleanup afterward.
+func (h *TestHub) StopBackgroundTasks() {
 	h.AlertManager.Stop()
 	h.GetSystemManager().RemoveAllSystems()
-	h.TestApp.Cleanup()
 }
 
 func CreateSystems(app core.App, count int, userId string, status string) ([]*core.Record, error) {
